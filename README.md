@@ -20,7 +20,7 @@ LastTimeFetched     // Last time the tool could retrieve the content
 NonFetchableDates   // List of dates where we couldn't retrieve the content
 ```
 
-The tool will fill the `content metadata` DB in the first retrieval of the CID, and it will keep pinging the CID every hour and updating the DB with a positive or negative attempt. 
+The tool will fill the `content metadata` DB in the first retrieval of the CID conten, and it will keep pinging it every hour updating the DB with a positive or negative attempt. 
 The first experiment will run for a few days to test the tool's performance. After all the checks are successful, we could already move to stage 2 :) 
 
 ## 2. Cli CID Discovery Improvement (v2.0.0)
