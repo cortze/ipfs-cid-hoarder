@@ -1,3 +1,4 @@
+
 # IPFS-CID-hoarder
 
 An IPFS CID "crawler" that monitors the shared content in the IPFS Network. The tool will serve as the data-gathering part to study and measure [Protocol Labs's RFM 1](https://github.com/protocol/network-measurements/blob/master/RFMs.md#rfm-1--liveness-of-a-document-in-the-ipfs-network) (Liveness of a document in the IPFS Network).
@@ -20,7 +21,7 @@ LastTimeFetched     // Last time the tool could retrieve the content
 NonFetchableDates   // List of dates where we couldn't retrieve the content
 ```
 
-The tool will fill the `content metadata` DB in the first retrieval of the CID conten, and it will keep pinging it every hour updating the DB with a positive or negative attempt. 
+The tool will fill the `content metadata` DB in the first retrieval of the CID content. Afterward, it will keep pinging it every hour, updating the DB with a positive or negative attempt. 
 The first experiment will run for a few days to test the tool's performance. After all the checks are successful, we could already move to stage 2 :) 
 
 ## 2. Cli CID Discovery Improvement (v2.0.0)
