@@ -1,5 +1,5 @@
 # dismiss binaries
-hoarder
+./build/
 
 # dismiss data folder including the databases
 data/*
