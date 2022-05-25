@@ -1,0 +1,136 @@
+package cmd
+
+import (
+	"net/http"
+	_ "net/http/pprof"
+
+	"github.com/migalabs/armiarma/src/utils"
+	"github.com/pkg/errors"
+
+	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
+	"github.com/cortze/ipfs-cid-hoarder/pkg/hoarder"
+
+	"github.com/sirupsen/logrus"
+	cli "github.com/urfave/cli/v2"
+)
+
+var CmdName = "Run CMD"
+var log = logrus.WithField(
+	"Run Cmd", CmdName,
+)
+
+var RunCmd = &cli.Command{
+	Name:   "run",
+	Usage:  "starts requesting CIDs from the IPFS network from the given source",
+	Action: RunHoarder,
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:        "log-level",
+			Usage:       "verbosity of the logs that will be displayed [debug,warn,info,error]",
+			EnvVars:     []string{"IPFS_CID_HOARDER_LOGLEVEL"},
+			DefaultText: "info",
+			Value:       config.DefaultConfig.LogLevel,
+		},
+		&cli.StringFlag{
+			Name:    "priv-key",
+			Usage:   "Private key to initialize the host (to avoid generating node churn in the network)",
+			EnvVars: []string{"IPFS_CID_HOARDER_PRIV_KEY"},
+		},
+		&cli.StringFlag{
+			Name:        "database-endpoint",
+			Usage:       "database enpoint (e.g. postgresql://user:password@localhost:5432/database)",
+			EnvVars:     []string{"IPFS_CID_HOARDER_DATABASE_ENDPOINT"},
+			DefaultText: "postgres://cid_hoarder:password@127.0.0.1:5432/cid_hoarder",
+			Value:       config.DefaultConfig.Database,
+		},
+		&cli.StringFlag{
+			Name:        "cid-source",
+			Usage:       "defines the mode where we want to run the tool [random-content-gen, text-file, bitswap]",
+			DefaultText: "text",
+			Value:       config.DefaultConfig.CidSource,
+		},
+		&cli.StringFlag{
+			Name:        "cid-file",
+			Usage:       "link to the file containing the files to track (txt/json files)",
+			EnvVars:     []string{"IPFS_CID_HOARDER_CID_FILE"},
+			DefaultText: "cids/test.txt",
+			Value:       config.DefaultConfig.CidFile,
+		},
+		&cli.IntFlag{
+			Name:        "cid-content-size",
+			Usage:       "size in KB of the random block generated",
+			EnvVars:     []string{"IPFS_CID_HOARDER_CID_CONTENT_SIZE"},
+			DefaultText: "1MB",
+			Value:       config.DefaultConfig.CidContentSize,
+		},
+		&cli.IntFlag{
+			Name:        "cid-number",
+			Usage:       "number of CIDs that will be generated for the study",
+			EnvVars:     []string{"IPFS_CID_HOARDER_CID_NUMBER"},
+			DefaultText: "1000 CIDs",
+			Value:       config.DefaultConfig.CidNumber,
+		},
+		&cli.IntFlag{
+			Name:        "batch-size",
+			Usage:       "max number of CIDs on each of the generation batch",
+			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
+			DefaultText: "250 CIDs",
+			Value:       config.DefaultConfig.BatchSize,
+		},
+		&cli.IntFlag{
+			Name:        "req-interval",
+			Usage:       "delay in minutes in between PRHolders pings for each CID",
+			EnvVars:     []string{"IPFS_CID_HOARDER_REQ_INTERVAL"},
+			DefaultText: "250 CIDs",
+			Value:       config.DefaultConfig.ReqInterval,
+		},
+		&cli.IntFlag{
+			Name:        "k",
+			Usage:       "number of peers that we want to forward the Provider Records",
+			EnvVars:     []string{"IPFS_CID_HOARDER_K"},
+			DefaultText: "K=20",
+			Value:       config.DefaultConfig.CidNumber,
+		},
+	},
+}
+
+func RunHoarder(ctx *cli.Context) error {
+	// here goes all the magic
+
+	// generate config from the urfave/cli context
+	conf, err := config.NewConfig(ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate config from arguments")
+	}
+
+	// set the logs configurations
+	log.Logger.SetFormatter(utils.ParseLogFormatter("text"))
+	log.Logger.SetOutput(utils.ParseLogOutput("terminal"))
+	log.Logger.SetLevel(utils.ParseLogLevel(conf.LogLevel))
+
+	log.Debug("get configuration:", conf)
+
+	// expose the pprof and prometheus metrics
+	go func() {
+		pprofAddres := config.PprofIp + ":" + config.PprofPort
+		log.Debugf("initializing pprof in %s\n", pprofAddres)
+		err := http.ListenAndServe(pprofAddres, nil)
+		if err != nil {
+			log.Errorf("unable to initialize pprof at %s - error %s", pprofAddres, err.Error())
+		}
+	}()
+
+	// Initialize the CidHoarder
+	log.Info("Running Cid-Hoarder on mode")
+	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
+	if err != nil {
+		log.Errorf("unable to initialize the CidHoarder - error %s", err.Error())
+	}
+	cidHoarder.Run()
+
+	// Not necessary for now, better to finish when the cidHoarder.Run(finishes)
+	// // wait until SIGTERM signal from urfave/cli
+	// <-ctx.Context.Done()
+
+	return nil
+}
