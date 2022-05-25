@@ -33,7 +33,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			cmd.GetCmd,
+			cmd.RunCmd,
 		},
 	}
 
