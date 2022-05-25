@@ -49,8 +49,10 @@ var KnownErrors = map[string]string{
 func ParseConError(err error) string {
 	// nested error casting to the swarm.DialError to process all the errors that might come
 	connErr, ok := err.(*swarm.DialError)
-	if !ok && connErr.Cause != nil {
-		return ParseConError(connErr.Cause)
+	if !ok && connErr != nil {
+		if connErr.Cause != nil {
+			return ParseConError(connErr.Cause)
+		}
 	}
 
 	// check if the connError is one of the ones that we have identified
