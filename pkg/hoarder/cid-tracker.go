@@ -34,24 +34,22 @@ type CidTracker struct {
 	CidNumber     int
 	BatchSize     int
 	ReqInterval   int
-	CidMap        map[string]*models.CidInfo
-	CidFetcherMap map[string]*CidFetcher
+	CidMap        sync.Map
+	CidFetcherMap sync.Map
 }
 
 func NewCidTracker(ctx context.Context, h *p2p.Host, db *db.DBClient, cidSource CidSource, k, cidNum, batchSize, reqInterval int) (*CidTracker, error) {
 
 	return &CidTracker{
-		ctx:           ctx,
-		host:          h,
-		DBCli:         db,
-		MsgNot:        h.GetMsgNotifier(),
-		CidSource:     cidSource,
-		K:             k,
-		CidNumber:     cidNum,
-		ReqInterval:   reqInterval,
-		BatchSize:     batchSize,
-		CidMap:        make(map[string]*models.CidInfo, 0),
-		CidFetcherMap: make(map[string]*CidFetcher, 0),
+		ctx:         ctx,
+		host:        h,
+		DBCli:       db,
+		MsgNot:      h.GetMsgNotifier(),
+		CidSource:   cidSource,
+		K:           k,
+		CidNumber:   cidNum,
+		ReqInterval: reqInterval,
+		BatchSize:   batchSize,
 	}, nil
 }
 
@@ -86,7 +84,7 @@ func (t *CidTracker) trackRandomCids() {
 	msgNotC := t.MsgNot.GetNotChan()
 
 	// generate first round of CidFetch results (to keep track of which peers got the PR)
-	firstCidFetchRes := make(map[string]*models.CidFetchResults, 0)
+	var firstCidFetchRes sync.Map
 
 	// TODO: make here the batching of the CID (making the following code a method of the CidTracker)
 	var wg sync.WaitGroup
@@ -130,7 +128,8 @@ func (t *CidTracker) trackRandomCids() {
 						connError)
 
 					// add the ping result
-					cidFetRes, ok := firstCidFetchRes[c.Hash().B58String()]
+					val, ok := firstCidFetchRes.Load(c.Hash().B58String())
+					cidFetRes := val.(*models.CidFetchResults)
 					if !ok {
 						log.Errorf("CidFetcher not ready for cid %s", c.Hash().B58String())
 					} else {
@@ -148,7 +147,8 @@ func (t *CidTracker) trackRandomCids() {
 					)
 
 					// add PRHolder to the CidInfo
-					cidInfo, ok := t.CidMap[c.Hash().B58String()]
+					val, ok = t.CidMap.Load(c.Hash().B58String())
+					cidInfo := val.(*models.CidInfo)
 					if !ok {
 						log.Warnf("unable to find CidInfo on CidMap for Cid %s", c.Hash().B58String())
 					} else {
@@ -197,14 +197,13 @@ func (t *CidTracker) trackRandomCids() {
 	log.Infof("generating %d random Cids", t.CidNumber)
 	for batch := 1; batch <= totBatches; batch++ {
 		//
-		batchCids := make(map[string]*models.CidInfo)
-
+		var batchCids sync.Map
 		var cidGenWg sync.WaitGroup
 
 		for i := totCid; i <= t.CidNumber && i <= (t.BatchSize*batch); i++ {
 			// TODO: parallelize this for performance improvement
 			cidGenWg.Add(1)
-			go func(genWg *sync.WaitGroup, t *CidTracker, cidFetchRes map[string]*models.CidFetchResults) { // TODO: might bring up race conditions accessing the CidMap and the FetcherMap
+			go func(genWg *sync.WaitGroup, t *CidTracker, cidFetchRes *sync.Map) { // TODO: might bring up race conditions accessing the CidMap and the FetcherMap
 				defer cidGenWg.Done()
 				_, contID, err := t.CidSource.GetNewCid()
 				if err != nil {
@@ -215,16 +214,16 @@ func (t *CidTracker) trackRandomCids() {
 				cidInfo := models.NewCidInfo(contID, time.Duration(t.ReqInterval)*time.Minute, config.RandomContent, config.RandomSource, t.host.ID())
 
 				// generate the cidFecher
-				t.CidMap[contID.Hash().B58String()] = cidInfo
-				batchCids[contID.Hash().B58String()] = cidInfo
+				t.CidMap.Store(contID.Hash().B58String(), cidInfo)
+				batchCids.Store(contID.Hash().B58String(), cidInfo)
 
 				// generate a new CidFetchResults
 				fetchRes := models.NewCidFetchResults(contID, 0) // first round of the
-				cidFetchRes[contID.Hash().B58String()] = fetchRes
+				cidFetchRes.Store(contID.Hash().B58String(), fetchRes)
 
 				// TODO: harcoded the 5 iterations
 				cidFetcher := NewCidFetcher(t.ctx, &fetchWg, t.host, t.DBCli, cidInfo, time.Duration(time.Duration(t.ReqInterval)*time.Minute), rounds)
-				t.CidFetcherMap[contID.Hash().B58String()] = cidFetcher
+				t.CidFetcherMap.Store(contID.Hash().B58String(), cidFetcher)
 
 				tstart := time.Now()
 				err = t.host.DHT.Provide(t.ctx, contID, true)
@@ -235,7 +234,7 @@ func (t *CidTracker) trackRandomCids() {
 
 				// add the request time to the CidInfo
 				cidInfo.AddReqTimeInterval(reqTime)
-			}(&cidGenWg, t, firstCidFetchRes)
+			}(&cidGenWg, t, &firstCidFetchRes)
 
 			totCid++
 		}
@@ -247,9 +246,13 @@ func (t *CidTracker) trackRandomCids() {
 		time.Sleep(1 * time.Second)
 
 		// Important - Add the first round of PRHolder pings into the CidInfo
-		for c, cidFetchRes := range firstCidFetchRes {
+		firstCidFetchRes.Range(func(key, value interface{}) bool {
+			c := key.(string)
+			cidFetchRes := value.(*models.CidFetchResults)
+
 			// add the first round of FetchResults to the CidMap
-			cidInfo, ok := t.CidMap[c]
+			val, ok := t.CidMap.Load(c)
+			cidInfo := val.(*models.CidInfo)
 			if !ok {
 				log.Warnf("no Cid %s on CidMap", c)
 			}
@@ -280,18 +283,19 @@ func (t *CidTracker) trackRandomCids() {
 			// ----- End of the persist into DB -------
 
 			// reset the firstCidFetchRes map for the next batch
-			delete(firstCidFetchRes, c)
-		}
+			firstCidFetchRes.Delete(c)
+			return true
+		})
 
 		// generate the CIDFetchers for each of the CIDs
-		log.Infof("launching the CID fetchers for %d CIDs", len(batchCids))
-
-		for c, cidInfo := range batchCids {
+		batchCids.Range(func(key, value interface{}) bool {
+			c := key.(string)
+			cidInfo := value.(*models.CidInfo)
 
 			// get the first PRPingResults
 			if cidInfo.GetFetchResultsLen() == 0 {
 				log.Warnf("unable to find CidInfo for Cid %s", c)
-				continue
+				return true
 			}
 			// Calculate success ratio on adding PR into PRHolders
 			tot, success, failed := cidInfo.GetFetchResultSummaryOfRound(0)
@@ -308,14 +312,17 @@ func (t *CidTracker) trackRandomCids() {
 			}
 
 			// create and launch the fetcher for the given CID
-			fetcher, ok := t.CidFetcherMap[cidInfo.CID.Hash().B58String()]
+			val, ok := t.CidFetcherMap.Load(cidInfo.CID.Hash().B58String())
+			fetcher := val.(*CidFetcher)
 			if !ok {
 				log.Warnf("no fetcher for the Cid %s was initialized", cidInfo.CID.Hash().B58String())
 			}
 
 			fetchWg.Add(1)
 			go fetcher.Run()
-		}
+
+			return true
+		})
 
 		log.Infof("batch %d of %d Cids done!", batch, t.BatchSize)
 		// wait untill the ticker raises to launch the next batch
