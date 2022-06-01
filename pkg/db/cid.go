@@ -9,6 +9,7 @@ import (
 )
 
 func (db *DBClient) CreateCidInfoTable() error {
+
 	log.Debugf("creating table 'cid_info' for SQLite3 DB")
 
 	stmt, err := db.sqlCli.Prepare(`CREATE TABLE IF NOT EXISTS cid_info(
@@ -33,6 +34,7 @@ func (db *DBClient) CreateCidInfoTable() error {
 }
 
 func (db *DBClient) AddNewCidInfo(cidInfo *models.CidInfo) (err error) {
+
 	log.WithFields(log.Fields{
 		"cid": cidInfo.CID.Hash().B58String(),
 	}).Trace("adding new cid info to DB")
@@ -68,6 +70,7 @@ func (db *DBClient) AddNewCidInfo(cidInfo *models.CidInfo) (err error) {
 
 // insertCidInfo adds new
 func (db *DBClient) insertCidInfo(tx *sql.Tx, cidInfo *models.CidInfo) error {
+
 	// insert the cidInfo
 	_, err := tx.Exec(`INSERT INTO cid_info (
 			cid_hash,
@@ -96,6 +99,7 @@ func (db *DBClient) insertCidInfo(tx *sql.Tx, cidInfo *models.CidInfo) error {
 }
 
 func (db *DBClient) GetIdOfCid(cidStr string) (id int, err error) {
+
 	row := db.sqlCli.QueryRow(`SELECT id FROM cid_info WHERE cid_hash=$1;`, cidStr)
 	err = row.Scan(&id)
 	if err != nil {

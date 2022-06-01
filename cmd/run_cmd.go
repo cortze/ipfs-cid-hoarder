@@ -38,9 +38,9 @@ var RunCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:        "database-endpoint",
-			Usage:       "database enpoint (e.g. postgresql://user:password@localhost:5432/database)",
+			Usage:       "database enpoint (e.g. /Path/to/sqlite3.db)",
 			EnvVars:     []string{"IPFS_CID_HOARDER_DATABASE_ENDPOINT"},
-			DefaultText: "postgres://cid_hoarder:password@127.0.0.1:5432/cid_hoarder",
+			DefaultText: "./data/ipfs-hoarder-db.db",
 			Value:       config.DefaultConfig.Database,
 		},
 		&cli.StringFlag{
@@ -77,12 +77,19 @@ var RunCmd = &cli.Command{
 			DefaultText: "250 CIDs",
 			Value:       config.DefaultConfig.BatchSize,
 		},
-		&cli.IntFlag{
+		&cli.StringFlag{
 			Name:        "req-interval",
-			Usage:       "delay in minutes in between PRHolders pings for each CID",
+			Usage:       "delay in minutes in between PRHolders pings for each CID (example '30m' - '1h' - '60s')",
 			EnvVars:     []string{"IPFS_CID_HOARDER_REQ_INTERVAL"},
-			DefaultText: "250 CIDs",
+			DefaultText: "30m",
 			Value:       config.DefaultConfig.ReqInterval,
+		},
+		&cli.StringFlag{
+			Name:        "study-duration",
+			Usage:       "max time for the study to run (example '24h', '35h', '48h')",
+			EnvVars:     []string{"IPFS_CID_HOARDER_STUDY_DURATION"},
+			DefaultText: "48h",
+			Value:       config.DefaultConfig.StudyDuration,
 		},
 		&cli.IntFlag{
 			Name:        "k",

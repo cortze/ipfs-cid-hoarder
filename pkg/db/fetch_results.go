@@ -7,6 +7,7 @@ import (
 )
 
 func (db *DBClient) CreateFetchResultsTable() error {
+
 	log.Debugf("creating table 'fetch_results' for SQLite3 DB")
 
 	stmt, err := db.sqlCli.Prepare(`CREATE TABLE IF NOT EXISTS fetch_results(
@@ -31,6 +32,7 @@ func (db *DBClient) CreateFetchResultsTable() error {
 }
 
 func (db *DBClient) AddFetchResults(fetchRes *models.CidFetchResults) (err error) {
+
 	log.WithFields(log.Fields{
 		"cid": fetchRes.Cid.Hash().B58String(),
 	}).Trace("adding fetch_results to DB")

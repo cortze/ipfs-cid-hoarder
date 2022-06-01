@@ -11,6 +11,7 @@ import (
 )
 
 func (db *DBClient) CreatePeerInfoTable() error {
+
 	log.Debugf("creating table 'peer_info' for SQLite3 DB")
 
 	// TODO: missing multiaddrs
@@ -35,6 +36,7 @@ func (db *DBClient) CreatePeerInfoTable() error {
 }
 
 func (db *DBClient) AddNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []*models.PeerInfo) (err error) {
+
 	log.WithFields(log.Fields{
 		"cid": c.Hash().B58String(),
 	}).Trace("adding set of peer infos to DB")
@@ -95,6 +97,7 @@ func (db *DBClient) AddNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []
 }
 
 func (db *DBClient) AddNewPeerInfo(c *cid.Cid, pInfo *models.PeerInfo) (err error) {
+
 	log.WithFields(log.Fields{
 		"cid": c.Hash().B58String(),
 	}).Trace("adding new peer info to DB")

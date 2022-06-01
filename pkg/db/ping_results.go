@@ -7,6 +7,7 @@ import (
 )
 
 func (db *DBClient) CreatePingResultsTable() error {
+
 	log.Debugf("creating table 'ping_results' for SQLite3 DB")
 
 	stmt, err := db.sqlCli.Prepare(`CREATE TABLE IF NOT EXISTS ping_results(
@@ -32,6 +33,12 @@ func (db *DBClient) CreatePingResultsTable() error {
 }
 
 func (db *DBClient) AddPingResultsSet(pingRes []*models.PRPingResults) (err error) {
+	// first thing to do is to request the id of the CID
+	contId, err := db.GetIdOfCid(pingRes[0].Cid.Hash().B58String())
+	if err != nil {
+		return err
+	}
+
 	if len(pingRes) <= 0 {
 		return errors.New("unable to insert ping result set - no ping_results set given")
 	}
@@ -69,11 +76,6 @@ func (db *DBClient) AddPingResultsSet(pingRes []*models.PRPingResults) (err erro
 	VALUES ($1, $2, $3, $4, $5, $6, $7)`)
 	if err != nil {
 		return errors.Wrap(err, "unable to prepare insert query for ping_results at SQLite3 DB ")
-	}
-
-	contId, err := db.GetIdOfCid(pingRes[0].Cid.Hash().B58String())
-	if err != nil {
-		return err
 	}
 
 	// insert each of the Peers holding the PR

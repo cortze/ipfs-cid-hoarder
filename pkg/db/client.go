@@ -14,7 +14,7 @@ import (
 
 type DBClient struct {
 	ctx context.Context
-	m   sync.RWMutex // is it necessary?
+	m   sync.RWMutex
 
 	dbPath string
 	sqlCli *sql.DB
@@ -57,8 +57,6 @@ func NewDBClient(ctx context.Context, dbPath string) (*DBClient, error) {
 }
 
 func (db *DBClient) Close() {
-	// db.m.Lock()
-	// defer db.m.Unlock()
 
 	log.Info("closing SQLite3 DB for the CID Hoarder")
 	db.sqlCli.Close()
