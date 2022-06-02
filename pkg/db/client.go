@@ -56,6 +56,12 @@ func NewDBClient(ctx context.Context, dbPath string) (*DBClient, error) {
 	return dbCli, nil
 }
 
+func (db *DBClient) runPersisters() {
+
+	log.Info("closing SQLite3 DB for the CID Hoarder")
+	db.sqlCli.Close()
+}
+
 func (db *DBClient) Close() {
 
 	log.Info("closing SQLite3 DB for the CID Hoarder")

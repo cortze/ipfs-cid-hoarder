@@ -24,6 +24,8 @@ type CidInfo struct {
 	Creator       peer.ID // Peer hosting the content, so far only one (us)
 
 	ProvideTime time.Duration // time that took to publish the provider records
+	NextPing    time.Time
+	PingCounter int
 }
 
 func NewCidInfo(
@@ -44,11 +46,11 @@ func NewCidInfo(
 	}
 }
 
-func (c *CidInfo) AddReqTimeInterval(reqTime time.Duration) {
+func (c *CidInfo) AddProvideTime(reqTime time.Duration) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	c.ReqInterval = reqTime
+	c.ProvideTime = reqTime
 }
 
 func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
@@ -56,7 +58,6 @@ func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	defer c.m.Unlock()
 
 	c.PRHolders = append(c.PRHolders, prHolder)
-	c.ProvideTime = time.Since(c.GenTime)
 	c.K++
 }
 
@@ -65,6 +66,26 @@ func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	defer c.m.Unlock()
 
 	c.PRPingResults = append(c.PRPingResults, results)
+	// check if the CID is initialized or not
+	if c.NextPing == (time.Time{}) {
+		// Update the next ping time to gentime + providetime + req interval
+		c.NextPing = c.GenTime.Add(c.ProvideTime).Add(c.ReqInterval)
+	}
+}
+
+func (c *CidInfo) IncreasePingCounter() {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.PingCounter++
+	c.NextPing = c.NextPing.Add(c.ReqInterval)
+}
+
+func (c *CidInfo) GetPingCounter() int {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	return c.PingCounter
 }
 
 func (c *CidInfo) GetFetchResultsLen() int {

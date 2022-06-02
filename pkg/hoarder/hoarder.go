@@ -2,6 +2,8 @@ package hoarder
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/db"
@@ -14,10 +16,12 @@ import (
 
 type CidHoarder struct {
 	ctx context.Context
+	wg  *sync.WaitGroup
 
 	Host       *p2p.Host
 	DBCli      *db.DBClient
 	CidTracker *CidTracker
+	CidPinger  *CidPinger
 }
 
 func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error) {
@@ -56,9 +60,29 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
 	}
 
+	var studyWG sync.WaitGroup
+
+	reqInterval, err := time.ParseDuration(conf.ReqInterval)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing ReqInterval "+conf.ReqInterval)
+	}
+	studyDuration, err := time.ParseDuration(conf.StudyDuration)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing StudyDuration"+conf.StudyDuration)
+	}
+
+	log.Info("configured Hoarder to request at an interval of ", reqInterval, " and during ", studyDuration)
+
+	rounds := int(studyDuration/reqInterval) + 1
+
+	// ----- Generate the CidPinger -----
+	studyWG.Add(1)
+	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds)
+
 	// ----- Generate the CidTracker -----
 	cidSource := NewRandomCidGen(conf.CidContentSize)
-	cidTracker, err := NewCidTracker(ctx, h, db, cidSource, conf.K, conf.CidNumber, conf.BatchSize, conf.ReqInterval, conf.StudyDuration)
+	studyWG.Add(1)
+	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.BatchSize, reqInterval, studyDuration)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating the CidTracker")
 	}
@@ -67,9 +91,11 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	return &CidHoarder{
 		ctx:        ctx,
+		wg:         &studyWG,
 		Host:       h,
 		DBCli:      db,
 		CidTracker: cidTracker,
+		CidPinger:  cidPinger,
 	}, nil
 }
 
@@ -80,7 +106,12 @@ func (c *CidHoarder) Run() {
 		log.Errorf("unable to boostrap the host with the kdht routing table. %s", err.Error())
 	}
 	// Launch the Cid Tracker
-	c.CidTracker.Run()
+	go c.CidTracker.Run()
+	go c.CidPinger.Run()
+
+	c.wg.Wait()
+
+	log.Info("study finished! closing everything")
 
 	// after the CidTracker has already finished, close the DB
 	c.DBCli.Close()

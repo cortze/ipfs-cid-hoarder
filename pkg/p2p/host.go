@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,6 +42,10 @@ type Host struct {
 
 func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string) (*Host, error) {
 	log.Debug("generating random cid generator")
+
+	// set the max limit of connections to 30000
+	os.Setenv("LIBP2P_SWARM_FD_LIMIT", "30000")
+
 	// compose the multiaddress
 	mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", ip, port))
 	if err != nil {
