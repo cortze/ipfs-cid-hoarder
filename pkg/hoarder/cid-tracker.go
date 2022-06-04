@@ -230,6 +230,10 @@ func (t *CidTracker) newRandomCidTracker() {
 					}
 					reqTime := time.Since(tstart)
 
+					// TODO: fix this little wait to comput last PR Holder status
+					// little not channel for inside the CID to notify when k peers where recorded
+					time.Sleep(500 * time.Millisecond)
+
 					// the Cid has already being published to the network, we can already save it into the DB
 
 					// add the request time to the CidInfo

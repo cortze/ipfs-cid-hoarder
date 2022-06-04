@@ -16,7 +16,7 @@ import (
 )
 
 var DialTimeout = 20 * time.Second
-var pingers = 5
+var pingers = 25
 var minIterTime = 500 * time.Millisecond
 
 type CidPinger struct {

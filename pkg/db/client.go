@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const bufferSize = 10000
+const bufferSize = 20000
 const maxPersisters = 1
 
 type DBClient struct {
@@ -29,6 +29,8 @@ type DBClient struct {
 	peerInfoC    chan DBPeer // might be unnecesary because could be taken from CID info when writing
 	fetchResultC chan *models.CidFetchResults
 	pingResultsC chan []*models.PRPingResults
+
+	persistC chan interface{}
 
 	doneC chan struct{}
 }
@@ -62,6 +64,7 @@ func NewDBClient(ctx context.Context, dbPath string) (*DBClient, error) {
 		peerInfoC:    make(chan DBPeer, bufferSize),
 		fetchResultC: make(chan *models.CidFetchResults, bufferSize),
 		pingResultsC: make(chan []*models.PRPingResults, bufferSize),
+		persistC:     make(chan interface{}, bufferSize),
 		doneC:        make(chan struct{}),
 	}
 
@@ -92,74 +95,37 @@ func (db *DBClient) runPersisters() {
 			logEntry := log.WithField("persister", persisterID)
 			for {
 				select {
-				case cidInfo := <-db.cidInfoC:
-					logEntry.Debugf("persisting CID %s into DB", cidInfo.CID.Hash().B58String())
-					err := db.addCidInfo(cidInfo)
-					if err != nil {
-						logEntry.Error("error persisting CidInfo - " + err.Error())
+				case p := <-db.persistC:
+					switch p.(type) {
+					case (*models.CidInfo):
+						cidInfo := p.(*models.CidInfo)
+						logEntry.Debugf("persisting CID %s into DB", cidInfo.CID.Hash().B58String())
+						err := db.addCidInfo(cidInfo)
+						if err != nil {
+							logEntry.Error("error persisting CidInfo - " + err.Error())
+						}
+					case (DBPeer):
+						dbPeer := p.(DBPeer)
+						logEntry.Debugf("persisting peer %s into DB", dbPeer.Peer.ID.String())
+						err := db.addPeerInfo(dbPeer.Cid, dbPeer.Peer)
+						if err != nil {
+							logEntry.Error("error persisting PeerInfo - " + err.Error())
+						}
+					case (*models.CidFetchResults):
+						fetchRes := p.(*models.CidFetchResults)
+						logEntry.Debugf("persisting fetch info into DB")
+						err := db.addFetchResults(fetchRes)
+						if err != nil {
+							logEntry.Error("error persisting FetchResults - " + err.Error())
+						}
+					case ([]*models.PRPingResults):
+						pingRes := p.([]*models.PRPingResults)
+						logEntry.Debugf("persisting ping res into DB")
+						err := db.addPingResultsSet(pingRes)
+						if err != nil {
+							logEntry.Error("error persisting PingResults - " + err.Error())
+						}
 					}
-				case <-db.doneC:
-					logEntry.Info("finish detected, closing persister")
-					return
-
-				case <-db.ctx.Done():
-					logEntry.Info("shutdown detected, closing persister")
-					return
-				}
-			}
-		}(&persisterWG, persister)
-		go func(wg *sync.WaitGroup, persisterID int) {
-			defer wg.Done()
-			logEntry := log.WithField("persister", persisterID)
-			for {
-				select {
-				case p := <-db.peerInfoC:
-					logEntry.Debugf("persisting peer %s into DB", p.Peer.ID.String())
-					err := db.addPeerInfo(p.Cid, p.Peer)
-					if err != nil {
-						logEntry.Error("error persisting PeerInfo - " + err.Error())
-					}
-				case <-db.doneC:
-					logEntry.Info("finish detected, closing persister")
-					return
-
-				case <-db.ctx.Done():
-					logEntry.Info("shutdown detected, closing persister")
-					return
-				}
-			}
-		}(&persisterWG, persister)
-		go func(wg *sync.WaitGroup, persisterID int) {
-			defer wg.Done()
-			logEntry := log.WithField("persister", persisterID)
-			for {
-				select {
-				case fetchResults := <-db.fetchResultC:
-					err := db.addFetchResults(fetchResults)
-					if err != nil {
-						logEntry.Error("error persisting FetchResults - " + err.Error())
-					}
-				case <-db.doneC:
-					logEntry.Info("finish detected, closing persister")
-					return
-
-				case <-db.ctx.Done():
-					logEntry.Info("shutdown detected, closing persister")
-					return
-				}
-			}
-		}(&persisterWG, persister)
-		go func(wg *sync.WaitGroup, persisterID int) {
-			defer wg.Done()
-			logEntry := log.WithField("persister", persisterID)
-			for {
-				select {
-				case pingResults := <-db.pingResultsC:
-					err := db.addPingResultsSet(pingResults)
-					if err != nil {
-						logEntry.Error("error persisting PingResults - " + err.Error())
-					}
-
 				case <-db.doneC:
 					logEntry.Info("finish detected, closing persister")
 					return
@@ -178,19 +144,19 @@ func (db *DBClient) runPersisters() {
 }
 
 func (db *DBClient) AddCidInfo(c *models.CidInfo) {
-	db.cidInfoC <- c
+	db.persistC <- c
 }
 
 func (db *DBClient) AddPeerInfo(p DBPeer) {
-	db.peerInfoC <- p
+	db.persistC <- p
 }
 
 func (db *DBClient) AddFetchResult(f *models.CidFetchResults) {
-	db.fetchResultC <- f
+	db.persistC <- f
 }
 
 func (db *DBClient) AddPingResults(p []*models.PRPingResults) {
-	db.pingResultsC <- p
+	db.persistC <- p
 }
 
 func (db *DBClient) Close() {
@@ -205,6 +171,7 @@ func (db *DBClient) Close() {
 	close(db.peerInfoC)
 	close(db.fetchResultC)
 	close(db.pingResultsC)
+	close(db.persistC)
 
 	db.sqlCli.Close()
 }
