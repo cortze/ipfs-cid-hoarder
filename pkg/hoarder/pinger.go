@@ -91,7 +91,7 @@ func (p *CidPinger) Run() {
 					// check if the time for next ping has arrived
 					if time.Now().Sub(c.NextPing) < time.Duration(0) {
 						logEntry.Debugf("not in time to ping %s", cStr)
-						continue
+						break
 					}
 
 					// Add the CID to the pingTaskC
@@ -165,15 +165,8 @@ func (p *CidPinger) Run() {
 					wg.Wait()
 
 					// add the fetch results to the array and persist it in the DB
-					c.AddPRFetchResults(cidFetchRes)
-					err := p.dbCli.AddFetchResults(cidFetchRes)
-					if err != nil {
-						log.Fatalln("unable to persist to DB new fetch_results", err)
-					}
-					err = p.dbCli.AddPingResultsSet(cidFetchRes.PRPingResults)
-					if err != nil {
-						log.Fatalln("unable to persist to DB new ping_results", err)
-					}
+					p.dbCli.AddFetchResult(cidFetchRes)
+					p.dbCli.AddPingResults(cidFetchRes.PRPingResults)
 
 				case <-p.ctx.Done():
 					logEntry.Info("shutdown detected, closing pinger")

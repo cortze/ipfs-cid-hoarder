@@ -12,7 +12,8 @@ func (db *DBClient) CreateCidInfoTable() error {
 
 	log.Debugf("creating table 'cid_info' for SQLite3 DB")
 
-	stmt, err := db.sqlCli.Prepare(`CREATE TABLE IF NOT EXISTS cid_info(
+	stmt, err := db.sqlCli.Prepare(`
+		CREATE TABLE IF NOT EXISTS cid_info(
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
 		cid_hash TEXT NOT NULL,
 		gen_time REAL NOT NULL,
@@ -33,15 +34,11 @@ func (db *DBClient) CreateCidInfoTable() error {
 	return nil
 }
 
-func (db *DBClient) AddNewCidInfo(cidInfo *models.CidInfo) (err error) {
+func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) (err error) {
 
 	log.WithFields(log.Fields{
 		"cid": cidInfo.CID.Hash().B58String(),
 	}).Trace("adding new cid info to DB")
-
-	// Should be threadsafe?¿?
-	// db.m.Lock()
-	// defer db.m.Unlock()
 
 	tx, err := db.sqlCli.BeginTx(db.ctx, nil)
 	if err != nil {
@@ -92,7 +89,6 @@ func (db *DBClient) insertCidInfo(tx *sql.Tx, cidInfo *models.CidInfo) error {
 		cidInfo.Creator.String(),
 	)
 	if err != nil {
-		log.Error("unable to exec CidInfo insert" + err.Error())
 		return err
 	}
 	return nil

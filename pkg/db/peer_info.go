@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/ipfs/go-cid"
@@ -35,15 +34,11 @@ func (db *DBClient) CreatePeerInfoTable() error {
 	return nil
 }
 
-func (db *DBClient) AddNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []*models.PeerInfo) (err error) {
+func (db *DBClient) addNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []*models.PeerInfo) (err error) {
 
 	log.WithFields(log.Fields{
 		"cid": c.Hash().B58String(),
 	}).Trace("adding set of peer infos to DB")
-
-	// Should be threadsafe?¿?
-	// db.m.Lock()
-	// defer db.m.Unlock()
 
 	tx, err := db.sqlCli.BeginTx(ctx, nil)
 	if err != nil {
@@ -96,42 +91,65 @@ func (db *DBClient) AddNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []
 	return err
 }
 
-func (db *DBClient) AddNewPeerInfo(c *cid.Cid, pInfo *models.PeerInfo) (err error) {
+func (db *DBClient) addPeerInfo(c *cid.Cid, pInfo *models.PeerInfo) (err error) {
 
 	log.WithFields(log.Fields{
 		"cid": c.Hash().B58String(),
 	}).Trace("adding new peer info to DB")
 
-	// Should be threadsafe?¿?
-	// db.m.Lock()
-	// defer db.m.Unlock()
+	/*
+		tx, err := db.sqlCli.BeginTx(db.ctx, nil)
+		if err != nil {
+			return errors.Wrap(err, "unable to begin transaction to add new PeerInfo ")
+		}
 
-	tx, err := db.sqlCli.BeginTx(db.ctx, nil)
+		// commit or rollback the tx depending on the error
+		defer func() {
+			if err != nil {
+				tx.Rollback()
+				err = errors.Wrap(err, "unable to add new cid info, rollback the tx ")
+			}
+			err = tx.Commit()
+			log.WithFields(log.Fields{
+				"cid": c.Hash().B58String(),
+			}).Trace("tx successfully saved peer_info into DB")
+		}()
+
+		// insert each of the Peers holding the PR
+
+		err = db.insertPeerInfo(tx, c, pInfo)
+		if err != nil {
+			return errors.Wrap(err, "unable to insert peer_info at SQLite3 DB ")
+		}
+	*/
+
+	id, err := db.GetIdOfCid(c.Hash().B58String())
 	if err != nil {
-		return errors.Wrap(err, "unable to begin transaction to add new PeerInfo ")
+		return errors.Wrap(err, "unable to insert peer_info ")
 	}
 
-	// commit or rollback the tx depending on the error
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-			err = errors.Wrap(err, "unable to add new cid info, rollback the tx ")
-		}
-		err = tx.Commit()
-		log.WithFields(log.Fields{
-			"cid": c.Hash().B58String(),
-		}).Trace("tx successfully saved peer_info into DB")
-	}()
-
-	// insert each of the Peers holding the PR
-	err = db.insertPeerInfo(tx, c, pInfo)
+	// insert the cidInfo
+	_, err = db.sqlCli.Exec(`INSERT INTO peer_info (
+			cid,
+			peer_id,
+			user_agent,
+			client,
+			version) 
+		VALUES ($1, $2, $3, $4, $5)`,
+		id,
+		pInfo.ID.String(),
+		pInfo.UserAgent,
+		pInfo.Client,
+		pInfo.Version,
+	)
 	if err != nil {
-		return errors.Wrap(err, "unable to insert peer_info at SQLite3 DB ")
+		return err
 	}
 
 	return err
 }
 
+/*
 func (db *DBClient) insertPeerInfo(tx *sql.Tx, c *cid.Cid, peerInfo *models.PeerInfo) error {
 	id, err := db.GetIdOfCid(c.Hash().B58String())
 	if err != nil {
@@ -144,7 +162,7 @@ func (db *DBClient) insertPeerInfo(tx *sql.Tx, c *cid.Cid, peerInfo *models.Peer
 			peer_id,
 			user_agent,
 			client,
-			version) 
+			version)
 		VALUES ($1, $2, $3, $4, $5)`,
 		id,
 		peerInfo.ID.String(),
@@ -157,6 +175,7 @@ func (db *DBClient) insertPeerInfo(tx *sql.Tx, c *cid.Cid, peerInfo *models.Peer
 	}
 	return nil
 }
+*/
 
 func (db *DBClient) GetIdOfPeer(pIdStr string) (id int, err error) {
 

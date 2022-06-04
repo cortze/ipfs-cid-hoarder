@@ -184,7 +184,7 @@ func (t *CidTracker) newRandomCidTracker() {
 	go func(t *CidTracker, wg *sync.WaitGroup, cidC chan *cid.Cid) {
 		defer wg.Done()
 		// generate the CIDs
-		for i := 0; i <= t.CidNumber; i++ {
+		for i := 0; i < t.CidNumber; i++ {
 			_, contID, err := t.CidSource.GetNewCid()
 			if err != nil {
 				log.Errorf("unable to generate random content. %s", err.Error())
@@ -239,20 +239,19 @@ func (t *CidTracker) newRandomCidTracker() {
 					// TODO: generate a new DB saving interface to speed up the CID providing process
 					// ----- Persist inot DB -------
 					// Add the cidInfo to the DB
-					err = t.DBCli.AddNewCidInfo(cidInfo)
-					if err != nil {
-						logEntry.Fatalln("unable to persist to DB new cid info", err)
-					}
+					t.DBCli.AddCidInfo(cidInfo)
+
 					// loop over the PRHoders
 					for _, prHolder := range cidInfo.PRHolders {
-						err = t.DBCli.AddNewPeerInfo(&cidInfo.CID, prHolder)
+						t.DBCli.AddPeerInfo(
+							db.DBPeer{
+								Cid:  &cidInfo.CID,
+								Peer: prHolder,
+							})
 					}
 					// Add the fetchResults to the DB
-					err = t.DBCli.AddFetchResults(fetchRes)
-					if err != nil {
-						logEntry.Fatalln("unable to persist to DB new fetch_results", err)
-					}
-					err = t.DBCli.AddPingResultsSet(fetchRes.PRPingResults)
+					t.DBCli.AddFetchResult(fetchRes)
+					t.DBCli.AddPingResults(fetchRes.PRPingResults)
 					if err != nil {
 						logEntry.Fatalln("unable to persist to DB new ping_results", err)
 					}

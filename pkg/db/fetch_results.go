@@ -31,11 +31,16 @@ func (db *DBClient) CreateFetchResultsTable() error {
 	return nil
 }
 
-func (db *DBClient) AddFetchResults(fetchRes *models.CidFetchResults) (err error) {
+func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error) {
 
 	log.WithFields(log.Fields{
 		"cid": fetchRes.Cid.Hash().B58String(),
 	}).Trace("adding fetch_results to DB")
+
+	contId, err := db.GetIdOfCid(fetchRes.Cid.Hash().B58String())
+	if err != nil {
+		return err
+	}
 
 	tx, err := db.sqlCli.BeginTx(db.ctx, nil)
 	if err != nil {
@@ -67,11 +72,6 @@ func (db *DBClient) AddFetchResults(fetchRes *models.CidFetchResults) (err error
 	VALUES ($1, $2, $3, $4, $5, $6, $7)`)
 	if err != nil {
 		return errors.Wrap(err, "unable to prepare insert query for fetch_results at SQLite3 DB ")
-	}
-
-	contId, err := db.GetIdOfCid(fetchRes.Cid.Hash().B58String())
-	if err != nil {
-		return err
 	}
 
 	tot, suc, fail := fetchRes.GetSummary()
