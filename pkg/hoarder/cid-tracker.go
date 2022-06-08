@@ -34,7 +34,7 @@ type CidTracker struct {
 
 	K             int
 	CidNumber     int
-	BatchSize     int
+	Workers       int
 	ReqInterval   time.Duration
 	StudyDuration time.Duration
 	CidMap        sync.Map
@@ -47,7 +47,7 @@ func NewCidTracker(
 	db *db.DBClient,
 	cidSource CidSource,
 	cidPinger *CidPinger,
-	k, cidNum, batchSize int,
+	k, cidNum, Workers int,
 	reqInterval, studyDuration time.Duration) (*CidTracker, error) {
 
 	return &CidTracker{
@@ -62,7 +62,7 @@ func NewCidTracker(
 		CidNumber:     cidNum,
 		ReqInterval:   reqInterval,
 		StudyDuration: studyDuration,
-		BatchSize:     batchSize,
+		Workers:       Workers,
 	}, nil
 }
 
@@ -91,8 +91,8 @@ func (t *CidTracker) newRandomCidTracker() {
 	// launch the PRholder reading routine
 	msgNotC := t.MsgNot.GetNotChan()
 
-	// generate a channel with the same size as the batchsize one
-	cidC := make(chan *cid.Cid, t.BatchSize)
+	// generate a channel with the same size as the Workers one
+	cidC := make(chan *cid.Cid, t.Workers)
 
 	var firstCidFetchRes sync.Map
 
@@ -184,7 +184,7 @@ func (t *CidTracker) newRandomCidTracker() {
 	go func(t *CidTracker, wg *sync.WaitGroup, cidC chan *cid.Cid) {
 		defer wg.Done()
 		// generate the CIDs
-		for i := 0; i <= t.CidNumber; i++ {
+		for i := 0; i < t.CidNumber; i++ {
 			_, contID, err := t.CidSource.GetNewCid()
 			if err != nil {
 				log.Errorf("unable to generate random content. %s", err.Error())
@@ -196,7 +196,7 @@ func (t *CidTracker) newRandomCidTracker() {
 	var publisherWG sync.WaitGroup
 
 	// CID PR Publishers
-	for publisher := 0; publisher < t.BatchSize; publisher++ {
+	for publisher := 0; publisher < t.Workers; publisher++ {
 		publisherWG.Add(1)
 		// launch publisher
 		go func(ctx context.Context, publisherWG *sync.WaitGroup, publisherID int, cidC chan *cid.Cid, cidFetchRes *sync.Map) {
@@ -230,32 +230,22 @@ func (t *CidTracker) newRandomCidTracker() {
 					}
 					reqTime := time.Since(tstart)
 
+					// TODO: fix this little wait to comput last PR Holder status
+					// little not channel for inside the CID to notify when k peers where recorded
+					time.Sleep(500 * time.Millisecond)
+
 					// the Cid has already being published to the network, we can already save it into the DB
 
 					// add the request time to the CidInfo
 					cidInfo.AddProvideTime(reqTime)
 					cidInfo.AddPRFetchResults(fetchRes)
 
-					// TODO: generate a new DB saving interface to speed up the CID providing process
 					// ----- Persist inot DB -------
 					// Add the cidInfo to the DB
-					err = t.DBCli.AddNewCidInfo(cidInfo)
-					if err != nil {
-						logEntry.Fatalln("unable to persist to DB new cid info", err)
-					}
-					// loop over the PRHoders
-					for _, prHolder := range cidInfo.PRHolders {
-						err = t.DBCli.AddNewPeerInfo(&cidInfo.CID, prHolder)
-					}
+					t.DBCli.AddCidInfo(cidInfo)
+
 					// Add the fetchResults to the DB
-					err = t.DBCli.AddFetchResults(fetchRes)
-					if err != nil {
-						logEntry.Fatalln("unable to persist to DB new fetch_results", err)
-					}
-					err = t.DBCli.AddPingResultsSet(fetchRes.PRPingResults)
-					if err != nil {
-						logEntry.Fatalln("unable to persist to DB new ping_results", err)
-					}
+					t.DBCli.AddFetchResult(fetchRes)
 					// ----- End of the persist into DB -------
 
 					// Calculate success ratio on adding PR into PRHolders

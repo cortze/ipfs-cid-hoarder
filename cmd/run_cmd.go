@@ -71,11 +71,11 @@ var RunCmd = &cli.Command{
 			Value:       config.DefaultConfig.CidNumber,
 		},
 		&cli.IntFlag{
-			Name:        "batch-size",
+			Name:        "workers",
 			Usage:       "max number of CIDs on each of the generation batch",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
 			DefaultText: "250 CIDs",
-			Value:       config.DefaultConfig.BatchSize,
+			Value:       config.DefaultConfig.Workers,
 		},
 		&cli.StringFlag{
 			Name:        "req-interval",
@@ -131,7 +131,7 @@ func RunHoarder(ctx *cli.Context) error {
 	log.Info("Running Cid-Hoarder on mode")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
-		log.Errorf("unable to initialize the CidHoarder - error %s", err.Error())
+		log.Errorf("CidHoarder - %s", err.Error())
 	}
 	cidHoarder.Run()
 

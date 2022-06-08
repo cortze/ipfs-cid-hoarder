@@ -16,7 +16,7 @@ import (
 )
 
 var DialTimeout = 20 * time.Second
-var pingers = 5
+var pingers = 200
 var minIterTime = 500 * time.Millisecond
 
 type CidPinger struct {
@@ -91,7 +91,7 @@ func (p *CidPinger) Run() {
 					// check if the time for next ping has arrived
 					if time.Now().Sub(c.NextPing) < time.Duration(0) {
 						logEntry.Debugf("not in time to ping %s", cStr)
-						continue
+						break
 					}
 
 					// Add the CID to the pingTaskC
@@ -140,6 +140,7 @@ func (p *CidPinger) Run() {
 					// check if the models.CidInfo id not nil
 					if c == nil {
 						logEntry.Warn("empty CID received from channel, finishing worker")
+						continue
 					}
 
 					cStr := c.CID.Hash().B58String()
@@ -151,6 +152,36 @@ func (p *CidPinger) Run() {
 					cidFetchRes := models.NewCidFetchResults(c.CID, pingCounter)
 
 					var wg sync.WaitGroup
+
+					// TODO: Keep track of all the times to retrieve the entire set of data + each of the parts individually
+
+					wg.Add(1)
+					// Add DHT FindContent call to see if the content is acutally retrievable from the network
+					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
+						defer wg.Done()
+						var isRetrievable bool
+						providers, err := p.host.DHT.GetClosestPeers(p.ctx, c.CID.Hash().B58String())
+						if err != nil {
+							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
+						}
+						if len(providers) > 0 {
+							isRetrievable = true
+						}
+						cidFetchRes.IsRetrievable = isRetrievable
+					}(p, c, cidFetchRes)
+
+					wg.Add(1)
+					// recalculate the closest k peers to the content
+					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
+						defer wg.Done()
+						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, c.CID.Hash().B58String())
+						if err != nil {
+							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
+						}
+						for _, peer := range closestPeers {
+							cidFetchRes.AddClosestPeer(peer)
+						}
+					}(p, c, cidFetchRes)
 
 					for _, peerInfo := range c.PRHolders {
 						// launch in parallel all the peer Pings
@@ -165,15 +196,7 @@ func (p *CidPinger) Run() {
 					wg.Wait()
 
 					// add the fetch results to the array and persist it in the DB
-					c.AddPRFetchResults(cidFetchRes)
-					err := p.dbCli.AddFetchResults(cidFetchRes)
-					if err != nil {
-						log.Fatalln("unable to persist to DB new fetch_results", err)
-					}
-					err = p.dbCli.AddPingResultsSet(cidFetchRes.PRPingResults)
-					if err != nil {
-						log.Fatalln("unable to persist to DB new ping_results", err)
-					}
+					p.dbCli.AddFetchResult(cidFetchRes)
 
 				case <-p.ctx.Done():
 					logEntry.Info("shutdown detected, closing pinger")
@@ -216,24 +239,42 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 
 	var active, hasRecords bool
 	var connError string
+	var fetchTime time.Duration
 
 	tstart := time.Now()
 	// connect the peer
-	provs, _, err := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
-	fetchTime := time.Since(tstart)
-	if err != nil {
-		logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
-		connError = err.Error() // TODO: IPFSdht error parsing missing
-	} else {
-		logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
-		active = true
-		connError = p2p.NoConnError
-		// check it the peer still has the records
+	var wg sync.WaitGroup
+	pingCtx, cancel := context.WithTimeout(p.ctx, DialTimeout)
+	defer cancel()
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		err := p.host.Connect(pingCtx, pAddr)
+		if err != nil {
+			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
+			connError = p2p.ParseConError(err) // TODO: IPFSdht error parsing missing
+		} else {
+			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
+			active = true
+			connError = p2p.NoConnError
+		}
+		err = p.host.Network().ClosePeer(pAddr.ID)
+		if err != nil {
+			logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
+		fetchTime = time.Since(tstart)
 		if len(provs) > 0 {
 			hasRecords = true
+			logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
 		}
-		logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
-	}
+	}()
+
+	wg.Wait()
 
 	return models.NewPRPingResults(
 		c,

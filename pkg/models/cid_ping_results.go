@@ -12,13 +12,14 @@ import (
 // every time we request the state of a peer that is supposed to keep the PR of a CID in the list
 // we will fill up this state
 type PRPingResults struct {
-	Cid        cid.Cid
-	PeerID     peer.ID
-	Round      int
-	FetchTime  time.Duration
-	Active     bool
-	HasRecords bool
-	ConError   string
+	Cid           cid.Cid
+	PeerID        peer.ID
+	Round         int
+	FetchTime     time.Time
+	FetchDuration time.Duration
+	Active        bool
+	HasRecords    bool
+	ConError      string
 }
 
 func NewPRPingResults(
@@ -34,6 +35,7 @@ func NewPRPingResults(
 		cid,
 		p,
 		round,
+		time.Now(),
 		fetchT,
 		active,
 		hasRecords,
@@ -51,6 +53,7 @@ type CidFetchResults struct {
 	PRPingResults []*PRPingResults
 	IsRetrievable bool // results of the CidLookup (to check if the content is still reachable)
 	// TODO: 	-Add the new closest peers to the content? (to track the degradation of the Provider Record)
+	ClosestPeers []peer.ID
 }
 
 func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
@@ -61,6 +64,7 @@ func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
 		StartTime:     time.Now(),
 		FinishTime:    time.Now(),
 		PRPingResults: make([]*PRPingResults, 0),
+		ClosestPeers:  make([]peer.ID, 0),
 	}
 }
 
@@ -69,7 +73,7 @@ func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	defer c.m.Unlock()
 
 	c.PRPingResults = append(c.PRPingResults, pingRes)
-	t := c.StartTime.Add(pingRes.FetchTime)
+	t := c.StartTime.Add(pingRes.FetchDuration)
 	if c.FinishTime.Before(t) {
 		c.FinishTime = t
 	}
@@ -87,4 +91,11 @@ func (c *CidFetchResults) GetSummary() (tot, success, failed int) {
 		}
 	}
 	return tot, success, failed
+}
+
+func (c *CidFetchResults) AddClosestPeer(pInfo peer.ID) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.ClosestPeers = append(c.ClosestPeers, pInfo)
 }

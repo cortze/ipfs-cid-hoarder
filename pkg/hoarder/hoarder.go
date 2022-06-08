@@ -31,7 +31,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// ----- Compose the DB client -----
 	db, err := db.NewDBClient(ctx, conf.Database)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to initialise the DB")
+		return nil, errors.Wrap(err, "initialise the DB")
 	}
 
 	// Read or Generate Priv key for the host
@@ -82,7 +82,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// ----- Generate the CidTracker -----
 	cidSource := NewRandomCidGen(conf.CidContentSize)
 	studyWG.Add(1)
-	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.BatchSize, reqInterval, studyDuration)
+	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating the CidTracker")
 	}
