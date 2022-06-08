@@ -12,13 +12,14 @@ import (
 // every time we request the state of a peer that is supposed to keep the PR of a CID in the list
 // we will fill up this state
 type PRPingResults struct {
-	Cid        cid.Cid
-	PeerID     peer.ID
-	Round      int
-	FetchTime  time.Duration
-	Active     bool
-	HasRecords bool
-	ConError   string
+	Cid           cid.Cid
+	PeerID        peer.ID
+	Round         int
+	FetchTime     time.Time
+	FetchDuration time.Duration
+	Active        bool
+	HasRecords    bool
+	ConError      string
 }
 
 func NewPRPingResults(
@@ -34,6 +35,7 @@ func NewPRPingResults(
 		cid,
 		p,
 		round,
+		time.Now(),
 		fetchT,
 		active,
 		hasRecords,
@@ -71,7 +73,7 @@ func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	defer c.m.Unlock()
 
 	c.PRPingResults = append(c.PRPingResults, pingRes)
-	t := c.StartTime.Add(pingRes.FetchTime)
+	t := c.StartTime.Add(pingRes.FetchDuration)
 	if c.FinishTime.Before(t) {
 		c.FinishTime = t
 	}

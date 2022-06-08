@@ -12,17 +12,15 @@ func (db *DBClient) CreateCidInfoTable() error {
 
 	_, err := db.psqlPool.Exec(db.ctx, `
 		CREATE TABLE IF NOT EXISTS cid_info(
-		id SERIAL PRIMARY KEY, 
-		cid_hash TEXT NOT NULL,
+		id SERIAL, 
+		cid_hash TEXT NOT NULL PRIMARY KEY,
 		gen_time FLOAT NOT NULL,
 		provide_time FLOAT NOT NULL,
 		req_interval INT NOT NULL,
 		k INT NOT NULL,
 		content_type TEXT NOT NULL,
 		source TEXT NOT NULL,
-		creator TEXT NOT NULL,
-		
-		UNIQUE (cid_hash)
+		creator TEXT NOT NULL
 	);`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for CidInfo table generation")
@@ -60,6 +58,19 @@ func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) (err error) {
 	if err != nil {
 		return err
 	}
+
+	// add the peer info of the PR holders
+	err = db.addNewPeerInfoSet(cidInfo.PRHolders)
+	if err != nil {
+		return errors.Wrap(err, "insering peer info")
+	}
+
+	// add the PR holders to the table
+	err = db.addPRHoldersSet(cidInfo.CID, cidInfo.PRHolders)
+	if err != nil {
+		return errors.Wrap(err, "inserting pr_holders")
+	}
+
 	return nil
 }
 

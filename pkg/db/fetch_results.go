@@ -13,13 +13,18 @@ func (db *DBClient) CreateFetchResultsTable() error {
 	_, err := db.psqlPool.Exec(db.ctx, `
 	CREATE TABLE IF NOT EXISTS fetch_results(
 		id SERIAL PRIMARY KEY, 
-		cid INT NOT NULL,
-		fetch_round INT NOT NULL,
+		cid_hash TEXT NOT NULL,
+		ping_round INT NOT NULL,
 		fetch_time FLOAT NOT NULL,
+		fetch_duration FLOAT NOT NULL,
 		k INT NOT NULL,
 		success_att INT NOT NULL,
 		fail_att INT NOT NULL,
-		is_retrievable BOOL NOT NULL
+		is_retrievable BOOL NOT NULL,
+
+		UNIQUE(cid_hash, ping_round),
+		FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
+
 	);`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for fetch_results table generation")
@@ -33,11 +38,6 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		"cid": fetchRes.Cid.Hash().B58String(),
 	}).Trace("adding fetch_results to DB")
 
-	contId, err := db.GetIdOfCid(fetchRes.Cid.Hash().B58String())
-	if err != nil {
-		return err
-	}
-
 	tot, suc, fail := fetchRes.GetSummary()
 	var isRetrievable bool
 	if suc > 0 {
@@ -46,16 +46,18 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 
 	_, err = db.psqlPool.Exec(db.ctx, `
 	INSERT INTO fetch_results (
-		cid,
-		fetch_round,
+		cid_hash,
+		ping_round,
 		fetch_time,
+		fetch_duration,
 		k,
 		success_att,
 		fail_att,
 		is_retrievable)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		contId,
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		fetchRes.Cid.Hash().B58String(),
 		fetchRes.Round,
+		fetchRes.StartTime.Unix(),
 		fetchRes.FinishTime.Sub(fetchRes.StartTime).Milliseconds(),
 		tot,
 		suc,
@@ -66,7 +68,16 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		return errors.Wrap(err, "unable to insert fetch_results at DB ")
 	}
 
-	err = db.addClosestPeerSet(fetchRes.Cid, fetchRes.Round, fetchRes.ClosestPeers)
+	err = db.addPingResultsSet(fetchRes.PRPingResults)
+	if err != nil {
+		return errors.Wrap(err, "persisting PingResults")
+	}
+
+	err = db.addClosestPeerSet(&models.ClosestPeers{
+		Cid:       fetchRes.Cid,
+		PingRound: fetchRes.Round,
+		Peers:     fetchRes.ClosestPeers,
+	})
 
 	return err
 }

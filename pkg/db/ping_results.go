@@ -13,68 +13,67 @@ func (db *DBClient) CreatePingResultsTable() error {
 	_, err := db.psqlPool.Exec(db.ctx, `
 		CREATE TABLE IF NOT EXISTS ping_results(
 			id SERIAL PRIMARY KEY, 
-			cid INT NOT NULL,
-			peer_id INT NOT NULL,
+			cid_hash TEXT NOT NULL,
 			ping_round INT NOT NULL,
-			fetch_time FLOAT NOT NULL,
+			peer_id TEXT NOT NULL,
+			ping_time FLOAT NOT NULL,
+			ping_duration FLOAT NOT NULL,
 			is_active BOOL NOT NULL,
 			has_records BOOL NOT NULL,
-			conn_error VARCHAR(500) NOT NULL
+			conn_error TEXT NOT NULL,
+
+			UNIQUE(cid_hash, ping_round, peer_id),
+			FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash),
+			FOREIGN KEY(peer_id) REFERENCES peer_info(peer_id)
 		);`)
 	if err != nil {
-		return errors.Wrap(err, "error preparing statement for ping_results table generation")
+		return errors.Wrap(err, "ping_results table")
 	}
 
 	return nil
 }
 
 func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) (err error) {
-	// first thing to do is to request the id of the CID
-	contId, err := db.GetIdOfCid(pingRes[0].Cid.Hash().B58String())
-	if err != nil {
-		return err
-	}
-
 	if len(pingRes) <= 0 {
-		return errors.New("unable to insert ping result set - no ping_results set given")
+		return errors.New("insert ping result set - no ping_results set given")
 	}
+	cStr := pingRes[0].Cid.Hash().B58String()
+	pingRound := pingRes[0].Round
+
 	log.WithFields(log.Fields{
-		"cid": pingRes[0].Cid.Hash().B58String(),
+		"cid": cStr,
 	}).Debug("adding set of cid ping_results to DB")
 
 	// insert each of the Peers holding the PR
 	for _, ping := range pingRes {
 
-		peerId, err := db.GetIdOfPeer(ping.PeerID.String())
-		if err != nil {
-			return err
-		}
-
 		_, err = db.psqlPool.Exec(db.ctx, `
 		INSERT INTO ping_results (
-			cid,
-			peer_id,
+			cid_hash,
 			ping_round,
-			fetch_time,
+			peer_id,
+			ping_time,
+			ping_duration,
 			is_active,
 			has_records,
 			conn_error)		 
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			contId,
-			peerId,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			cStr,
 			ping.Round,
-			ping.FetchTime.Milliseconds(),
+			ping.PeerID.String(),
+			ping.FetchTime.Unix(),
+			ping.FetchDuration.Milliseconds(),
 			ping.Active,
 			ping.HasRecords,
 			ping.ConError,
 		)
 		if err != nil {
-			return errors.Wrap(err, "unable to insert ping_results at DB ")
+			return errors.Wrap(err, "insert ping_results ")
 		}
 
 		log.WithFields(log.Fields{
-			"cid":   pingRes[0].Cid.Hash().B58String(),
-			"round": pingRes[0].Round,
+			"cid":   cStr,
+			"round": pingRound,
 			"pings": len(pingRes),
 		}).Trace("tx successfully saved ping_results into DB")
 	}

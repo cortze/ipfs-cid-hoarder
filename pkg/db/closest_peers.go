@@ -1,8 +1,7 @@
 package db
 
 import (
-	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -12,47 +11,46 @@ func (db *DBClient) CreateClosestPeersTable() error {
 	log.Debugf("creating table 'ping_results' for DB")
 
 	_, err := db.psqlPool.Exec(db.ctx, `
-		CREATE TABLE IF NOT EXISTS closest_peers(
+		CREATE TABLE IF NOT EXISTS k_closest_peers(
 			id SERIAL PRIMARY KEY, 
-			cid INT NOT NULL,
+			cid_hash TEXT NOT NULL,
 			ping_round INT NOT NULL,
-			peer_id VARCHAR(256) NOT NULL
+			peer_id TEXT NOT NULL,
+
+			FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
 		);`)
 	if err != nil {
-		return errors.Wrap(err, "error preparing statement for ping_results table generation")
+		return errors.Wrap(err, "error preparing statement for k_closest_peers table generation")
 	}
 
 	return nil
 }
 
-func (db *DBClient) addClosestPeerSet(c cid.Cid, pingRound int, closestPeers []peer.ID) (err error) {
+func (db *DBClient) addClosestPeerSet(closestPeers *models.ClosestPeers) (err error) {
 	// first round has not closest peers
-	if pingRound == 0 {
+	if closestPeers.PingRound == 0 {
 		return nil
 	}
-	// first thing to do is to request the id of the CID
-	contId, err := db.GetIdOfCid(c.Hash().B58String())
-	if err != nil {
-		return err
-	}
 
-	if len(closestPeers) <= 0 {
+	if len(closestPeers.Peers) <= 0 {
 		return errors.New("unable to insert closest peers - no closest peers set given")
 	}
+
+	cStr := closestPeers.Cid.Hash().B58String()
 	log.WithFields(log.Fields{
-		"cid": c.Hash().B58String(),
+		"cid": cStr,
 	}).Debug("adding set of cid closest_peers to DB")
 
 	// insert each of the Peers holding the PR
-	for _, p := range closestPeers {
+	for _, p := range closestPeers.Peers {
 		_, err = db.psqlPool.Exec(db.ctx, `
-		INSERT INTO closest_peers (
-			cid,
+		INSERT INTO k_closest_peers (
+			cid_hash,
 			ping_round,
 			peer_id)		 
 		VALUES ($1, $2, $3)`,
-			contId,
-			pingRound,
+			cStr,
+			closestPeers.PingRound,
 			p.String(),
 		)
 		if err != nil {
@@ -60,9 +58,9 @@ func (db *DBClient) addClosestPeerSet(c cid.Cid, pingRound int, closestPeers []p
 		}
 
 		log.WithFields(log.Fields{
-			"cid":        c.Hash().B58String(),
-			"round":      pingRound,
-			"closePeers": len(closestPeers),
+			"cid":        cStr,
+			"round":      closestPeers.PingRound,
+			"closePeers": len(closestPeers.Peers),
 		}).Trace("tx successfully saved closest_peers into DB")
 	}
 	return err

@@ -31,7 +31,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// ----- Compose the DB client -----
 	db, err := db.NewDBClient(ctx, conf.Database)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to initialise the DB")
+		return nil, errors.Wrap(err, "initialise the DB")
 	}
 
 	// Read or Generate Priv key for the host

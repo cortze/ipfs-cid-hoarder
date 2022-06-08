@@ -197,7 +197,6 @@ func (p *CidPinger) Run() {
 
 					// add the fetch results to the array and persist it in the DB
 					p.dbCli.AddFetchResult(cidFetchRes)
-					p.dbCli.AddPingResults(cidFetchRes.PRPingResults)
 
 				case <-p.ctx.Done():
 					logEntry.Info("shutdown detected, closing pinger")

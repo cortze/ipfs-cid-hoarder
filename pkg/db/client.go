@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
-	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -24,7 +23,7 @@ type DBClient struct {
 
 	// Req Channels
 	cidInfoC     chan *models.CidInfo
-	peerInfoC    chan DBPeer // might be unnecesary because could be taken from CID info when writing
+	peerInfoC    chan *models.PeerInfo
 	fetchResultC chan *models.CidFetchResults
 	pingResultsC chan []*models.PRPingResults
 
@@ -59,7 +58,7 @@ func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 		connectionUrl: url,
 		psqlPool:      psqlPool,
 		cidInfoC:      make(chan *models.CidInfo, bufferSize),
-		peerInfoC:     make(chan DBPeer, bufferSize),
+		peerInfoC:     make(chan *models.PeerInfo, bufferSize),
 		fetchResultC:  make(chan *models.CidFetchResults, bufferSize),
 		pingResultsC:  make(chan []*models.PRPingResults, bufferSize),
 		persistC:      make(chan interface{}, bufferSize),
@@ -68,18 +67,13 @@ func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 
 	err = dbCli.initTables()
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to initilize the tables for the SQLite3 DB")
+		return nil, errors.Wrap(err, "initialising the tables")
 	}
 
 	go dbCli.runPersisters()
 
-	logEntry.Infof("SQLite3 db initialised")
+	logEntry.Infof("DB initialised")
 	return dbCli, nil
-}
-
-type DBPeer struct {
-	Cid  *cid.Cid
-	Peer *models.PeerInfo
 }
 
 func (db *DBClient) runPersisters() {
@@ -92,6 +86,14 @@ func (db *DBClient) runPersisters() {
 			defer wg.Done()
 			logEntry := log.WithField("persister", persisterID)
 			for {
+				// give priority to the dbDone channel if it closed
+				select {
+				case <-db.doneC:
+					logEntry.Info("finish detected, closing persister")
+					return
+				default:
+				}
+
 				select {
 				case p := <-db.persistC:
 					switch p.(type) {
@@ -102,10 +104,10 @@ func (db *DBClient) runPersisters() {
 						if err != nil {
 							logEntry.Error("error persisting CidInfo - " + err.Error())
 						}
-					case (DBPeer):
-						dbPeer := p.(DBPeer)
-						logEntry.Debugf("persisting peer %s into DB", dbPeer.Peer.ID.String())
-						err := db.addPeerInfo(dbPeer.Cid, dbPeer.Peer)
+					case (*models.PeerInfo):
+						dbPeer := p.(*models.PeerInfo)
+						logEntry.Debugf("persisting peer %s into DB", dbPeer.ID.String())
+						err := db.addPeerInfo(dbPeer)
 						if err != nil {
 							logEntry.Error("error persisting PeerInfo - " + err.Error())
 						}
@@ -116,18 +118,7 @@ func (db *DBClient) runPersisters() {
 						if err != nil {
 							logEntry.Error("error persisting FetchResults - " + err.Error())
 						}
-					case ([]*models.PRPingResults):
-						pingRes := p.([]*models.PRPingResults)
-						logEntry.Debugf("persisting ping res into DB")
-						err := db.addPingResultsSet(pingRes)
-						if err != nil {
-							logEntry.Error("error persisting PingResults - " + err.Error())
-						}
 					}
-				case <-db.doneC:
-					logEntry.Info("finish detected, closing persister")
-					return
-
 				case <-db.ctx.Done():
 					logEntry.Info("shutdown detected, closing persister")
 					return
@@ -139,13 +130,20 @@ func (db *DBClient) runPersisters() {
 
 	persisterWG.Wait()
 	log.Info("Done persisting study")
+
+	close(db.cidInfoC)
+	close(db.peerInfoC)
+	close(db.fetchResultC)
+	close(db.pingResultsC)
+	close(db.persistC)
+	close(db.doneC)
 }
 
 func (db *DBClient) AddCidInfo(c *models.CidInfo) {
 	db.persistC <- c
 }
 
-func (db *DBClient) AddPeerInfo(p DBPeer) {
+func (db *DBClient) AddPeerInfo(p *models.PeerInfo) {
 	db.persistC <- p
 }
 
@@ -153,24 +151,14 @@ func (db *DBClient) AddFetchResult(f *models.CidFetchResults) {
 	db.persistC <- f
 }
 
-func (db *DBClient) AddPingResults(p []*models.PRPingResults) {
-	db.persistC <- p
-}
-
 func (db *DBClient) Close() {
 
-	log.Info("closing SQLite3 DB for the CID Hoarder")
+	log.Info("closing DB for the CID Hoarder")
 
 	// wait untill all the channels have been emptied
 
-	// close the channels and send message on doneC
+	// send message on doneC
 	db.doneC <- struct{}{}
-	close(db.cidInfoC)
-	close(db.peerInfoC)
-	close(db.fetchResultC)
-	close(db.pingResultsC)
-	close(db.persistC)
-
 	//db.psqlPool.Close()
 }
 
@@ -189,6 +177,12 @@ func (db *DBClient) initTables() error {
 		return err
 	}
 
+	// pr_holders
+	err = db.CreatePRHoldersTable()
+	if err != nil {
+		return err
+	}
+
 	// fetch_results table
 	err = db.CreateFetchResultsTable()
 	if err != nil {
@@ -201,9 +195,11 @@ func (db *DBClient) initTables() error {
 		return err
 	}
 
+	// k_closest_peers
 	err = db.CreateClosestPeersTable()
 	if err != nil {
 		return err
 	}
+
 	return err
 }

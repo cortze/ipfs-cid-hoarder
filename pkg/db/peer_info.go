@@ -1,10 +1,7 @@
 package db
 
 import (
-	"context"
-
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
-	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -16,13 +13,12 @@ func (db *DBClient) CreatePeerInfoTable() error {
 	// TODO: missing multiaddrs
 	_, err := db.psqlPool.Exec(db.ctx,
 		`CREATE TABLE IF NOT EXISTS peer_info(
-		id SERIAL PRIMARY KEY, 
-		cid INT NOT NULL,
-		peer_id VARCHAR(256) NOT NULL,
-		multi_addrs VARCHAR(256)[] NOT NULL,
-		user_agent VARCHAR(256) NOT NULL,
-		client VARCHAR(256) NOT NULL,
-		version VARCHAR(256) NOT NULL
+		id SERIAL, 
+		peer_id TEXT NOT NULL PRIMARY KEY,
+		multi_addrs TEXT[] NOT NULL,
+		user_agent TEXT NOT NULL,
+		client TEXT NOT NULL,
+		version TEXT NOT NULL
 	);`)
 	if err != nil {
 		return errors.Wrap(err, "creating table peer_info ")
@@ -31,35 +27,17 @@ func (db *DBClient) CreatePeerInfoTable() error {
 	return nil
 }
 
-func (db *DBClient) addNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []*models.PeerInfo) (err error) {
-
-	log.WithFields(log.Fields{
-		"cid": c.Hash().B58String(),
-	}).Trace("adding set of peer infos to DB")
-
-	id, err := db.GetIdOfCid(c.Hash().B58String())
-	if err != nil {
-		return errors.Wrap(err, "unable to insert peerInfo ")
+func (db *DBClient) addNewPeerInfoSet(pInfos []*models.PeerInfo) (err error) {
+	if len(pInfos) <= 0 {
+		return errors.New("unable to insert peer_info set - no peer_info set given")
 	}
+	log.WithFields(log.Fields{
+		"peerIDs": len(pInfos),
+	}).Trace("adding set of peer infos to DB")
 
 	// insert each of the Peers holding the PR
 	for _, p := range pInfos {
-		_, err = db.psqlPool.Exec(db.ctx, `
-		INSERT INTO peer_info (
-			cid,
-			peer_id,
-			multi_addrs,
-			user_agent,
-			client,
-			version) 
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-			id,
-			p.ID.String(),
-			p.MultiAddr,
-			p.UserAgent,
-			p.Client,
-			p.Version,
-		)
+		err = db.addPeerInfo(p)
 		if err != nil {
 			return errors.Wrap(err, "unable to insert peer info at DB ")
 		}
@@ -68,27 +46,19 @@ func (db *DBClient) addNewPeerInfoSet(ctx context.Context, c *cid.Cid, pInfos []
 	return err
 }
 
-func (db *DBClient) addPeerInfo(c *cid.Cid, pInfo *models.PeerInfo) (err error) {
+func (db *DBClient) addPeerInfo(pInfo *models.PeerInfo) (err error) {
 
-	log.WithFields(log.Fields{
-		"cid": c.Hash().B58String(),
-	}).Trace("adding new peer info to DB")
-
-	id, err := db.GetIdOfCid(c.Hash().B58String())
-	if err != nil {
-		return errors.Wrap(err, "unable to insert peer_info ")
-	}
+	log.Tracef("adding new peer %s info to DB", pInfo.ID.String())
 
 	// insert the cidInfo
 	_, err = db.psqlPool.Exec(db.ctx, `INSERT INTO peer_info (
-			cid,
 			peer_id,
 			multi_addrs,
 			user_agent,
 			client,
 			version) 
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		id,
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT DO NOTHING`,
 		pInfo.ID.String(),
 		pInfo.MultiAddr,
 		pInfo.UserAgent,

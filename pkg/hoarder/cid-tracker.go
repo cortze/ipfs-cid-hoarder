@@ -240,25 +240,12 @@ func (t *CidTracker) newRandomCidTracker() {
 					cidInfo.AddProvideTime(reqTime)
 					cidInfo.AddPRFetchResults(fetchRes)
 
-					// TODO: generate a new DB saving interface to speed up the CID providing process
 					// ----- Persist inot DB -------
 					// Add the cidInfo to the DB
 					t.DBCli.AddCidInfo(cidInfo)
 
-					// loop over the PRHoders
-					for _, prHolder := range cidInfo.PRHolders {
-						t.DBCli.AddPeerInfo(
-							db.DBPeer{
-								Cid:  &cidInfo.CID,
-								Peer: prHolder,
-							})
-					}
 					// Add the fetchResults to the DB
 					t.DBCli.AddFetchResult(fetchRes)
-					t.DBCli.AddPingResults(fetchRes.PRPingResults)
-					if err != nil {
-						logEntry.Fatalln("unable to persist to DB new ping_results", err)
-					}
 					// ----- End of the persist into DB -------
 
 					// Calculate success ratio on adding PR into PRHolders
