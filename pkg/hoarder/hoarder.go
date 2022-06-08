@@ -82,7 +82,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// ----- Generate the CidTracker -----
 	cidSource := NewRandomCidGen(conf.CidContentSize)
 	studyWG.Add(1)
-	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.BatchSize, reqInterval, studyDuration)
+	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating the CidTracker")
 	}

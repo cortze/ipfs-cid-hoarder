@@ -5,11 +5,9 @@ import (
 	"os"
 	"sync"
 
-	"database/sql"
-
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/ipfs/go-cid"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -21,8 +19,8 @@ type DBClient struct {
 	ctx context.Context
 	m   sync.RWMutex
 
-	dbPath string
-	sqlCli *sql.DB
+	connectionUrl string // the url might not be necessary (better to remove it?¿)
+	psqlPool      *pgxpool.Pool
 
 	// Req Channels
 	cidInfoC     chan *models.CidInfo
@@ -39,33 +37,33 @@ func RemoveOldDBIfExists(oldDBPath string) {
 	os.Remove(oldDBPath)
 }
 
-func NewDBClient(ctx context.Context, dbPath string) (*DBClient, error) {
+func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 	logEntry := log.WithFields(log.Fields{
-		"Path": dbPath,
+		"db": url,
 	},
 	)
 	logEntry.Debug("initialising the db")
 
-	db, err := sql.Open("sqlite3", dbPath)
+	psqlPool, err := pgxpool.Connect(ctx, url)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to initialise SQLite3 db at "+dbPath)
+		return nil, errors.Wrap(err, "unable to initialise Posgres DB at "+url)
 	}
 
 	// Ping database to verify connection.
-	if err = db.Ping(); err != nil {
+	if err = psqlPool.Ping(ctx); err != nil {
 		return nil, errors.Wrap(err, "pinging database")
 	}
 
 	dbCli := &DBClient{
-		ctx:          ctx,
-		dbPath:       dbPath,
-		sqlCli:       db,
-		cidInfoC:     make(chan *models.CidInfo, bufferSize),
-		peerInfoC:    make(chan DBPeer, bufferSize),
-		fetchResultC: make(chan *models.CidFetchResults, bufferSize),
-		pingResultsC: make(chan []*models.PRPingResults, bufferSize),
-		persistC:     make(chan interface{}, bufferSize),
-		doneC:        make(chan struct{}),
+		ctx:           ctx,
+		connectionUrl: url,
+		psqlPool:      psqlPool,
+		cidInfoC:      make(chan *models.CidInfo, bufferSize),
+		peerInfoC:     make(chan DBPeer, bufferSize),
+		fetchResultC:  make(chan *models.CidFetchResults, bufferSize),
+		pingResultsC:  make(chan []*models.PRPingResults, bufferSize),
+		persistC:      make(chan interface{}, bufferSize),
+		doneC:         make(chan struct{}),
 	}
 
 	err = dbCli.initTables()
@@ -173,7 +171,7 @@ func (db *DBClient) Close() {
 	close(db.pingResultsC)
 	close(db.persistC)
 
-	db.sqlCli.Close()
+	//db.psqlPool.Close()
 }
 
 func (db *DBClient) initTables() error {
@@ -199,6 +197,11 @@ func (db *DBClient) initTables() error {
 
 	// ping_results table
 	err = db.CreatePingResultsTable()
+	if err != nil {
+		return err
+	}
+
+	err = db.CreateClosestPeersTable()
 	if err != nil {
 		return err
 	}

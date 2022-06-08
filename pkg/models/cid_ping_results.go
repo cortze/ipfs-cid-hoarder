@@ -51,6 +51,7 @@ type CidFetchResults struct {
 	PRPingResults []*PRPingResults
 	IsRetrievable bool // results of the CidLookup (to check if the content is still reachable)
 	// TODO: 	-Add the new closest peers to the content? (to track the degradation of the Provider Record)
+	ClosestPeers []peer.ID
 }
 
 func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
@@ -61,6 +62,7 @@ func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
 		StartTime:     time.Now(),
 		FinishTime:    time.Now(),
 		PRPingResults: make([]*PRPingResults, 0),
+		ClosestPeers:  make([]peer.ID, 0),
 	}
 }
 
@@ -87,4 +89,11 @@ func (c *CidFetchResults) GetSummary() (tot, success, failed int) {
 		}
 	}
 	return tot, success, failed
+}
+
+func (c *CidFetchResults) AddClosestPeer(pInfo peer.ID) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.ClosestPeers = append(c.ClosestPeers, pInfo)
 }

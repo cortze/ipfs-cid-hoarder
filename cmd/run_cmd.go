@@ -71,11 +71,11 @@ var RunCmd = &cli.Command{
 			Value:       config.DefaultConfig.CidNumber,
 		},
 		&cli.IntFlag{
-			Name:        "batch-size",
+			Name:        "workers",
 			Usage:       "max number of CIDs on each of the generation batch",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
 			DefaultText: "250 CIDs",
-			Value:       config.DefaultConfig.BatchSize,
+			Value:       config.DefaultConfig.Workers,
 		},
 		&cli.StringFlag{
 			Name:        "req-interval",

@@ -36,7 +36,7 @@ var DefaultConfig = Config{
 	CidFile:        "cids/cid-list.txt",
 	CidContentSize: 1000, // 1MB in KBs
 	CidNumber:      10,
-	BatchSize:      250,
+	Workers:        250,
 	ReqInterval:    "30m",
 	StudyDuration:  "48h",
 	K:              20, // K-bucket parameter
@@ -51,7 +51,7 @@ type Config struct {
 	CidFile        string `json:"cid-file"`
 	CidContentSize int    `json:"cid-content-size"`
 	CidNumber      int    `json:"cid-number"` // in KBs
-	BatchSize      int    `json:"batch-size"`
+	Workers        int    `json:"workers"`
 	ReqInterval    string `json:"req-interval"`
 	StudyDuration  string `json:"study-duration"`
 	K              int    `json:"k"`
@@ -96,8 +96,8 @@ func (c *Config) apply(ctx *cli.Context) {
 					c.CidNumber = ctx.Int("cid-number")
 				}
 				// batch of CIDs for the entire study
-				if ctx.IsSet("batch-size") {
-					c.BatchSize = ctx.Int("batch-size")
+				if ctx.IsSet("workers") {
+					c.Workers = ctx.Int("workers")
 				}
 				// Time delay between the each of the PRHolder pings
 				if ctx.IsSet("req-interval") {

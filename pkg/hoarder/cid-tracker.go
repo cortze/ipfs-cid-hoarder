@@ -34,7 +34,7 @@ type CidTracker struct {
 
 	K             int
 	CidNumber     int
-	BatchSize     int
+	Workers       int
 	ReqInterval   time.Duration
 	StudyDuration time.Duration
 	CidMap        sync.Map
@@ -47,7 +47,7 @@ func NewCidTracker(
 	db *db.DBClient,
 	cidSource CidSource,
 	cidPinger *CidPinger,
-	k, cidNum, batchSize int,
+	k, cidNum, Workers int,
 	reqInterval, studyDuration time.Duration) (*CidTracker, error) {
 
 	return &CidTracker{
@@ -62,7 +62,7 @@ func NewCidTracker(
 		CidNumber:     cidNum,
 		ReqInterval:   reqInterval,
 		StudyDuration: studyDuration,
-		BatchSize:     batchSize,
+		Workers:       Workers,
 	}, nil
 }
 
@@ -91,8 +91,8 @@ func (t *CidTracker) newRandomCidTracker() {
 	// launch the PRholder reading routine
 	msgNotC := t.MsgNot.GetNotChan()
 
-	// generate a channel with the same size as the batchsize one
-	cidC := make(chan *cid.Cid, t.BatchSize)
+	// generate a channel with the same size as the Workers one
+	cidC := make(chan *cid.Cid, t.Workers)
 
 	var firstCidFetchRes sync.Map
 
@@ -196,7 +196,7 @@ func (t *CidTracker) newRandomCidTracker() {
 	var publisherWG sync.WaitGroup
 
 	// CID PR Publishers
-	for publisher := 0; publisher < t.BatchSize; publisher++ {
+	for publisher := 0; publisher < t.Workers; publisher++ {
 		publisherWG.Add(1)
 		// launch publisher
 		go func(ctx context.Context, publisherWG *sync.WaitGroup, publisherID int, cidC chan *cid.Cid, cidFetchRes *sync.Map) {
