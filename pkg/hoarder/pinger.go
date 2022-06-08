@@ -94,11 +94,11 @@ func (p *CidPinger) Run() {
 						break
 					}
 
-					// Add the CID to the pingTaskC
-					p.pingTaskC <- c
-
 					// increment Ping Counter
 					c.IncreasePingCounter()
+
+					// Add the CID to the pingTaskC
+					p.pingTaskC <- c
 
 					// check if they have reached the max-round counter
 					// if yes, remove them from the cidQ.cidArray
@@ -160,7 +160,7 @@ func (p *CidPinger) Run() {
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
 						var isRetrievable bool
-						providers, err := p.host.DHT.GetClosestPeers(p.ctx, c.CID.Hash().B58String())
+						providers, err := p.host.DHT.FindProviders(p.ctx, c.CID)
 						if err != nil {
 							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
 						}
