@@ -77,7 +77,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	// ----- Generate the CidPinger -----
 	studyWG.Add(1)
-	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds)
+	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds, conf.Workers)
 
 	// ----- Generate the CidTracker -----
 	cidSource := NewRandomCidGen(conf.CidContentSize)

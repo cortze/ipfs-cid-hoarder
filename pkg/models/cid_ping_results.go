@@ -8,9 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-// PRReqState correspond to the basic state that contains the Provider Records Request state
-// every time we request the state of a peer that is supposed to keep the PR of a CID in the list
-// we will fill up this state
+// PRPingResults is the basic struct containing the result of the individual ping of a PR Holder.
 type PRPingResults struct {
 	Cid           cid.Cid
 	PeerID        peer.ID
@@ -44,6 +42,7 @@ func NewPRPingResults(
 	}
 }
 
+// CidFetchResults is the basic struct containing the summary of all the requests done for a ficen CID on a fetch round.
 type CidFetchResults struct {
 	m   sync.Mutex
 	Cid cid.Cid
@@ -55,9 +54,8 @@ type CidFetchResults struct {
 	FindProvDuration      time.Duration
 	GetClosePeersDuration time.Duration
 	PRPingResults         []*PRPingResults
-	IsRetrievable         bool // results of the CidLookup (to check if the content is still reachable)
-	// TODO: 	-Add the new closest peers to the content? (to track the degradation of the Provider Record)
-	ClosestPeers []peer.ID
+	IsRetrievable         bool
+	ClosestPeers          []peer.ID
 }
 
 func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
@@ -72,6 +70,7 @@ func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
 	}
 }
 
+// AddPRPingResults inserts a new PingResult into the FetchResult, updating at the same time the final duration of the PR Holder ping process
 func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -82,6 +81,7 @@ func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	}
 }
 
+// GetSummary returns the summary of the PR Holder pings for the fetch round
 func (c *CidFetchResults) GetSummary() (tot, success, failed int) {
 	// calculate the summary of the PingRound
 	for _, pingRes := range c.PRPingResults {
@@ -96,6 +96,7 @@ func (c *CidFetchResults) GetSummary() (tot, success, failed int) {
 	return tot, success, failed
 }
 
+// AddClosestPeer inserts into the PRFetchResults a peer that is inside the K closest peers in the IPFS DHT in that fetch round
 func (c *CidFetchResults) AddClosestPeer(pInfo peer.ID) {
 	c.m.Lock()
 	defer c.m.Unlock()

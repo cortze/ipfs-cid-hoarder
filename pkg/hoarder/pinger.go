@@ -16,7 +16,6 @@ import (
 )
 
 var DialTimeout = 20 * time.Second
-var pingers = 200
 var minIterTime = 500 * time.Millisecond
 
 type CidPinger struct {
@@ -42,7 +41,8 @@ func NewCidPinger(
 	host *p2p.Host,
 	dbCli *db.DBClient,
 	pingInterval time.Duration,
-	rounds int) *CidPinger {
+	rounds int,
+	workers int) *CidPinger {
 
 	return &CidPinger{
 		ctx:          ctx,
@@ -53,7 +53,7 @@ func NewCidPinger(
 		rounds:       rounds,
 		cidQ:         newCidQueue(),
 		initC:        make(chan struct{}),
-		pingTaskC:    make(chan *models.CidInfo, pingers), // TODO: harcoded
+		pingTaskC:    make(chan *models.CidInfo, workers), // TODO: harcoded
 	}
 }
 
@@ -67,7 +67,7 @@ func (p *CidPinger) Run() {
 		defer pingOrchWG.Done()
 
 		logEntry := log.WithField("mod", "cid-orchester")
-		// we need to wait unitil the first CID is added, otherwise we
+		// we need to wait unitil the first CID is added, wait otherwise
 		<-p.initC
 
 		// generate a timer to determine
@@ -154,7 +154,7 @@ func (p *CidPinger) Run() {
 					var wg sync.WaitGroup
 
 					wg.Add(1)
-					// Add DHT FindContent call to see if the content is acutally retrievable from the network
+					// DHT FindProviders call to see if the content is acutally retrievable from the network
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
 						var isRetrievable bool
@@ -187,8 +187,8 @@ func (p *CidPinger) Run() {
 						}
 					}(p, c, cidFetchRes)
 
+					// Ping in parallel each of the PRHolders
 					for _, peerInfo := range c.PRHolders {
-						// launch in parallel all the peer Pings
 						wg.Add(1)
 						go func(wg *sync.WaitGroup, c cid.Cid, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
 							defer wg.Done()

@@ -8,6 +8,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
+// CidInfo contains the basic information of the CID to track.
+// It also includes the information about the PRHolders and the fetch results of all the fetch attempts.
 type CidInfo struct {
 	m sync.Mutex
 
