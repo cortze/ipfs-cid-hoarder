@@ -9,6 +9,7 @@ import (
 
 type MsgNotification struct {
 	RemotePeer    peer.ID
+	QueryTime     time.Time
 	QueryDuration time.Duration
 	Msg           pb.Message
 	Resp          pb.Message

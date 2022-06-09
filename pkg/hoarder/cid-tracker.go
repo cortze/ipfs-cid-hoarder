@@ -130,6 +130,7 @@ func (t *CidTracker) newRandomCidTracker() {
 						c,
 						msgNot.RemotePeer,
 						0, // round is 0 since is the ADD_PROVIDE result
+						msgNot.QueryTime,
 						msgNot.QueryDuration,
 						active,
 						hasRecords,

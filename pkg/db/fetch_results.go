@@ -17,6 +17,9 @@ func (db *DBClient) CreateFetchResultsTable() error {
 		ping_round INT NOT NULL,
 		fetch_time FLOAT NOT NULL,
 		fetch_duration FLOAT NOT NULL,
+		holders_ping_duration FLOAT NOT NULL,
+		find_prov_duration FLOAT NOT NULL,
+		get_closest_peer_duration FLOAT NOT NULL,
 		k INT NOT NULL,
 		success_att INT NOT NULL,
 		fail_att INT NOT NULL,
@@ -24,7 +27,6 @@ func (db *DBClient) CreateFetchResultsTable() error {
 
 		UNIQUE(cid_hash, ping_round),
 		FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
-
 	);`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for fetch_results table generation")
@@ -50,15 +52,21 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		ping_round,
 		fetch_time,
 		fetch_duration,
+		holders_ping_duration,
+		find_prov_duration,
+		get_closest_peer_duration,
 		k,
 		success_att,
 		fail_att,
 		is_retrievable)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		fetchRes.Cid.Hash().B58String(),
 		fetchRes.Round,
 		fetchRes.StartTime.Unix(),
 		fetchRes.FinishTime.Sub(fetchRes.StartTime).Milliseconds(),
+		fetchRes.PRHoldPingDuration.Milliseconds(),
+		fetchRes.FindProvDuration.Milliseconds(),
+		fetchRes.GetClosePeersDuration.Milliseconds(),
 		tot,
 		suc,
 		fail,

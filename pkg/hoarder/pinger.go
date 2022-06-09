@@ -153,18 +153,19 @@ func (p *CidPinger) Run() {
 
 					var wg sync.WaitGroup
 
-					// TODO: Keep track of all the times to retrieve the entire set of data + each of the parts individually
-
 					wg.Add(1)
 					// Add DHT FindContent call to see if the content is acutally retrievable from the network
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
 						var isRetrievable bool
+						t := time.Now()
 						providers, err := p.host.DHT.FindProviders(p.ctx, c.CID)
+						pingTime := time.Since(t)
+						fetchRes.FindProvDuration = pingTime
 						if err != nil {
 							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
 						}
-						if len(providers) > 0 {
+						if len(providers) > 0 { // is this assumption naive?
 							isRetrievable = true
 						}
 						cidFetchRes.IsRetrievable = isRetrievable
@@ -174,7 +175,10 @@ func (p *CidPinger) Run() {
 					// recalculate the closest k peers to the content
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
+						t := time.Now()
 						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, c.CID.Hash().B58String())
+						pingTime := time.Since(t)
+						fetchRes.GetClosePeersDuration = pingTime
 						if err != nil {
 							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
 						}
@@ -194,6 +198,9 @@ func (p *CidPinger) Run() {
 					}
 
 					wg.Wait()
+
+					// update the finish time for the total fetch round
+					cidFetchRes.FinishTime = time.Now()
 
 					// add the fetch results to the array and persist it in the DB
 					p.dbCli.AddFetchResult(cidFetchRes)
@@ -239,14 +246,14 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 
 	var active, hasRecords bool
 	var connError string
-	var fetchTime time.Duration
 
-	tstart := time.Now()
 	// connect the peer
 	var wg sync.WaitGroup
 	pingCtx, cancel := context.WithTimeout(p.ctx, DialTimeout)
 	defer cancel()
 	wg.Add(2)
+
+	tstart := time.Now()
 	go func() {
 		defer wg.Done()
 		err := p.host.Connect(pingCtx, pAddr)
@@ -267,7 +274,7 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 	go func() {
 		defer wg.Done()
 		provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
-		fetchTime = time.Since(tstart)
+
 		if len(provs) > 0 {
 			hasRecords = true
 			logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
@@ -276,10 +283,13 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 
 	wg.Wait()
 
+	fetchTime := time.Since(tstart)
+
 	return models.NewPRPingResults(
 		c,
 		pAddr.ID,
 		round,
+		tstart,
 		fetchTime,
 		active,
 		hasRecords,
