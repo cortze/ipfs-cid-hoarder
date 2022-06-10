@@ -14,9 +14,7 @@ build:
 
 dependencies:
 	$(GIT_SUBM) update --init
-	cd go-libp2p-kad-dht
-	git checkout cid-hoarder
-	cd ../
+	cd go-libp2p-kad-dht && git checkout cid-hoarder
 
 
 clean:
