@@ -27,6 +27,7 @@ type CidPinger struct {
 	dbCli        *db.DBClient
 	pingInterval time.Duration
 	rounds       int
+	workers      int
 
 	init  bool
 	initC chan struct{}
@@ -54,6 +55,7 @@ func NewCidPinger(
 		cidQ:         newCidQueue(),
 		initC:        make(chan struct{}),
 		pingTaskC:    make(chan *models.CidInfo, workers), // TODO: harcoded
+		workers:      workers,
 	}
 }
 
@@ -127,7 +129,7 @@ func (p *CidPinger) Run() {
 
 	// Launch CID pingers (workers)
 	var pingerWG sync.WaitGroup
-	for pinger := 0; pinger < pingers; pinger++ {
+	for pinger := 0; pinger < p.workers; pinger++ {
 		pingerWG.Add(1)
 		go func(p *CidPinger, wg *sync.WaitGroup, pingerID int) {
 			defer wg.Done()
