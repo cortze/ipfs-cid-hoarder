@@ -1,15 +1,18 @@
-GOCC=go
+GOCC=go1.17.7
 MKDIR_P=mkdir -p
 GIT_SUBM=git submodule
 
 BIN_PATH=./build
-BIN="./build/cid-hoarder"
+BIN="./build/ipfs-cid-hoarder"
 
-.PHONY: check dependencies build clean
+.PHONY: check dependencies build install clean
 
 build: 
-	$(MKDIR_P) $(BIN) fi
 	$(GOCC) build -o $(BIN)
+
+
+install:
+	$(GOCC) install
 
 
 dependencies:
@@ -19,3 +22,5 @@ dependencies:
 
 clean:
 	rm -r $(BIN_PATH)
+
+

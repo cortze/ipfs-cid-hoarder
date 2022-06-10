@@ -38,9 +38,9 @@ var RunCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:        "database-endpoint",
-			Usage:       "database enpoint (e.g. /Path/to/sqlite3.db)",
+			Usage:       "database endpoint",
 			EnvVars:     []string{"IPFS_CID_HOARDER_DATABASE_ENDPOINT"},
-			DefaultText: "./data/ipfs-hoarder-db.db",
+			DefaultText: "postgresql://user:password@localhost:5432/database",
 			Value:       config.DefaultConfig.Database,
 		},
 		&cli.StringFlag{
@@ -72,7 +72,7 @@ var RunCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:        "workers",
-			Usage:       "max number of CIDs on each of the generation batch",
+			Usage:       "max number of CIDs publish and ping workers",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
 			DefaultText: "250 CIDs",
 			Value:       config.DefaultConfig.Workers,

@@ -1,6 +1,6 @@
 module github.com/cortze/ipfs-cid-hoarder
 
-go 1.18
+go 1.17
 
 require (
 	github.com/ipfs/go-cid v0.0.7

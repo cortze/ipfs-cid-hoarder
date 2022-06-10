@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	CliName    = "IPFS CID HOARDER"
+	CliName    = "ipfs-cid-hoarder"
 	CliVersion = "v0.0.1"
 	log        = logrus.WithField(
 		"App", CliName,
