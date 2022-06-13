@@ -7,95 +7,75 @@ import (
 )
 
 func (db *DBClient) CreatePingResultsTable() error {
-	log.Debugf("creating table 'ping_results' for SQLite3 DB")
 
-	stmt, err := db.sqlCli.Prepare(`CREATE TABLE IF NOT EXISTS ping_results(
-		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		cid INTEGER NOT NULL,
-		peer_id INTEGER NOT NULL,
-		ping_round INTEGER NOT NULL,
-		fetch_time REAL NOT NULL,
-		is_active INTEGER NOT NULL,
-		has_records INTEGER NOT NULL,
-		conn_error INTEGER NOT NULL,
-		
-		FOREIGN KEY(cid) REFERENCES cid_info(cid_hash) 
-		FOREIGN KEY(peer_id) REFERENCES peer_info(peer_id)
-		CONSTRAINT ping UNIQUE(cid, peer_id, ping_round)
-	);`)
+	log.Debugf("creating table 'ping_results' for DB")
+
+	_, err := db.psqlPool.Exec(db.ctx, `
+		CREATE TABLE IF NOT EXISTS ping_results(
+			id SERIAL PRIMARY KEY, 
+			cid_hash TEXT NOT NULL,
+			ping_round INT NOT NULL,
+			peer_id TEXT NOT NULL,
+			ping_time FLOAT NOT NULL,
+			ping_duration FLOAT NOT NULL,
+			is_active BOOL NOT NULL,
+			has_records BOOL NOT NULL,
+			conn_error TEXT NOT NULL,
+
+			UNIQUE(cid_hash, ping_round, peer_id),
+			FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash),
+			FOREIGN KEY(peer_id) REFERENCES peer_info(peer_id)
+		);`)
 	if err != nil {
-		return errors.Wrap(err, "error preparing statement for ping_results table generation")
+		return errors.Wrap(err, "ping_results table")
 	}
-	stmt.Exec()
 
 	return nil
 }
 
-func (db *DBClient) AddPingResultsSet(pingRes []*models.PRPingResults) (err error) {
+func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) (err error) {
 	if len(pingRes) <= 0 {
-		return errors.New("unable to insert ping result set - no ping_results set given")
+		return errors.New("insert ping result set - no ping_results set given")
 	}
+	cStr := pingRes[0].Cid.Hash().B58String()
+	pingRound := pingRes[0].Round
+
 	log.WithFields(log.Fields{
-		"cid": pingRes[0].Cid.Hash().B58String(),
+		"cid": cStr,
 	}).Debug("adding set of cid ping_results to DB")
-
-	tx, err := db.sqlCli.BeginTx(db.ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "unable to begin transaction to add new PingResSet ")
-	}
-
-	// commit or rollback the tx depending on the error
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-			err = errors.Wrap(err, "unable to add new set of ping_results, rollback the tx ")
-		}
-		err = tx.Commit()
-		log.WithFields(log.Fields{
-			"cid":   pingRes[0].Cid.Hash().B58String(),
-			"round": pingRes[0].Round,
-			"pings": len(pingRes),
-		}).Trace("tx successfully saved ping_results into DB")
-	}()
-
-	stmt, err := tx.Prepare(`INSERT INTO ping_results (
-		cid,
-		peer_id,
-		ping_round,
-		fetch_time,
-		is_active,
-		has_records,
-		conn_error)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7)`)
-	if err != nil {
-		return errors.Wrap(err, "unable to prepare insert query for ping_results at SQLite3 DB ")
-	}
-
-	contId, err := db.GetIdOfCid(pingRes[0].Cid.Hash().B58String())
-	if err != nil {
-		return err
-	}
 
 	// insert each of the Peers holding the PR
 	for _, ping := range pingRes {
 
-		peerId, err := db.GetIdOfPeer(ping.PeerID.String())
-		if err != nil {
-			return err
-		}
-
-		_, err = stmt.Exec(
-			contId,
-			peerId,
+		_, err = db.psqlPool.Exec(db.ctx, `
+		INSERT INTO ping_results (
+			cid_hash,
+			ping_round,
+			peer_id,
+			ping_time,
+			ping_duration,
+			is_active,
+			has_records,
+			conn_error)		 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			cStr,
 			ping.Round,
-			ping.FetchTime.Milliseconds(),
+			ping.PeerID.String(),
+			ping.FetchTime.Unix(),
+			ping.FetchDuration.Milliseconds(),
 			ping.Active,
 			ping.HasRecords,
 			ping.ConError,
 		)
 		if err != nil {
-			return errors.Wrap(err, "unable to insert ping_results at SQLite3 DB ")
+			return errors.Wrap(err, "insert ping_results ")
 		}
+
+		log.WithFields(log.Fields{
+			"cid":   cStr,
+			"round": pingRound,
+			"pings": len(pingRes),
+		}).Trace("tx successfully saved ping_results into DB")
 	}
 	return err
 }

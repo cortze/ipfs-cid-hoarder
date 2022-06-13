@@ -38,9 +38,9 @@ var RunCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:        "database-endpoint",
-			Usage:       "database enpoint (e.g. postgresql://user:password@localhost:5432/database)",
+			Usage:       "database endpoint",
 			EnvVars:     []string{"IPFS_CID_HOARDER_DATABASE_ENDPOINT"},
-			DefaultText: "postgres://cid_hoarder:password@127.0.0.1:5432/cid_hoarder",
+			DefaultText: "postgresql://user:password@localhost:5432/database",
 			Value:       config.DefaultConfig.Database,
 		},
 		&cli.StringFlag{
@@ -71,18 +71,25 @@ var RunCmd = &cli.Command{
 			Value:       config.DefaultConfig.CidNumber,
 		},
 		&cli.IntFlag{
-			Name:        "batch-size",
-			Usage:       "max number of CIDs on each of the generation batch",
+			Name:        "workers",
+			Usage:       "max number of CIDs publish and ping workers",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
 			DefaultText: "250 CIDs",
-			Value:       config.DefaultConfig.BatchSize,
+			Value:       config.DefaultConfig.Workers,
 		},
-		&cli.IntFlag{
+		&cli.StringFlag{
 			Name:        "req-interval",
-			Usage:       "delay in minutes in between PRHolders pings for each CID",
+			Usage:       "delay in minutes in between PRHolders pings for each CID (example '30m' - '1h' - '60s')",
 			EnvVars:     []string{"IPFS_CID_HOARDER_REQ_INTERVAL"},
-			DefaultText: "250 CIDs",
+			DefaultText: "30m",
 			Value:       config.DefaultConfig.ReqInterval,
+		},
+		&cli.StringFlag{
+			Name:        "study-duration",
+			Usage:       "max time for the study to run (example '24h', '35h', '48h')",
+			EnvVars:     []string{"IPFS_CID_HOARDER_STUDY_DURATION"},
+			DefaultText: "48h",
+			Value:       config.DefaultConfig.StudyDuration,
 		},
 		&cli.IntFlag{
 			Name:        "k",
@@ -124,7 +131,7 @@ func RunHoarder(ctx *cli.Context) error {
 	log.Info("Running Cid-Hoarder on mode")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
-		log.Errorf("unable to initialize the CidHoarder - error %s", err.Error())
+		log.Errorf("CidHoarder - %s", err.Error())
 	}
 	cidHoarder.Run()
 

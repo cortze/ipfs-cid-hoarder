@@ -48,6 +48,7 @@ func (ms *MessageSender) SendMessage(ctx context.Context, p peer.ID, pmes *pb.Me
 	// compose the Notifier
 	not := &MsgNotification{
 		RemotePeer:    p,
+		QueryTime:     startT,
 		QueryDuration: t,
 		Msg:           *pmes,
 		Error:         err,

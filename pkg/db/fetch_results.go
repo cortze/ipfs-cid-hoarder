@@ -7,70 +7,38 @@ import (
 )
 
 func (db *DBClient) CreateFetchResultsTable() error {
-	log.Debugf("creating table 'fetch_results' for SQLite3 DB")
 
-	stmt, err := db.sqlCli.Prepare(`CREATE TABLE IF NOT EXISTS fetch_results(
-		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		cid INTEGER NOT NULL,
-		fetch_round INTEGER NOT NULL,
-		fetch_time REAL NOT NULL,
-		k INTEGER NOT NULL,
-		success_att INTEGER NOT NULL,
-		fail_att INTEGER NOT NULL,
-		is_retrievable INTEGER NOT NULL,
-		
-		CONSTRAINT fetch_round UNIQUE (cid, fetch_round)
-		FOREIGN KEY(cid) REFERENCES cid_info(cid_hash)
+	log.Debugf("creating table 'fetch_results' for DB")
+
+	_, err := db.psqlPool.Exec(db.ctx, `
+	CREATE TABLE IF NOT EXISTS fetch_results(
+		id SERIAL PRIMARY KEY, 
+		cid_hash TEXT NOT NULL,
+		ping_round INT NOT NULL,
+		fetch_time FLOAT NOT NULL,
+		fetch_duration FLOAT NOT NULL,
+		holders_ping_duration FLOAT NOT NULL,
+		find_prov_duration FLOAT NOT NULL,
+		get_closest_peer_duration FLOAT NOT NULL,
+		k INT NOT NULL,
+		success_att INT NOT NULL,
+		fail_att INT NOT NULL,
+		is_retrievable BOOL NOT NULL,
+
+		UNIQUE(cid_hash, ping_round),
+		FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
 	);`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for fetch_results table generation")
 	}
-	stmt.Exec()
-
 	return nil
 }
 
-func (db *DBClient) AddFetchResults(fetchRes *models.CidFetchResults) (err error) {
+func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error) {
+
 	log.WithFields(log.Fields{
 		"cid": fetchRes.Cid.Hash().B58String(),
 	}).Trace("adding fetch_results to DB")
-
-	tx, err := db.sqlCli.BeginTx(db.ctx, nil)
-	if err != nil {
-		return errors.Wrap(err, "unable to begin transaction to add new fetch_results ")
-	}
-
-	// commit or rollback the tx depending on the error
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-			err = errors.Wrap(err, "unable to add new fetch_results, rollback the tx ")
-		} else {
-			err = tx.Commit()
-			log.WithFields(log.Fields{
-				"cid":   fetchRes.Cid.Hash().B58String(),
-				"round": fetchRes.Round,
-			}).Trace("tx successfully saved fetch infos into DB")
-		}
-	}()
-
-	stmt, err := tx.Prepare(`INSERT INTO fetch_results (
-		cid,
-		fetch_round,
-		fetch_time,
-		k,
-		success_att,
-		fail_att,
-		is_retrievable)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7)`)
-	if err != nil {
-		return errors.Wrap(err, "unable to prepare insert query for fetch_results at SQLite3 DB ")
-	}
-
-	contId, err := db.GetIdOfCid(fetchRes.Cid.Hash().B58String())
-	if err != nil {
-		return err
-	}
 
 	tot, suc, fail := fetchRes.GetSummary()
 	var isRetrievable bool
@@ -78,18 +46,46 @@ func (db *DBClient) AddFetchResults(fetchRes *models.CidFetchResults) (err error
 		isRetrievable = true
 	}
 
-	_, err = stmt.Exec(
-		contId,
+	_, err = db.psqlPool.Exec(db.ctx, `
+	INSERT INTO fetch_results (
+		cid_hash,
+		ping_round,
+		fetch_time,
+		fetch_duration,
+		holders_ping_duration,
+		find_prov_duration,
+		get_closest_peer_duration,
+		k,
+		success_att,
+		fail_att,
+		is_retrievable)		 
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		fetchRes.Cid.Hash().B58String(),
 		fetchRes.Round,
+		fetchRes.StartTime.Unix(),
 		fetchRes.FinishTime.Sub(fetchRes.StartTime).Milliseconds(),
+		fetchRes.PRHoldPingDuration.Milliseconds(),
+		fetchRes.FindProvDuration.Milliseconds(),
+		fetchRes.GetClosePeersDuration.Milliseconds(),
 		tot,
 		suc,
 		fail,
 		isRetrievable,
 	)
 	if err != nil {
-		return errors.Wrap(err, "unable to insert fetch_results at SQLite3 DB ")
+		return errors.Wrap(err, "unable to insert fetch_results at DB ")
 	}
+
+	err = db.addPingResultsSet(fetchRes.PRPingResults)
+	if err != nil {
+		return errors.Wrap(err, "persisting PingResults")
+	}
+
+	err = db.addClosestPeerSet(&models.ClosestPeers{
+		Cid:       fetchRes.Cid,
+		PingRound: fetchRes.Round,
+		Peers:     fetchRes.ClosestPeers,
+	})
 
 	return err
 }
