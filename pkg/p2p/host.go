@@ -40,7 +40,7 @@ type Host struct {
 	StartTime time.Time
 }
 
-func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string) (*Host, error) {
+func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int) (*Host, error) {
 	log.Debug("generating random cid generator")
 
 	// set the max limit of connections to 30000
@@ -67,6 +67,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string) (*Hos
 				kaddht.Mode(kaddht.ModeClient),
 				// Consider a Wrapper around MessageSender to get more details of underneath processes
 				kaddht.WithCustomMessageSender(msgSender.Init),
+				kaddht.BucketSize(bucketSize),
 			)
 			return dht, err
 		}),

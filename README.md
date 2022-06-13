@@ -111,7 +111,7 @@ By changing the configuration parameters of the tool, we will be able to generat
 To compile the tool you will need:
 - `make`
 - Go `1.17` (Go `1.18` is still not supported by few imported modules)
-- A `postgres` instance, doesn't matter if you are running it on a docker or lacally
+- A `postgres` instance, doesn't matter if you are running it on a docker or locally
 
 
 ## Compilation
