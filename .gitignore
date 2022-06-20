@@ -1,3 +1,14 @@
 # dismiss binaries
+build/
+
+# dismiss data folder including the databases
+data/*
+
+# Dismiss python cached stuff and venv
+.ipynb_checkpoints/
+analyzer/.ipynb_checkpoints/
+analyzer/venv/
+
+
 # TODO: update to make file and build folder
-cid-hoarder
+dbs

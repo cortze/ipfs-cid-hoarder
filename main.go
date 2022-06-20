@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	CliName    = "IPFS CID HOARDER"
-	CliVersion = "v0.0.1"
+	CliName    = "ipfs-cid-hoarder"
+	CliVersion = "v0.1.0"
 	log        = logrus.WithField(
 		"App", CliName,
 	)
@@ -33,7 +33,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			cmd.GetCmd,
+			cmd.RunCmd,
 		},
 	}
 
