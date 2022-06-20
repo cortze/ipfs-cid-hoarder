@@ -17,6 +17,8 @@ import (
 
 var DialTimeout = 20 * time.Second
 var minIterTime = 500 * time.Millisecond
+var maxDialAttempts = 3 // Are three attempts enough?
+var dialGraceTime = 10 * time.Second
 
 type CidPinger struct {
 	ctx context.Context
@@ -178,7 +180,7 @@ func (p *CidPinger) Run() {
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
 						t := time.Now()
-						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, c.CID.Hash().B58String())
+						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, string(c.CID.Hash()))
 						pingTime := time.Since(t)
 						fetchRes.GetClosePeersDuration = pingTime
 						if err != nil {
@@ -258,18 +260,29 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 	tstart := time.Now()
 	go func() {
 		defer wg.Done()
-		err := p.host.Connect(pingCtx, pAddr)
-		if err != nil {
-			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
-			connError = p2p.ParseConError(err) // TODO: IPFSdht error parsing missing
-		} else {
-			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
-			active = true
-			connError = p2p.NoConnError
-		}
-		err = p.host.Network().ClosePeer(pAddr.ID)
-		if err != nil {
-			logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
+
+		// loop over max tries if the connection is connection refused/ connection reset by peer
+		for att := 0; att < maxDialAttempts; att++ {
+			// TODO: attempt at least to see if the connection refused
+			err := p.host.Connect(pingCtx, pAddr)
+			if err != nil {
+				logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
+				connError = p2p.ParseConError(err)
+				if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
+					break
+				}
+			} else {
+				logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
+				active = true
+				connError = p2p.NoConnError
+
+				// close connection and exit loop
+				err = p.host.Network().ClosePeer(pAddr.ID)
+				if err != nil {
+					logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
+				}
+				break
+			}
 		}
 	}()
 
