@@ -1,0 +1,15 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: IPFS CID Hoarder
+message: >-
+  if you want to cite the code, please use the
+  provided template
+type: software
+authors:
+  - given-names: Mikel
+    family-names: Cortes-Goicoechea
+    email: cortze@protonmail.com
+    affiliation: Barcelona Supercomputing Center
+    orcid: 'https://orcid.org/0000-0003-3167-6014'
