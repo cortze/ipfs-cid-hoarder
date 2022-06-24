@@ -252,51 +252,41 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 	var connError string
 
 	// connect the peer
-	var wg sync.WaitGroup
 	pingCtx, cancel := context.WithTimeout(p.ctx, DialTimeout)
 	defer cancel()
-	wg.Add(2)
 
 	tstart := time.Now()
-	go func() {
-		defer wg.Done()
 
-		// loop over max tries if the connection is connection refused/ connection reset by peer
-		for att := 0; att < maxDialAttempts; att++ {
-			// TODO: attempt at least to see if the connection refused
-			err := p.host.Connect(pingCtx, pAddr)
-			if err != nil {
-				logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
-				connError = p2p.ParseConError(err)
-				if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
-					break
-				}
-			} else {
-				logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
-				active = true
-				connError = p2p.NoConnError
-
-				// close connection and exit loop
-				err = p.host.Network().ClosePeer(pAddr.ID)
-				if err != nil {
-					logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
-				}
+	// loop over max tries if the connection is connection refused/ connection reset by peer
+	for att := 0; att < maxDialAttempts; att++ {
+		// TODO: attempt at least to see if the connection refused
+		err := p.host.Connect(pingCtx, pAddr)
+		if err != nil {
+			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
+			connError = p2p.ParseConError(err)
+			if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
 				break
 			}
+		} else {
+			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
+			active = true
+			connError = p2p.NoConnError
+
+			// if the connection was successfull, request wheter it has the records or not
+			provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
+			if len(provs) > 0 {
+				hasRecords = true
+				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
+			}
+
+			// close connection and exit loop
+			err = p.host.Network().ClosePeer(pAddr.ID)
+			if err != nil {
+				logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
+			}
+			break
 		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
-
-		if len(provs) > 0 {
-			hasRecords = true
-			logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
-		}
-	}()
-
-	wg.Wait()
+	}
 
 	fetchTime := time.Since(tstart)
 
