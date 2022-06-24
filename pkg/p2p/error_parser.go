@@ -27,6 +27,7 @@ const (
 	DialErrorMaddrReset                                 = "maddr_reset"
 	DialErrorStreamReset                                = "stream_reset"
 	DialErrorHostIsDown                                 = "host_is_down"
+	DialErrorTooManyOpenFiles                           = "too_many_open_files"
 	DialErrorNegotiateSecurityProtocolNoTrailingNewLine = "negotiate_security_protocol_no_trailing_new_line"
 )
 
@@ -43,6 +44,7 @@ var KnownErrors = map[string]string{
 	DialErrorMaxDialAttemptsExceeded:                    "max dial attempts exceeded",
 	DialErrorHostIsDown:                                 "host is down",
 	DialErrorStreamReset:                                "stream reset",
+	DialErrorTooManyOpenFiles:                           "too many open files",
 	DialErrorNegotiateSecurityProtocolNoTrailingNewLine: "failed to negotiate security protocol: message did not have trailing newline",
 }
 
