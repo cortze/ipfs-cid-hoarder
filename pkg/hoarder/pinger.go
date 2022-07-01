@@ -15,10 +15,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var DialTimeout = 20 * time.Second
-var minIterTime = 500 * time.Millisecond
-var maxDialAttempts = 3 // Are three attempts enough?
-var dialGraceTime = 10 * time.Second
+const (
+	DialTimeout     = 20 * time.Second
+	minIterTime     = 500 * time.Millisecond
+	maxDialAttempts = 3 // Are three attempts enough?
+	dialGraceTime   = 10 * time.Second
+)
 
 type CidPinger struct {
 	ctx context.Context
@@ -264,6 +266,7 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 		if err != nil {
 			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
 			connError = p2p.ParseConError(err)
+			// If the error is not linked to an connection refused or reset by peer, just break the look
 			if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
 				break
 			}

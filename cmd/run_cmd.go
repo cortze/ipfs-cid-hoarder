@@ -4,7 +4,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/migalabs/armiarma/src/utils"
 	"github.com/pkg/errors"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
@@ -111,9 +110,9 @@ func RunHoarder(ctx *cli.Context) error {
 	}
 
 	// set the logs configurations
-	log.Logger.SetFormatter(utils.ParseLogFormatter("text"))
-	log.Logger.SetOutput(utils.ParseLogOutput("terminal"))
-	log.Logger.SetLevel(utils.ParseLogLevel(conf.LogLevel))
+	log.Logger.SetFormatter(config.ParseLogFormatter("text"))
+	log.Logger.SetOutput(config.ParseLogOutput("terminal"))
+	log.Logger.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
 	log.Debug("get configuration:", conf)
 
