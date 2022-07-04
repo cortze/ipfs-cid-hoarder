@@ -10,6 +10,10 @@ const (
 	NoUserAgentDefined = "Not Defined"
 )
 
+// Much easier/prettier way of filtering the Error returned by the libp2p.Host.Connect
+// extracted from `@dennis-tra`'s nebula-crawler repo:
+// https://github.com/dennis-tra/nebula-crawler/blob/f2b3ba376d221fed886dad204acfc0dfe8e492ea/pkg/db/errors.go#L28
+
 const (
 	// list errors
 	NoConnError                                         = "none"
@@ -27,6 +31,7 @@ const (
 	DialErrorMaddrReset                                 = "maddr_reset"
 	DialErrorStreamReset                                = "stream_reset"
 	DialErrorHostIsDown                                 = "host_is_down"
+	DialErrorTooManyOpenFiles                           = "too_many_open_files"
 	DialErrorNegotiateSecurityProtocolNoTrailingNewLine = "negotiate_security_protocol_no_trailing_new_line"
 )
 
@@ -43,6 +48,7 @@ var KnownErrors = map[string]string{
 	DialErrorMaxDialAttemptsExceeded:                    "max dial attempts exceeded",
 	DialErrorHostIsDown:                                 "host is down",
 	DialErrorStreamReset:                                "stream reset",
+	DialErrorTooManyOpenFiles:                           "too many open files",
 	DialErrorNegotiateSecurityProtocolNoTrailingNewLine: "failed to negotiate security protocol: message did not have trailing newline",
 }
 

@@ -10,7 +10,6 @@ func (db *DBClient) CreatePeerInfoTable() error {
 
 	log.Debugf("creating table 'peer_info' for DB")
 
-	// TODO: missing multiaddrs
 	_, err := db.psqlPool.Exec(db.ctx,
 		`CREATE TABLE IF NOT EXISTS peer_info(
 		id SERIAL, 

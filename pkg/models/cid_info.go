@@ -48,6 +48,7 @@ func NewCidInfo(
 	}
 }
 
+// AddProvideTime modifies the time that took to publish a CID
 func (c *CidInfo) AddProvideTime(reqTime time.Duration) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -55,6 +56,7 @@ func (c *CidInfo) AddProvideTime(reqTime time.Duration) {
 	c.ProvideTime = reqTime
 }
 
+// AddPRHolder inserts a given Peer selected/attempted to keep the PRs for a CID
 func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -63,6 +65,7 @@ func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	c.K++
 }
 
+// AddPRFetchResults inserts the results of a given CidFetch round into the CID obj
 func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -75,14 +78,18 @@ func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	}
 }
 
+// IncreasePingCounter increases the internal ping counter, later used to track the ping round
+// it also increases the time for the next ping
 func (c *CidInfo) IncreasePingCounter() {
 	c.m.Lock()
 	defer c.m.Unlock()
 
+	// TODO: since is internal and we have GetPingCounter, PingCounter local
 	c.PingCounter++
 	c.NextPing = c.NextPing.Add(c.ReqInterval)
 }
 
+// GetPingCounter returns the state of the internal pingCounter
 func (c *CidInfo) GetPingCounter() int {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -90,10 +97,12 @@ func (c *CidInfo) GetPingCounter() int {
 	return c.PingCounter
 }
 
+// GetFetchResultsLen returns the number of FetchResults that are stored in the CID
 func (c *CidInfo) GetFetchResultsLen() int {
 	return len(c.PRPingResults)
 }
 
+// GetFetchResultSummaryOfRound returns the summary of a given fetch/ping round of the CID
 func (c *CidInfo) GetFetchResultSummaryOfRound(round int) (tot, success, failed int) {
 	// check if the Result Array has enough rounds as the requested one
 	if round >= c.GetFetchResultsLen() {

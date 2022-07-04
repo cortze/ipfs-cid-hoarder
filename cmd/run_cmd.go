@@ -4,7 +4,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/migalabs/armiarma/src/utils"
 	"github.com/pkg/errors"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
@@ -111,9 +110,9 @@ func RunHoarder(ctx *cli.Context) error {
 	}
 
 	// set the logs configurations
-	log.Logger.SetFormatter(utils.ParseLogFormatter("text"))
-	log.Logger.SetOutput(utils.ParseLogOutput("terminal"))
-	log.Logger.SetLevel(utils.ParseLogLevel(conf.LogLevel))
+	log.Logger.SetFormatter(config.ParseLogFormatter("text"))
+	log.Logger.SetOutput(config.ParseLogOutput("terminal"))
+	log.Logger.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
 	log.Debug("get configuration:", conf)
 
@@ -131,13 +130,8 @@ func RunHoarder(ctx *cli.Context) error {
 	log.Info("Running Cid-Hoarder on mode")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
-		log.Errorf("CidHoarder - %s", err.Error())
+		return err
 	}
-	cidHoarder.Run()
 
-	// Not necessary for now, better to finish when the cidHoarder.Run(finishes)
-	// // wait until SIGTERM signal from urfave/cli
-	// <-ctx.Context.Done()
-
-	return nil
+	return cidHoarder.Run()
 }

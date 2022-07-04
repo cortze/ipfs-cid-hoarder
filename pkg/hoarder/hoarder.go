@@ -73,6 +73,8 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	log.Info("configured Hoarder to request at an interval of ", reqInterval, " and during ", studyDuration)
 
+	// TODO: understimate the number of workers that will be needed might add certain delay between rounds
+	//       Better to swap it to check the final time for finishing the run than counting rounds
 	rounds := int(studyDuration/reqInterval) + 1
 
 	// ----- Generate the CidPinger -----
@@ -99,11 +101,11 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}, nil
 }
 
-func (c *CidHoarder) Run() {
+func (c *CidHoarder) Run() error {
 	// Boostrap the kdht host
 	err := c.Host.Boostrap(c.ctx)
 	if err != nil {
-		log.Errorf("unable to boostrap the host with the kdht routing table. %s", err.Error())
+		return errors.Wrap(err, "unable to boostrap the host with the kdht routing table.")
 	}
 	// Launch the Cid Tracker
 	go c.CidTracker.Run()
@@ -116,4 +118,5 @@ func (c *CidHoarder) Run() {
 	// after the CidTracker has already finished, close the DB
 	c.DBCli.Close()
 
+	return nil
 }

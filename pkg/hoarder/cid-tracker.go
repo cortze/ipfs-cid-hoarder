@@ -20,6 +20,7 @@ type CidSource interface {
 	Type() string
 }
 
+// CidTracker composes the basic ojbject that generates and publishes the set of CIDs defined in the configuration
 type CidTracker struct {
 	ctx context.Context
 	wg  *sync.WaitGroup
@@ -40,6 +41,7 @@ type CidTracker struct {
 	CidMap        sync.Map
 }
 
+// NewCidTracker returns a CidTracker object from the run parameters
 func NewCidTracker(
 	ctx context.Context,
 	wg *sync.WaitGroup,
@@ -66,6 +68,7 @@ func NewCidTracker(
 	}, nil
 }
 
+// Run initializes and starts the run/study
 func (t *CidTracker) Run() {
 	// generate different run routines for the different cid source methods
 
@@ -83,6 +86,7 @@ func (t *CidTracker) Run() {
 	}
 }
 
+// newRandomCidTracker runs a randome CID tracker obj
 func (t *CidTracker) newRandomCidTracker() {
 	defer t.wg.Done()
 
