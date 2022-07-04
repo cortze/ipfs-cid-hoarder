@@ -22,6 +22,7 @@ const (
 	dialGraceTime   = 10 * time.Second
 )
 
+// CidPinger is the main object to schedule and monitor all the CID related metrics
 type CidPinger struct {
 	ctx context.Context
 	sync.Mutex
@@ -40,6 +41,7 @@ type CidPinger struct {
 	pingTaskC chan *models.CidInfo
 }
 
+// NewCidPinger return a CidPinger with the given configuration
 func NewCidPinger(
 	ctx context.Context,
 	wg *sync.WaitGroup,
@@ -63,6 +65,9 @@ func NewCidPinger(
 	}
 }
 
+// Run executes the main logic of the CID Pinger.
+// 1. runs the queue logic that schedules the pings
+// 2. launchs the pinger pool that will perform all the CID monitoring calls
 func (p *CidPinger) Run() {
 	defer p.wg.Done()
 
@@ -237,6 +242,7 @@ func (p *CidPinger) Run() {
 	log.Debug("done from the CID Pinger")
 }
 
+// AddCidInfo adds a new CID to the pinging queue
 func (p *CidPinger) AddCidInfo(c *models.CidInfo) {
 	if !p.init {
 		p.init = true
@@ -245,6 +251,7 @@ func (p *CidPinger) AddCidInfo(c *models.CidInfo) {
 	p.cidQ.addCid(c)
 }
 
+// PingPRHolder dials a given PR Holder to check whether it's acticve or not, and wheter it has the PRs or not
 func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *models.PRPingResults {
 	logEntry := log.WithFields(log.Fields{
 		"cid": c.Hash().B58String(),

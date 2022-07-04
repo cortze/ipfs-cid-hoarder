@@ -36,6 +36,7 @@ func RemoveOldDBIfExists(oldDBPath string) {
 	os.Remove(oldDBPath)
 }
 
+// NewDBClient creates and returns a db.cli to persist data into a PostgreSQL database
 func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 	logEntry := log.WithFields(log.Fields{
 		"db": url,
@@ -76,6 +77,8 @@ func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 	return dbCli, nil
 }
 
+// runPersisters creates a pool of DB persistors
+// TODO: originally created for cuncurrency issues with SQLite3, might not be needed now with PostgreSQL
 func (db *DBClient) runPersisters() {
 	log.Info("Initializing DB persisters")
 
@@ -151,17 +154,16 @@ func (db *DBClient) AddFetchResult(f *models.CidFetchResults) {
 	db.persistC <- f
 }
 
+// Close closes all the connections opened with the DB
+// TODO: still not completed
 func (db *DBClient) Close() {
-
 	log.Info("closing DB for the CID Hoarder")
-
-	// wait untill all the channels have been emptied
-
 	// send message on doneC
 	db.doneC <- struct{}{}
-	//db.psqlPool.Close()
+	// db.psqlPool.Close()
 }
 
+// initTables creates all the necesary tables in the given DB
 func (db *DBClient) initTables() error {
 	var err error
 

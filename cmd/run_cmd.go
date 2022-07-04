@@ -130,13 +130,8 @@ func RunHoarder(ctx *cli.Context) error {
 	log.Info("Running Cid-Hoarder on mode")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
-		log.Errorf("CidHoarder - %s", err.Error())
+		return err
 	}
-	cidHoarder.Run()
 
-	// Not necessary for now, better to finish when the cidHoarder.Run(finishes)
-	// // wait until SIGTERM signal from urfave/cli
-	// <-ctx.Context.Done()
-
-	return nil
+	return cidHoarder.Run()
 }

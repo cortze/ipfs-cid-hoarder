@@ -10,6 +10,10 @@ const (
 	NoUserAgentDefined = "Not Defined"
 )
 
+// Much easier/prettier way of filtering the Error returned by the libp2p.Host.Connect
+// extracted from `@dennis-tra`'s nebula-crawler repo:
+// https://github.com/dennis-tra/nebula-crawler/blob/f2b3ba376d221fed886dad204acfc0dfe8e492ea/pkg/db/errors.go#L28
+
 const (
 	// list errors
 	NoConnError                                         = "none"

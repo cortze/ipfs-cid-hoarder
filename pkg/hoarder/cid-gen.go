@@ -10,7 +10,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
-var DefCIDContLen = 1024 * 1024 // 1MB
+var DefCIDContLen = 1024 // 1KB
 
 type RandomCidGen struct {
 	contentSize int
@@ -31,18 +31,21 @@ func (g *RandomCidGen) Type() string {
 }
 
 // TODO: is it worth keeping the content?
+// getRandomContent returns generates an array of random bytes with the given size and the composed CID of the content
 func genRandomContent(byteLen int) ([]byte, cid.Cid, error) {
 	// generate random bytes
 	content := make([]byte, byteLen)
 	rand.Read(content)
 
-	// get the CID of the content we just generated
+	// configure the type of CID that we want
 	pref := cid.Prefix{
 		Version:  1,
 		Codec:    cid.Raw,
 		MhType:   mh.SHA2_256,
 		MhLength: -1,
 	}
+
+	// get the CID of the content we just generated
 	contID, err := pref.Sum(content)
 	if err != nil {
 		return content, cid.Cid{}, errors.Wrap(err, "composing CID")
