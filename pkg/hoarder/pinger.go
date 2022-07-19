@@ -187,7 +187,8 @@ func (p *CidPinger) Run() {
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
 						t := time.Now()
-						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, string(c.CID.Hash()))
+						var hops int32
+						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, string(c.CID.Hash()), &hops)
 						pingTime := time.Since(t)
 						fetchRes.GetClosePeersDuration = pingTime
 						if err != nil {
