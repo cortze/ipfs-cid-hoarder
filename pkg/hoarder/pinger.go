@@ -12,6 +12,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -187,9 +188,13 @@ func (p *CidPinger) Run() {
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
 						t := time.Now()
-						var hops int32
+
+						var hops dht.Hops
+
 						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, string(c.CID.Hash()), &hops)
 						pingTime := time.Since(t)
+						fetchRes.TotalHops = hops.Total
+						fetchRes.HopsToClosest = hops.ToClosest
 						fetchRes.GetClosePeersDuration = pingTime
 						if err != nil {
 							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())

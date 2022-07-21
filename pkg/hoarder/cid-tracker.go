@@ -229,9 +229,11 @@ func (t *CidTracker) newRandomCidTracker() {
 					fetchRes := models.NewCidFetchResults(*c, 0) // First round = Publish PR
 					cidFetchRes.Store(cStr, fetchRes)
 
-					//
-					var hops int32
+					// necessary stuff to get the different hop measurements
+					var hops dht.Hops
+					// currently linking a ContextKey variable througth the context that we generate
 					ctx := context.WithValue(t.ctx, dht.ContextKey("hops"), &hops)
+
 					tstart := time.Now()
 					err := t.host.DHT.Provide(ctx, *c, true)
 					if err != nil {
@@ -239,7 +241,9 @@ func (t *CidTracker) newRandomCidTracker() {
 					}
 					reqTime := time.Since(tstart)
 
-					// TODO: Add the number of hops to the SQL database
+					// add the number of hops to the fetch results
+					fetchRes.TotalHops = hops.Total
+					fetchRes.HopsToClosest = hops.ToClosest
 
 					// TODO: fix this little wait to comput last PR Holder status
 					// little not inside the CID to notify when k peers where recorded?
