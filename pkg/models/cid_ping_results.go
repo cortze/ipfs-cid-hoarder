@@ -50,6 +50,8 @@ type CidFetchResults struct {
 	Round                 int
 	StartTime             time.Time
 	FinishTime            time.Time
+	TotalHops             int
+	HopsToClosest         int
 	PRHoldPingDuration    time.Duration
 	FindProvDuration      time.Duration
 	GetClosePeersDuration time.Duration

@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/ipfs/go-cid"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 )
 
@@ -228,12 +229,21 @@ func (t *CidTracker) newRandomCidTracker() {
 					fetchRes := models.NewCidFetchResults(*c, 0) // First round = Publish PR
 					cidFetchRes.Store(cStr, fetchRes)
 
+					// necessary stuff to get the different hop measurements
+					var hops dht.Hops
+					// currently linking a ContextKey variable througth the context that we generate
+					ctx := context.WithValue(t.ctx, dht.ContextKey("hops"), &hops)
+
 					tstart := time.Now()
-					err := t.host.DHT.Provide(t.ctx, *c, true)
+					err := t.host.DHT.Provide(ctx, *c, true)
 					if err != nil {
 						logEntry.Errorf("unable to Provide random content. %s", err.Error())
 					}
 					reqTime := time.Since(tstart)
+
+					// add the number of hops to the fetch results
+					fetchRes.TotalHops = hops.Total
+					fetchRes.HopsToClosest = hops.ToClosest
 
 					// TODO: fix this little wait to comput last PR Holder status
 					// little not inside the CID to notify when k peers where recorded?
