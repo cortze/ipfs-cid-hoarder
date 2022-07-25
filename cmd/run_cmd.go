@@ -97,6 +97,13 @@ var RunCmd = &cli.Command{
 			DefaultText: "K=20",
 			Value:       config.DefaultConfig.CidNumber,
 		},
+		&cli.BoolFlag{
+			Name:        "hydra-filter",
+			Usage:       "boolean representation to activate or not the filter to avoid connections to hydras",
+			EnvVars:     []string{"IPFS_CID_HOARDER_HYDRA_FILTER"},
+			DefaultText: "false",
+			Value:       config.DefaultConfig.HydraFilter,
+		},
 	},
 }
 
