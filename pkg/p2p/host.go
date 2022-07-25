@@ -40,7 +40,7 @@ type Host struct {
 	StartTime time.Time
 }
 
-func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int) (*Host, error) {
+func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int, hydraFilter bool) (*Host, error) {
 	log.Debug("generating random cid generator")
 
 	// set the max limit of connections to 30000
@@ -53,7 +53,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 	}
 
 	var dht *kaddht.IpfsDHT
-	msgSender := NewCustomMessageSender()
+	msgSender := NewCustomMessageSender(hydraFilter)
 	// generate the libp2p host
 	h, err := libp2p.New(
 		libp2p.ListenAddrs(mAddr),

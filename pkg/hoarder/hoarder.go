@@ -55,7 +55,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}
 
 	// ----- Compose the Libp2p host -----
-	h, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K)
+	h, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
 	}

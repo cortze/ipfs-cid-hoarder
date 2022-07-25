@@ -3,6 +3,7 @@ package p2p
 import (
 	"strings"
 
+	net "github.com/libp2p/go-libp2p-kad-dht/net"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 )
 
@@ -17,6 +18,7 @@ const (
 const (
 	// list errors
 	NoConnError                                         = "none"
+	HydraBoosterError                                   = "hydra_booster"
 	DialErrorIoTimeout                                  = "io_timeout"
 	DialErrorConnectionRefused                          = "connection_refused"
 	DialErrorProtocolNotSupported                       = "protocol_not_supported"
@@ -36,6 +38,7 @@ const (
 )
 
 var KnownErrors = map[string]string{
+	HydraBoosterError:                                   net.HydraPeerError,
 	DialErrorIoTimeout:                                  "i/o timeout",
 	DialErrorConnectionRefused:                          "connection refused",
 	DialErrorProtocolNotSupported:                       "protocol not supported",

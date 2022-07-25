@@ -40,6 +40,7 @@ var DefaultConfig = Config{
 	ReqInterval:    "30m",
 	StudyDuration:  "48h",
 	K:              20, // K-bucket parameter
+	HydraFilter:    false,
 }
 
 // Config compiles all the set of flags that can be readed from the user while launching the cli
@@ -55,6 +56,7 @@ type Config struct {
 	ReqInterval    string `json:"req-interval"`
 	StudyDuration  string `json:"study-duration"`
 	K              int    `json:"k"`
+	HydraFilter    bool   `json:"hydra-filter"`
 }
 
 // Init takes the command line argumenst from the urfave/cli context and composes the configuration
@@ -80,8 +82,21 @@ func (c *Config) apply(ctx *cli.Context) {
 		if ctx.IsSet("database-endpoint") {
 			c.Database = ctx.String("database-endpoint")
 		}
-		// TODO: Add republish of the records interval
-		// 		 Add the content/peer ping interval
+		if ctx.IsSet("hydra-filter") {
+			c.HydraFilter = ctx.Bool("hydra-filter")
+		}
+		// Time delay between the each of the PRHolder pings
+		if ctx.IsSet("req-interval") {
+			c.ReqInterval = ctx.String("req-interval")
+		}
+		// Set the study duration time
+		if ctx.IsSet("study-duration") {
+			c.StudyDuration = ctx.String("study-duration")
+		}
+		// check the number of random CIDs that we want to generate
+		if ctx.IsSet("k") {
+			c.K = ctx.Int("k")
+		}
 		if ctx.IsSet("cid-source") {
 			c.CidSource = ctx.String("cid-source")
 			// if the TEXT mode was selected, read the file from the cid-file
@@ -98,18 +113,6 @@ func (c *Config) apply(ctx *cli.Context) {
 				// batch of CIDs for the entire study
 				if ctx.IsSet("workers") {
 					c.Workers = ctx.Int("workers")
-				}
-				// Time delay between the each of the PRHolder pings
-				if ctx.IsSet("req-interval") {
-					c.ReqInterval = ctx.String("req-interval")
-				}
-				// Set the study duration time
-				if ctx.IsSet("study-duration") {
-					c.StudyDuration = ctx.String("study-duration")
-				}
-				// check the number of random CIDs that we want to generate
-				if ctx.IsSet("k") {
-					c.K = ctx.Int("k")
 				}
 			case TextFileSource:
 				if ctx.IsSet("cid-file") {

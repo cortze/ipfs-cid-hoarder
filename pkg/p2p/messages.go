@@ -13,17 +13,19 @@ import (
 
 // MessageSender handles sending wire protocol messages to a given peer
 type MessageSender struct {
-	m      pb.MessageSender
-	msgNot *Notifier
+	m           pb.MessageSender
+	hydraFilter bool
+	msgNot      *Notifier
 }
 
-func NewCustomMessageSender() *MessageSender {
+func NewCustomMessageSender(hydraFilter bool) *MessageSender {
 	return &MessageSender{
-		msgNot: NewMsgNotifier(),
+		hydraFilter: hydraFilter,
+		msgNot:      NewMsgNotifier(),
 	}
 }
 func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSender {
-	msgSender := net.NewMessageSenderImpl(h, protocols)
+	msgSender := net.NewMessageSenderImpl(h, ms.hydraFilter, protocols)
 	ms.m = msgSender
 	return ms
 }
