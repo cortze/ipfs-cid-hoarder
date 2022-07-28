@@ -34,6 +34,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			cmd.RunCmd,
+			cmd.CrawlerCmd,
 		},
 	}
 
