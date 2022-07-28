@@ -71,6 +71,8 @@ Already from the first ADD_PROVIDE connection to the K closest peers, the tool f
 Fetch Results: (Summary of the K PR Ping Results)
 - CID 
 - Fetch round
+- TotalHops
+- HopsToClosest
 - Fetch Time
 - Fetch Round Duration
 - PR Holders Ping Duration
@@ -95,7 +97,7 @@ Once each CID has been generated and published to the network, The tool proceeds
 
 The CID Ping-Orchester has a list of CIDs ordered by the next connection time. It uses this next connection time to determine whether the CID needs to be pinged again or not. If the CID’s next connections proves that the track frequency has passed since the last ping, it will add the CID info into a `Ping Queue` for the ping worker.
 
-Each of the CID Ping workers will try to establish a connection with the PR Holders of the CID reader from the `Ping Queue` tracking the dial time, whether they are active or not, the reported error if the connection attempt failed, and whether they still keep the PR or not. Further more, the tool also walks the DHT looking for the K closest peers at the moment of pinging the PR Holders, and tries to retrieve the PR from the DHT itself. 
+Each of the CID Ping workers will try to establish a connection with the PR Holders of the CID reader from the `Ping Queue` tracking the dial time, whether they are active or not, the reported error if the connection attempt failed, and whether they still keep the PR or not. Further more, the tool also walks the DHT looking for the K closest peers at the moment of pinging the PR Holders, keeping track of the total hops needed to get the closest peers and the minimum hops to know all of them and trying to retrieve the PR from the DHT itself. 
 
 After attempting to connect all the PR Holders of a CID, the tool persists the Ping Results and their summary (Fetch Results) into the DB.
 
