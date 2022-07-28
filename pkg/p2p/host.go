@@ -2,15 +2,17 @@ package p2p
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
-	"github.com/sirupsen/logrus"
+	"github.com/cortze/ipfs-cid-hoarder/pkg/crawler"
+	log "github.com/sirupsen/logrus"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -22,12 +24,7 @@ import (
 
 	//quic "github.com/libp2p/go-libp2p-quic-transport"
 	tcp "github.com/libp2p/go-tcp-transport"
-
 	ma "github.com/multiformats/go-multiaddr"
-)
-
-var log = logrus.WithField(
-	"module", "Host",
 )
 
 type Host struct {
@@ -53,7 +50,22 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 	}
 
 	var dht *kaddht.IpfsDHT
-	msgSender := NewCustomMessageSender(hydraFilter)
+	// check if hydra filter has been tuned
+	var blacklistedUA string
+	var blacklistPeers map[peer.ID]struct{}
+
+	if hydraFilter {
+		log.Info("hydra-filter: ON -> crawling network to identify hydra-boosters (might take 5-7mins)")
+		blacklistedUA = config.DefaultBlacklistUserAgent
+		// launch light crawler identifying balcklistable peers
+		crawlResutls, err := crawler.RunLightCrawler(ctx, blacklistedUA)
+		if err != nil {
+			return nil, err
+		}
+		blacklistPeers = crawlResutls.GetBlacklistedPeers()
+	}
+	msgSender := NewCustomMessageSender(blacklistedUA)
+
 	// generate the libp2p host
 	h, err := libp2p.New(
 		libp2p.ListenAddrs(mAddr),
@@ -68,6 +80,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 				// Consider a Wrapper around MessageSender to get more details of underneath processes
 				kaddht.WithCustomMessageSender(msgSender.Init),
 				kaddht.BucketSize(bucketSize),
+				kaddht.WithPeerBlacklist(blacklistPeers), // always blacklist (can be an empty map or a full one)
 			)
 			return dht, err
 		}),

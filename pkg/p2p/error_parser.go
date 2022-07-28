@@ -18,7 +18,7 @@ const (
 const (
 	// list errors
 	NoConnError                                         = "none"
-	HydraBoosterError                                   = "hydra_booster"
+	DialBlacklistedPeer                                 = "hydra_booster_peer"
 	DialErrorIoTimeout                                  = "io_timeout"
 	DialErrorConnectionRefused                          = "connection_refused"
 	DialErrorProtocolNotSupported                       = "protocol_not_supported"
@@ -38,7 +38,7 @@ const (
 )
 
 var KnownErrors = map[string]string{
-	HydraBoosterError:                                   net.HydraPeerError,
+	DialBlacklistedPeer:                                  net.ErrBlacklistedPeer.Error(),
 	DialErrorIoTimeout:                                  "i/o timeout",
 	DialErrorConnectionRefused:                          "connection refused",
 	DialErrorProtocolNotSupported:                       "protocol not supported",

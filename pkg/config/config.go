@@ -28,6 +28,9 @@ var CliIp string = "0.0.0.0"
 var CliPort string = "9010"
 var UserAgent string = "BSC-Cid-Hoarder"
 
+// Blacklisting UserAgents
+var DefaultBlacklistUserAgent = "hydra-booster"
+
 // default configuration
 var DefaultConfig = Config{
 	LogLevel:       "info",
