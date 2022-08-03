@@ -82,7 +82,10 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds, conf.Workers)
 
 	// ----- Generate the CidTracker -----
-	cidSource := NewRandomCidGen(conf.CidContentSize)
+	cidSource, err := find_cid_source(conf)
+	if err != nil {
+		return nil, errors.Wrap(err, " error generating the CID Tracker")
+	}
 	studyWG.Add(1)
 	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 	if err != nil {
@@ -119,4 +122,28 @@ func (c *CidHoarder) Run() error {
 	c.DBCli.Close()
 
 	return nil
+}
+
+//Generates the cid source given a specific config file. E.g. a randomly generated cid source uses the Random_Cid_Gen struct, this function must return that.
+//The options for the cid source are defined in this enum like const value.
+//
+//  const (
+//	RandomSource   = "random-content-gen"
+//	TextFileSource = "text-file"
+//	BitswapSource  = "bitswap"
+//	RandomContent  = "random"
+//  )
+//
+func find_cid_source(conf *config.Config) (CidSource, error) {
+	switch conf.CidSource {
+	case config.TextFileSource:
+		return newFileCIDSource(), nil
+	case config.RandomContent:
+		return NewRandomCidGen(conf.CidContentSize), nil
+	case config.BitswapSource:
+		return newBitswapCIDSource(), nil
+
+	default:
+		return nil, errors.New("Could not figure out cid source")
+	}
 }
