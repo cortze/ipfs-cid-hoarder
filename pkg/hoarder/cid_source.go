@@ -12,6 +12,13 @@ import (
 
 var DefCIDContLen = 1024 // 1KB
 
+type Cid_Source interface {
+	Type() string
+}
+
+type File_CID_Gen struct {
+}
+
 type RandomCidGen struct {
 	contentSize int
 }
