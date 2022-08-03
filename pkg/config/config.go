@@ -15,8 +15,7 @@ const (
 	RandomSource   = "random-content-gen"
 	TextFileSource = "text-file"
 	BitswapSource  = "bitswap"
-
-	RandomContent = "random"
+	RandomContent  = "random"
 )
 
 // Harcoded variables for the tool's profiling
@@ -46,6 +45,21 @@ var DefaultConfig = Config{
 	HydraFilter:    false,
 }
 
+//importing cids from one tool to another
+var Reading_CIDs_From_File_Config = Config{
+	LogLevel:       "info",
+	Database:       "./data/ipfs-hoarder-db.db",
+	CidSource:      "text-file",
+	CidFile:        "cids/cid-list.txt",
+	CidContentSize: 1000, // 1MB in KBs
+	CidNumber:      1000,
+	Workers:        250,
+	ReqInterval:    "30m",
+	StudyDuration:  "48h",
+	K:              20, // K-bucket parameter
+	HydraFilter:    true,
+}
+
 // Config compiles all the set of flags that can be readed from the user while launching the cli
 type Config struct {
 	PrivKey        string `json:"priv-key"`
@@ -64,12 +78,21 @@ type Config struct {
 
 // Init takes the command line argumenst from the urfave/cli context and composes the configuration
 func NewConfig(ctx *cli.Context) (*Config, error) {
-	c := &Config{}
-	c.apply(ctx)
 
-	// TODO: work on reading config file from custom path/file (reproducibility)
-	// 		 export the current conf into a file?
-	return c, nil
+	if ctx.IsSet("default-config") {
+		return &DefaultConfig, nil
+	} else if ctx.IsSet("read-cids-from-file") {
+		return &Reading_CIDs_From_File_Config, nil
+	} else if ctx.IsSet("config-from-file") {
+		// TODO: work on reading config file from custom path/file (reproducibility)
+		// 		 export the current conf into a file?
+		//Read file function here
+		return nil, nil
+	} else {
+		c := &Config{}
+		c.apply(ctx)
+		return c, nil
+	}
 }
 
 // apply parses the arguments readed from cli.Context
