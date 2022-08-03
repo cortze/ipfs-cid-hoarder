@@ -171,7 +171,7 @@ func (p *CidPinger) Run() {
 						defer wg.Done()
 						var isRetrievable bool
 						t := time.Now()
-						providers, err := p.host.DHT.FindProviders(p.ctx, c.CID)
+						providers, err := p.host.DHT.LookupForProviders(p.ctx, c.CID)
 						pingTime := time.Since(t)
 						fetchRes.FindProvDuration = pingTime
 						if err != nil {
