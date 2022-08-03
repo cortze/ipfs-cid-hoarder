@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"bufio"
+	"io"
 	"math/rand"
 	"os"
 	"strings"
@@ -20,7 +21,9 @@ type CidSource interface {
 	Type() string
 }
 
-//Read CIDs and their content(?) from a file
+//Read CIDs and their content from a file. The struct will contain the file pointer that it's opened along with a pointer to a scanner
+//struct. When you want to access a new CID from the file the GetNewCid() function must be called. The scanner keeps the state and will
+//read the file until the end.
 type FileCIDSource struct {
 	filename string
 	file     *os.File
@@ -40,6 +43,14 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 	}
 }
 
+//Creates a new:
+//
+// 	type FileCIDSource struct {
+//		filename string
+//		file     *os.File
+//		scanner  *bufio.Scanner
+// 	}
+//If the file cannot be opened it returns the corresponding error.
 func newFileCIDSource(filename string) (*FileCIDSource, error) {
 	file, err := os.Open(filename)
 	defer file.Close()
@@ -69,9 +80,19 @@ func (g *RandomCidGen) Type() string {
 	return "random-content-gen"
 }
 
+//Scans the file and reads each line of the file. When it reaches the end of file it returns an EOF error. If another error occurs
+//it returns the error. The end of file error means that the file was read successfully.
 func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 
-	file_cid_source.scanner.Scan()
+	error_flag := file_cid_source.scanner.Scan()
+	if !error_flag {
+		//scanner.Err() returns a nil when error_flag = false and the error is an EOF error. Else it return the error normally.
+		err := file_cid_source.scanner.Err()
+		if err != io.EOF {
+			return nil, cid.Undef, err
+		}
+		return nil, cid.Undef, io.EOF
+	}
 	temp := strings.Fields(file_cid_source.scanner.Text())
 
 	cid_temp, err := cid.Parse(temp[0])
