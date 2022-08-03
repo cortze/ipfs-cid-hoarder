@@ -1,8 +1,12 @@
 package hoarder
 
 import (
+	"bufio"
 	"math/rand"
+	"os"
+	"strings"
 
+	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -67,9 +71,31 @@ func (bitswap_cid_source *BitswapCIDSource) Type() string {
 	return "bitswap"
 }
 
-func read_content_from_file() ([]byte, cid.Cid, error) {
+//Reads CID and content from a given file. Starting idea for the file format should be CID CONTENT([]byte array)\n.
+func read_content_from_file(conf *config.Config) ([]byte, cid.Cid, error) {
+	filename := conf.CidFile
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		return nil, cid.Undef, errors.Wrap(err, "opening CID file")
+	}
 
-	//configure the type of CID that we support
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	cid_and_contents := make(map[string]string)
+	for scanner.Scan() {
+		temp := strings.Fields(scanner.Text())
+		key := temp[0]
+		cid_and_contents[key] = cid_and_contents[temp[1]]
+	}
+
+	for cid, contents := range cid_and_contents {
+		//TODO check formatting and content
+
+	}
+}
+
+func return_cid_and_content(conf *config.Config) {
 
 }
 
@@ -80,6 +106,7 @@ func genRandomContent(byteLen int) ([]byte, cid.Cid, error) {
 	content := make([]byte, byteLen)
 	rand.Read(content)
 
+	//TODO do we have to have different CID types?
 	// configure the type of CID that we want
 	pref := cid.Prefix{
 		Version:  1,

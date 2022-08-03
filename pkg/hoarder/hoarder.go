@@ -124,7 +124,7 @@ func (c *CidHoarder) Run() error {
 	return nil
 }
 
-//Generates the cid source given a specific config file. E.g. a randomly generated cid source uses the Random_Cid_Gen struct, this function must return that.
+//Generates the cid source given a specific config struct. E.g. a randomly generated cid source uses the Random_Cid_Gen struct, this function must return that.
 //The options for the cid source are defined in this enum like const value.
 //
 //  const (
