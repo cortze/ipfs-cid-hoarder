@@ -16,11 +16,6 @@ import (
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 )
 
-type CidSource interface {
-	GetNewCid() ([]byte, cid.Cid, error)
-	Type() string
-}
-
 // CidTracker composes the basic ojbject that generates and publishes the set of CIDs defined in the configuration
 type CidTracker struct {
 	ctx context.Context
