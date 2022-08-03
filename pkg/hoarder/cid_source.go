@@ -12,11 +12,16 @@ import (
 
 var DefCIDContLen = 1024 // 1KB
 
-type Cid_Source interface {
+type CidSource interface {
+	GetNewCid() ([]byte, cid.Cid, error)
 	Type() string
 }
 
-type File_CID_Gen struct {
+//Read CIDs and their content(?) from a file
+type File_CID_Source struct {
+}
+
+type Bitswap_CID_Source struct {
 }
 
 type RandomCidGen struct {
@@ -29,12 +34,41 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 	}
 }
 
+func newFileCIDSource() *File_CID_Source {
+	return &File_CID_Source{}
+}
+
+func newBitswapCIDSource() *Bitswap_CID_Source {
+	return &Bitswap_CID_Source{}
+}
+
 func (g *RandomCidGen) GetNewCid() ([]byte, cid.Cid, error) {
 	return genRandomContent(g.contentSize)
 }
 
 func (g *RandomCidGen) Type() string {
 	return "random-content-gen"
+}
+
+func (file_cid_source *File_CID_Source) GetNewCid() ([]byte, cid.Cid, error) {
+	return read_content_from_file()
+}
+
+func (file_cid_source *File_CID_Source) Type() string {
+	return "text-file"
+}
+
+func (bitswap_cid_source *Bitswap_CID_Source) GetNewCid() ([]byte, cid.Cid, error) {
+	//TODO function that reads bitswap content
+	return read_content_from_file()
+}
+
+func (bitswap_cid_source *Bitswap_CID_Source) Type() string {
+	return "bitswap"
+}
+
+func read_content_from_file() ([]byte, cid.Cid, error) {
+
 }
 
 // TODO: is it worth keeping the content?
