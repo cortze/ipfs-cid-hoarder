@@ -18,10 +18,10 @@ type CidSource interface {
 }
 
 //Read CIDs and their content(?) from a file
-type File_CID_Source struct {
+type FileCIDSource struct {
 }
 
-type Bitswap_CID_Source struct {
+type BitswapCIDSource struct {
 }
 
 type RandomCidGen struct {
@@ -34,12 +34,12 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 	}
 }
 
-func newFileCIDSource() *File_CID_Source {
-	return &File_CID_Source{}
+func newFileCIDSource() *FileCIDSource {
+	return &FileCIDSource{}
 }
 
-func newBitswapCIDSource() *Bitswap_CID_Source {
-	return &Bitswap_CID_Source{}
+func newBitswapCIDSource() *BitswapCIDSource {
+	return &BitswapCIDSource{}
 }
 
 func (g *RandomCidGen) GetNewCid() ([]byte, cid.Cid, error) {
@@ -50,24 +50,26 @@ func (g *RandomCidGen) Type() string {
 	return "random-content-gen"
 }
 
-func (file_cid_source *File_CID_Source) GetNewCid() ([]byte, cid.Cid, error) {
+func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 	return read_content_from_file()
 }
 
-func (file_cid_source *File_CID_Source) Type() string {
+func (file_cid_source *FileCIDSource) Type() string {
 	return "text-file"
 }
 
-func (bitswap_cid_source *Bitswap_CID_Source) GetNewCid() ([]byte, cid.Cid, error) {
+func (bitswap_cid_source *BitswapCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 	//TODO function that reads bitswap content
 	return read_content_from_file()
 }
 
-func (bitswap_cid_source *Bitswap_CID_Source) Type() string {
+func (bitswap_cid_source *BitswapCIDSource) Type() string {
 	return "bitswap"
 }
 
 func read_content_from_file() ([]byte, cid.Cid, error) {
+
+	//configure the type of CID that we support
 
 }
 
