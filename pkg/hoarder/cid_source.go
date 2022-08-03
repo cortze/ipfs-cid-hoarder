@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -23,6 +22,9 @@ type CidSource interface {
 
 //Read CIDs and their content(?) from a file
 type FileCIDSource struct {
+	filename string
+	file     *os.File
+	scanner  *bufio.Scanner
 }
 
 type BitswapCIDSource struct {
@@ -38,8 +40,21 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 	}
 }
 
-func newFileCIDSource() *FileCIDSource {
-	return &FileCIDSource{}
+func newFileCIDSource(filename string) (*FileCIDSource, error) {
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		return nil, errors.Wrap(err, "opening CID file")
+	}
+
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+
+	return &FileCIDSource{
+		filename: filename,
+		file:     file,    //this a pointer to a file
+		scanner:  scanner, //this a pointer to the scanner
+	}, nil
 }
 
 func newBitswapCIDSource() *BitswapCIDSource {
@@ -55,7 +70,15 @@ func (g *RandomCidGen) Type() string {
 }
 
 func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
-	return read_content_from_file()
+
+	file_cid_source.scanner.Scan()
+	temp := strings.Fields(file_cid_source.scanner.Text())
+
+	cid_temp, err := cid.Parse(temp[0])
+	if err != nil {
+		return nil, cid.Undef, errors.Wrap(err, " while parsing cid")
+	}
+	return []byte(temp[1]), cid_temp, nil
 }
 
 func (file_cid_source *FileCIDSource) Type() string {
@@ -69,34 +92,6 @@ func (bitswap_cid_source *BitswapCIDSource) GetNewCid() ([]byte, cid.Cid, error)
 
 func (bitswap_cid_source *BitswapCIDSource) Type() string {
 	return "bitswap"
-}
-
-//Reads CID and content from a given file. Starting idea for the file format should be CID CONTENT([]byte array)\n.
-func read_content_from_file(conf *config.Config) ([]byte, cid.Cid, error) {
-	filename := conf.CidFile
-	file, err := os.Open(filename)
-	defer file.Close()
-	if err != nil {
-		return nil, cid.Undef, errors.Wrap(err, "opening CID file")
-	}
-
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	cid_and_contents := make(map[string]string)
-	for scanner.Scan() {
-		temp := strings.Fields(scanner.Text())
-		key := temp[0]
-		cid_and_contents[key] = cid_and_contents[temp[1]]
-	}
-
-	for cid, contents := range cid_and_contents {
-		//TODO check formatting and content
-
-	}
-}
-
-func return_cid_and_content(conf *config.Config) {
-
 }
 
 // TODO: is it worth keeping the content?
