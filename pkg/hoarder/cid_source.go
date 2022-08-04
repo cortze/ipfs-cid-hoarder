@@ -89,10 +89,10 @@ func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 		err := file_cid_source.scanner.Err()
 		if err != io.EOF {
 			file_cid_source.file.Close()
-			return nil, cid.Undef, err
+			return nil, cid.Undef, errors.Wrap(err, " while scanning the file")
 		}
 		file_cid_source.file.Close()
-		return nil, cid.Undef, io.EOF
+		return nil, cid.Undef, errors.Wrap(io.EOF, " while scanning the file")
 	}
 	temp := strings.Fields(file_cid_source.scanner.Text())
 
@@ -101,7 +101,8 @@ func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 	if err != nil {
 		return nil, cid.Undef, errors.Wrap(err, " while parsing cid")
 	}
-	return []byte(temp[1]), cid_temp, nil
+	//for now we only read the CIDs and not their contents
+	return nil, cid_temp, nil
 }
 
 func (file_cid_source *FileCIDSource) Type() string {

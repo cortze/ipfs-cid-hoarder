@@ -47,18 +47,19 @@ var DefaultConfig = Config{
 
 // Config compiles all the set of flags that can be readed from the user while launching the cli
 type Config struct {
-	PrivKey        string `json:"priv-key"`
-	LogLevel       string `json:"log-level"`
-	Database       string `json:"database-enpoint"`
-	CidSource      string `json:"cid-source"`
-	CidFile        string `json:"cid-file"`
-	CidContentSize int    `json:"cid-content-size"`
-	CidNumber      int    `json:"cid-number"` // in KBs
-	Workers        int    `json:"workers"`
-	ReqInterval    string `json:"req-interval"`
-	StudyDuration  string `json:"study-duration"`
-	K              int    `json:"k"`
-	HydraFilter    bool   `json:"hydra-filter"`
+	PrivKey              string `json:"priv-key"`
+	LogLevel             string `json:"log-level"`
+	Database             string `json:"database-enpoint"`
+	CidSource            string `json:"cid-source"`
+	CidFile              string `json:"cid-file"`
+	CidContentSize       int    `json:"cid-content-size"`
+	CidNumber            int    `json:"cid-number"` // in KBs
+	Workers              int    `json:"workers"`
+	AlreadyPublishedCIDs bool   `json:"already-published"` //already published CIDs skips the tracking phase of the hoarder.
+	ReqInterval          string `json:"req-interval"`
+	StudyDuration        string `json:"study-duration"`
+	K                    int    `json:"k"`
+	HydraFilter          bool   `json:"hydra-filter"`
 }
 
 // Init takes the command line argumenst from the urfave/cli context and composes the configuration
@@ -66,7 +67,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	// TODO: work on reading config file from custom path/file (reproducibility)
 	// 		 export the current conf into a file?
-	//Read file function here
 
 	c := &Config{}
 	c.apply(ctx)
@@ -93,6 +93,9 @@ func (c *Config) apply(ctx *cli.Context) {
 		// Time delay between the each of the PRHolder pings
 		if ctx.IsSet("req-interval") {
 			c.ReqInterval = ctx.String("req-interval")
+		}
+		if ctx.IsSet("already-published") {
+			c.AlreadyPublishedCIDs = ctx.Bool("already-published")
 		}
 		// Set the study duration time
 		if ctx.IsSet("study-duration") {
