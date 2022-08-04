@@ -184,7 +184,7 @@ func (tracker *CidTracker) newRandomCidTracker() {
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go func(t *CidTracker, wg *sync.WaitGroup, cidC chan *cid.Cid) {
+	go func(t *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
 		defer wg.Done()
 		// generate the CIDs
 		for i := 0; i < t.CidNumber; i++ {
@@ -192,7 +192,7 @@ func (tracker *CidTracker) newRandomCidTracker() {
 			if err != nil {
 				log.Errorf("unable to generate random content. %s", err.Error())
 			}
-			cidC <- &contID
+			cidChannel <- &contID
 		}
 	}(tracker, &genWG, cidChannel)
 
@@ -208,7 +208,7 @@ func (tracker *CidTracker) newRandomCidTracker() {
 			logEntry.Debugf("publisher ready")
 			for {
 				select {
-				case received_cid := <-cidChannel:
+				case received_cid := <-cidChannel: //this channel receives the CID from the CID generator go routine
 					if received_cid == nil {
 						logEntry.Warn("received empty CID to track, closing publisher")
 						// not needed
@@ -216,7 +216,7 @@ func (tracker *CidTracker) newRandomCidTracker() {
 					}
 					logEntry.Debugf("new cid to publish %s", received_cid.Hash().B58String())
 					received_cidStr := received_cid.Hash().B58String()
-					// generate the new CidInfo
+					// generate the new CidInfo cause a new CID was just received
 					cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, config.RandomSource, tracker.host.ID())
 
 					// generate the cidFecher
