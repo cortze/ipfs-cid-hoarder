@@ -20,6 +20,17 @@ type PRPingResults struct {
 	ConError      string
 }
 
+//Creates a new:
+// 	PRPingResults struct {
+//		Cid           cid.Cid
+//		PeerID        peer.ID
+//		Round         int
+//		FetchTime     time.Time
+//		FetchDuration time.Duration
+//		Active        bool
+//		HasRecords    bool
+//		ConError      string
+//	}
 func NewPRPingResults(
 	cid cid.Cid,
 	p peer.ID,
@@ -42,7 +53,7 @@ func NewPRPingResults(
 	}
 }
 
-// CidFetchResults is the basic struct containing the summary of all the requests done for a ficen CID on a fetch round.
+// CidFetchResults is the basic struct containing the summary of all the requests done for a ficen(?given) CID on a fetch round.
 type CidFetchResults struct {
 	m   sync.Mutex
 	Cid cid.Cid
@@ -60,6 +71,23 @@ type CidFetchResults struct {
 	ClosestPeers          []peer.ID
 }
 
+// Creates a new:
+// 	CidFetchResults struct {
+//		m   sync.Mutex
+//		Cid cid.Cid
+//
+//		Round                 int
+//		StartTime             time.Time
+//		FinishTime            time.Time
+//		TotalHops             int
+//		HopsToClosest         int
+//		PRHoldPingDuration    time.Duration
+//		FindProvDuration      time.Duration
+//		GetClosePeersDuration time.Duration
+//		PRPingResults         []*PRPingResults
+//		IsRetrievable         bool
+//		ClosestPeers          []peer.ID
+//	}
 func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
 	return &CidFetchResults{
 		m:             sync.Mutex{},
@@ -72,7 +100,11 @@ func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
 	}
 }
 
-// AddPRPingResults inserts a new PingResult into the FetchResult, updating at the same time the final duration of the PR Holder ping process
+// AddPRPingResults inserts a new ping result of type:
+//	type PRPingResults struct{...},
+//	into the:
+//	type CidFetchResult struct{...} which contains []*PRPingResults,
+//updating at the same time the final duration of the PR Holder ping process.
 func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	c.m.Lock()
 	defer c.m.Unlock()
