@@ -65,34 +65,34 @@ func NewCidTracker(
 }
 
 // Run initializes and starts the run/study
-func (t *CidTracker) Run() {
-	// generate different run routines for the different cid source methods
+func (tracker *CidTracker) Run() {
+	// generate different run routines for the different CID sources
 
-	switch t.CidSource.Type() {
+	switch tracker.CidSource.Type() {
 	case "random-content-gen":
-		t.newRandomCidTracker()
+		tracker.newRandomCidTracker()
 
 	case "text-file":
 		log.Info("initializing Text-File Cid Tracker (still not supported)")
 	case "bitswap":
 		log.Info("initializing Bitswap Cid Tracker (still not supported)")
 	default:
-		log.Errorf("cid source method not defined. cid source method = %s", t.CidSource.Type())
+		log.Errorf("cid source method not defined. cid source method = %s", tracker.CidSource.Type())
 
 	}
 }
 
 // newRandomCidTracker runs a randome CID tracker obj
-func (t *CidTracker) newRandomCidTracker() {
-	defer t.wg.Done()
+func (tracker *CidTracker) newRandomCidTracker() {
+	defer tracker.wg.Done()
 
 	log.Info("launching the Random Cid Tracker")
 
 	// launch the PRholder reading routine
-	msgNotC := t.MsgNot.GetNotChan()
+	msgNotChannel := tracker.MsgNot.GetNotifierChan()
 
 	// generate a channel with the same size as the Workers one
-	cidC := make(chan *cid.Cid, t.Workers)
+	cidChannel := make(chan *cid.Cid, tracker.Workers)
 
 	var firstCidFetchRes sync.Map
 
@@ -102,12 +102,12 @@ func (t *CidTracker) newRandomCidTracker() {
 
 		for {
 			select {
-			case msgNot := <-msgNotC:
+			case msgNot := <-msgNotChannel:
 				if msgNot == nil {
 					log.Warn("empty msgNot Received, closing reader for PR Holders")
 					return
 				}
-				c, err := cid.Cast(msgNot.Msg.GetKey())
+				casted_cid, err := cid.Cast(msgNot.Msg.GetKey())
 				if err != nil {
 					log.Error("unable to cast msg key into cid. %s", err.Error())
 				}
@@ -118,16 +118,18 @@ func (t *CidTracker) newRandomCidTracker() {
 
 					if msgNot.Error != nil {
 						connError = p2p.ParseConError(msgNot.Error) //TODO: parse the errors in a better way
-						log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s", c.String(), msgNot.RemotePeer.String(), msgNot.Error.Error())
+						log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s", casted_cid.String(), msgNot.RemotePeer.String(), msgNot.Error.Error())
 					} else {
 						active = true
 						hasRecords = true
 						connError = p2p.NoConnError
-						log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", c.String(), msgNot.RemotePeer.String())
+						log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", casted_cid.String(), msgNot.RemotePeer.String())
 					}
 
+					//if no error occured in p2p.MsgNotification the ping result will contain active = true and hasRecords = true,
+					//else it will have these fields as false.
 					pingRes := models.NewPRPingResults(
-						c,
+						casted_cid,
 						msgNot.RemotePeer,
 						0, // round is 0 since is the ADD_PROVIDE result
 						msgNot.QueryTime,
@@ -137,29 +139,29 @@ func (t *CidTracker) newRandomCidTracker() {
 						connError)
 
 					// add the ping result
-					val, ok := firstCidFetchRes.Load(c.Hash().B58String())
+					val, ok := firstCidFetchRes.Load(casted_cid.Hash().B58String())
 					cidFetRes := val.(*models.CidFetchResults)
 					if !ok {
-						log.Errorf("CidFetcher not ready for cid %s", c.Hash().B58String())
+						log.Errorf("CidFetcher not ready for cid %s", casted_cid.Hash().B58String())
 					} else {
 						// TODO: move into a seaparate method to make the DB interaction easier?
 						cidFetRes.AddPRPingResults(pingRes)
 					}
 
-					useragent := t.host.GetUserAgentOfPeer(msgNot.RemotePeer)
+					useragent := tracker.host.GetUserAgentOfPeer(msgNot.RemotePeer)
 
 					// Generate the new PeerInfo struct for the new PRHolder
 					prHolderInfo := models.NewPeerInfo(
 						msgNot.RemotePeer,
-						t.host.Peerstore().Addrs(msgNot.RemotePeer),
+						tracker.host.Peerstore().Addrs(msgNot.RemotePeer),
 						useragent,
 					)
 
 					// add PRHolder to the CidInfo
-					val, ok = t.CidMap.Load(c.Hash().B58String())
+					val, ok = tracker.CidMap.Load(casted_cid.Hash().B58String())
 					cidInfo := val.(*models.CidInfo)
 					if !ok {
-						log.Warnf("unable to find CidInfo on CidMap for Cid %s", c.Hash().B58String())
+						log.Warnf("unable to find CidInfo on CidMap for Cid %s", casted_cid.Hash().B58String())
 					} else {
 						cidInfo.AddPRHolder(prHolderInfo)
 					}
@@ -168,7 +170,7 @@ func (t *CidTracker) newRandomCidTracker() {
 					log.Debug("msg is not ADD_PROVIDER msg")
 				}
 
-			case <-t.ctx.Done():
+			case <-tracker.ctx.Done():
 				log.Info("context has been closed, finishing Random Cid Tracker")
 				return
 
@@ -192,45 +194,45 @@ func (t *CidTracker) newRandomCidTracker() {
 			}
 			cidC <- &contID
 		}
-	}(t, &genWG, cidC)
+	}(tracker, &genWG, cidChannel)
 
 	var publisherWG sync.WaitGroup
 
 	// CID PR Publishers
-	for publisher := 0; publisher < t.Workers; publisher++ {
+	for publisher := 0; publisher < tracker.Workers; publisher++ {
 		publisherWG.Add(1)
 		// launch publisher
-		go func(ctx context.Context, publisherWG *sync.WaitGroup, publisherID int, cidC chan *cid.Cid, cidFetchRes *sync.Map) {
+		go func(ctx context.Context, publisherWG *sync.WaitGroup, publisherID int, cidChannel chan *cid.Cid, cidFetchRes *sync.Map) {
 			defer publisherWG.Done()
 			logEntry := log.WithField("publisherID", publisherID)
 			logEntry.Debugf("publisher ready")
 			for {
 				select {
-				case c := <-cidC:
-					if c == nil {
+				case received_cid := <-cidChannel:
+					if received_cid == nil {
 						logEntry.Warn("received empty CID to track, closing publisher")
 						// not needed
 						return
 					}
-					logEntry.Debugf("new cid to publish %s", c.Hash().B58String())
-					cStr := c.Hash().B58String()
+					logEntry.Debugf("new cid to publish %s", received_cid.Hash().B58String())
+					received_cidStr := received_cid.Hash().B58String()
 					// generate the new CidInfo
-					cidInfo := models.NewCidInfo(*c, t.ReqInterval, config.RandomContent, config.RandomSource, t.host.ID())
+					cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, config.RandomSource, tracker.host.ID())
 
 					// generate the cidFecher
-					t.CidMap.Store(cStr, cidInfo)
+					tracker.CidMap.Store(received_cidStr, cidInfo)
 
 					// generate a new CidFetchResults
-					fetchRes := models.NewCidFetchResults(*c, 0) // First round = Publish PR
-					cidFetchRes.Store(cStr, fetchRes)
+					fetchRes := models.NewCidFetchResults(*received_cid, 0) // First round = Publish PR
+					cidFetchRes.Store(received_cidStr, fetchRes)
 
 					// necessary stuff to get the different hop measurements
 					var hops dht.Hops
 					// currently linking a ContextKey variable througth the context that we generate
-					ctx := context.WithValue(t.ctx, dht.ContextKey("hops"), &hops)
+					ctx := context.WithValue(tracker.ctx, dht.ContextKey("hops"), &hops)
 
 					tstart := time.Now()
-					err := t.host.DHT.Provide(ctx, *c, true)
+					err := tracker.host.DHT.Provide(ctx, *received_cid, true)
 					if err != nil {
 						logEntry.Errorf("unable to Provide random content. %s", err.Error())
 					}
@@ -251,10 +253,10 @@ func (t *CidTracker) newRandomCidTracker() {
 					// the Cid has already being published to the network, we can already save it into the DB
 					// ----- Persist inot DB -------
 					// Add the cidInfo to the DB
-					t.DBCli.AddCidInfo(cidInfo)
+					tracker.DBCli.AddCidInfo(cidInfo)
 
 					// Add the fetchResults to the DB
-					t.DBCli.AddFetchResult(fetchRes)
+					tracker.DBCli.AddFetchResult(fetchRes)
 					// ----- End of the persist into DB -------
 
 					// Calculate success ratio on adding PR into PRHolders
@@ -263,11 +265,11 @@ func (t *CidTracker) newRandomCidTracker() {
 						logEntry.Warnf("no ping results for the PR provide round of Cid %s", cidInfo.CID.Hash().B58String())
 					} else {
 						logEntry.Infof("Cid %s - %d total PRHolders | %d successfull PRHolders | %d failed PRHolders",
-							c, tot, success, failed)
+							received_cid, tot, success, failed)
 					}
 
 					// send the cid_info to the cid_pinger adn start pinging PR Holders
-					t.CidPinger.AddCidInfo(cidInfo)
+					tracker.CidPinger.AddCidInfo(cidInfo)
 
 				case <-ctx.Done():
 					logEntry.WithField("publisherID", publisherID).Debugf("shutdown detected, closing publisher")
@@ -275,17 +277,17 @@ func (t *CidTracker) newRandomCidTracker() {
 				}
 			}
 
-		}(t.ctx, &publisherWG, publisher, cidC, &firstCidFetchRes)
+		}(tracker.ctx, &publisherWG, publisher, cidChannel, &firstCidFetchRes)
 	}
 
 	genWG.Wait()
 	// check if there are still CIDs to generate
 	// loss of time or CPU cicles?
 	for {
-		if len(cidC) != 0 {
+		if len(cidChannel) != 0 {
 			continue
 		} else {
-			close(cidC)
+			close(cidChannel)
 			break
 		}
 	}
@@ -294,5 +296,5 @@ func (t *CidTracker) newRandomCidTracker() {
 	publisherWG.Wait()
 
 	// close Msg Notifier
-	close(msgNotC)
+	close(msgNotChannel)
 }
