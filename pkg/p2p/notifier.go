@@ -28,14 +28,17 @@ func NewMsgNotifier() *Notifier {
 	}
 }
 
-func (n *Notifier) GetNotChan() chan *MsgNotification {
-	return n.msgChan
+//This returns the channel of the notifier struct:
+//
+// 	msgChan chan *MsgNotification
+func (notifier_instance *Notifier) GetNotifierChan() chan *MsgNotification {
+	return notifier_instance.msgChan
 }
 
-func (n *Notifier) Notify(msgStatus *MsgNotification) {
-	n.msgChan <- msgStatus
+func (notifier_instance *Notifier) Notify(msgStatus *MsgNotification) {
+	notifier_instance.msgChan <- msgStatus
 }
 
-func (n *Notifier) Close() {
-	close(n.msgChan)
+func (notifier_instance *Notifier) Close() {
+	close(notifier_instance.msgChan)
 }
