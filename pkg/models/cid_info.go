@@ -30,6 +30,26 @@ type CidInfo struct {
 	PingCounter int
 }
 
+//Creates a new:
+//	CidInfo struct {
+//		m sync.Mutex
+//
+//		CID cid.Cid
+//
+//		GenTime     time.Time
+//		ReqInterval time.Duration
+//
+//		K             int         // Number of K peers that should get the initial PR
+//		PRHolders     []*PeerInfo // Peers that took the responsability to keep the PR
+//		PRPingResults []*CidFetchResults
+//		ContentType   string  // Type of the content that is under the CID (Random, Video, Image...)
+//		Source        string  // Track where is the content coming from (Random, Cid-File, Bitswap)
+//		Creator       peer.ID // Peer hosting the content, so far only one (us)
+//
+//		ProvideTime time.Duration // time that took to publish the provider records
+//		NextPing    time.Time
+//		PingCounter int
+//	}
 func NewCidInfo(
 	id cid.Cid,
 	reqInt time.Duration,
