@@ -137,7 +137,7 @@ func (c *CidHoarder) Run() error {
 func find_cid_source(conf *config.Config) (CidSource, error) {
 	switch conf.CidSource {
 	case config.TextFileSource:
-		return newFileCIDSource(), nil
+		return newFileCIDSource(conf.CidFile)
 	case config.RandomContent:
 		return NewRandomCidGen(conf.CidContentSize), nil
 	case config.BitswapSource:

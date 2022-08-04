@@ -53,7 +53,6 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 //If the file cannot be opened it returns the corresponding error.
 func newFileCIDSource(filename string) (*FileCIDSource, error) {
 	file, err := os.Open(filename)
-	defer file.Close()
 	if err != nil {
 		return nil, errors.Wrap(err, "opening CID file")
 	}
@@ -83,18 +82,21 @@ func (g *RandomCidGen) Type() string {
 //Scans the file and reads each line of the file. When it reaches the end of file it returns an EOF error. If another error occurs
 //it returns the error. The end of file error means that the file was read successfully.
 func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
-
+	//returns false when the scan stops (reaching the end of the file) or there's an error.
 	error_flag := file_cid_source.scanner.Scan()
 	if !error_flag {
 		//scanner.Err() returns a nil when error_flag = false and the error is an EOF error. Else it return the error normally.
 		err := file_cid_source.scanner.Err()
 		if err != io.EOF {
+			file_cid_source.file.Close()
 			return nil, cid.Undef, err
 		}
+		file_cid_source.file.Close()
 		return nil, cid.Undef, io.EOF
 	}
 	temp := strings.Fields(file_cid_source.scanner.Text())
 
+	//TODO check if parse function gives the desired functionality
 	cid_temp, err := cid.Parse(temp[0])
 	if err != nil {
 		return nil, cid.Undef, errors.Wrap(err, " while parsing cid")
