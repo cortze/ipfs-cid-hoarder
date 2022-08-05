@@ -85,7 +85,8 @@ func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	c.K++
 }
 
-// AddPRFetchResults inserts the results of a given CidFetch round into the CID obj
+// AddPRFetchResults inserts the results of a given CidFetch round into the CID object:
+//	CidInfo struct {...} contains PRPingResults []*CidFetchResults
 func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	c.m.Lock()
 	defer c.m.Unlock()
