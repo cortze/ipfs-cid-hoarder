@@ -157,7 +157,28 @@ func generateCids(tracker *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.
 //	msgNotchannel chan *p2p.MsgNotification
 //for a:
 //	MsgNotification.Msg.Type of Message_ADD_PROVIDER
-//when this message is received it adds the provider onto the database for later pings.
+//when this message is received it adds the provider onto the database for later pings:
+//
+//1.)Creates a new:
+//	PRPingResults struct{...}
+//the result of a ping of an individual PR_HOLDER
+//
+//2.) Adds the PRPingResults struct{...} into the:
+//	var cidFetRes *CidFetchResults
+//using:
+//	citFetRes.AddPRPingResults(pingRes)
+//which is set inside the providing_process routine:
+//	fetchRes := models.NewCidFetchResults(*received_cid, 0) // First round = Publish PR
+//	cidFetchRes.Store(received_cidStr, fetchRes)
+//
+//3.)Creates a new:
+//	PeerInfo struct{...}
+//which is stored inside a cidInfo struct{...}:
+//	cidInfo.AddPRHolder(prHolderInfo)
+//this is taken by the providing_process routine:
+//	cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, tracker.CidSource.Type(), tracker.host.ID())
+//	// generate the cidFetcher
+//	tracker.CidMap.Store(received_cidStr, cidInfo)
 func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel chan *p2p.MsgNotification) {
 	for {
 		select {
@@ -267,7 +288,7 @@ func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, don
 //
 //7.) Adds the cid info to the tracker's:
 //		CidPinger *CidPinger
-//	to be later pinged by the pinger.
+//to be later pinged by the pinger.
 func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publisherID int, cidChannel chan *cid.Cid, cidFetchRes *sync.Map) {
 	defer publisherWG.Done()
 	logEntry := log.WithField("publisherID", publisherID)
