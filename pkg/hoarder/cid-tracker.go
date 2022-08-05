@@ -16,7 +16,7 @@ import (
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 )
 
-// CidTracker composes the basic ojbject that generates and publishes the set of CIDs defined in the configuration
+// CidTracker composes the basic object that generates and publishes the set of CIDs defined in the configuration
 type CidTracker struct {
 	ctx context.Context
 	wg  *sync.WaitGroup
@@ -248,6 +248,26 @@ func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, don
 //
 //2.)After receiving a cid it creates a:
 //	CIdInfo struct {...} instance
+//which documents basic info about a specific CID
+//
+//3.) Create a:
+//	CidFetchResults struct {...}
+//which contains basic info about the fetching process (pinging)
+//
+//4.) Calls the:
+//	func provide(...) inside this package cid-tracker.go
+//providing the CID to the network
+//
+//5.) adds the metrics received from func provide(...) and the fetch result struct to the newly created:
+//	var cidInfo *CidInfo
+//
+//6.) Access the tracker's field:
+//		DBCli     *db.DBClient
+// and adds the cidInfo and the fetchRes
+//
+//7.) Adds the cid info to the tracker's:
+//		CidPinger *CidPinger
+//	to be later pinged by the pinger.
 func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publisherID int, cidChannel chan *cid.Cid, cidFetchRes *sync.Map) {
 	defer publisherWG.Done()
 	logEntry := log.WithField("publisherID", publisherID)
@@ -264,7 +284,8 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 			logEntry.Debugf("new cid to publish %s", received_cid.Hash().B58String())
 			received_cidStr := received_cid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
-			cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, config.RandomSource, tracker.host.ID())
+			//TODO the content type is not necessaliry random content
+			cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, tracker.CidSource.Type(), tracker.host.ID())
 
 			// generate the cidFetcher
 			tracker.CidMap.Store(received_cidStr, cidInfo)
