@@ -68,7 +68,8 @@ func NewCidTracker(
 func (tracker *CidTracker) Run() {
 	// generate different run routines for the different CID sources
 
-	switch tracker.CidSource.Type() {
+	//switch statement here is not needed because go can call the generate CIDs method polymorphically
+	/*switch tracker.CidSource.Type() {
 	case "random-content-gen":
 		tracker.newRandomCidTracker()
 
@@ -79,14 +80,18 @@ func (tracker *CidTracker) Run() {
 	default:
 		log.Errorf("cid source method not defined. cid source method = %s", tracker.CidSource.Type())
 
-	}
+	}*/
+	tracker.newCidTracker()
 }
 
-// newRandomCidTracker runs a randome CID tracker obj
-func (tracker *CidTracker) newRandomCidTracker() {
+// newCidTracker will create a CID tracker and based on the field:
+//	CidSource: cidSource which cidSource is a:
+//	type interface CidSource
+//	will generate-randomly,read the content from a file or from bitswap
+func (tracker *CidTracker) newCidTracker() {
 	defer tracker.wg.Done()
 
-	log.Info("launching the Random Cid Tracker")
+	log.Info("launching a new Cid Tracker")
 
 	// launch the PRholder reading routine
 	msgNotChannel := tracker.MsgNot.GetNotifierChan()
@@ -184,21 +189,11 @@ func (tracker *CidTracker) newRandomCidTracker() {
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go func(t *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
-		defer wg.Done()
-		// generate the CIDs
-		for i := 0; i < t.CidNumber; i++ {
-			_, contID, err := t.CidSource.GetNewCid()
-			if err != nil {
-				log.Errorf("unable to generate random content. %s", err.Error())
-			}
-			cidChannel <- &contID
-		}
-	}(tracker, &genWG, cidChannel)
+	go generateCids(tracker, &genWG, cidChannel)
 
 	var publisherWG sync.WaitGroup
 
-	// CID PR Publishers
+	// CID PR Publishers which are essentially the workers of tracker.
 	for publisher := 0; publisher < tracker.Workers; publisher++ {
 		publisherWG.Add(1)
 		// launch publisher
@@ -297,4 +292,19 @@ func (tracker *CidTracker) newRandomCidTracker() {
 
 	// close Msg Notifier
 	close(msgNotChannel)
+}
+
+//Generate cids function is responsible for generating the CIDs given a specific:
+//	tracker(of type *CidTracker struct {...}).CidSource (of type interface CidSource {...})
+//	it calls the CidSource.GetNewCid() func
+func generateCids(tracker *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
+	defer wg.Done()
+	// generate the CIDs
+	for i := 0; i < tracker.CidNumber; i++ {
+		_, contID, err := tracker.CidSource.GetNewCid()
+		if err != nil {
+			log.Errorf("unable to generate %s content. %s", err.Error(), tracker.CidSource.Type())
+		}
+		cidChannel <- &contID
+	}
 }

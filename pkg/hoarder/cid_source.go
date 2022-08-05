@@ -60,6 +60,7 @@ func newFileCIDSource(filename string) (*FileCIDSource, error) {
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
 
+	log.Info("Creating a new file cid source struct")
 	return &FileCIDSource{
 		filename: filename,
 		file:     file,    //this a pointer to a file
@@ -102,6 +103,7 @@ func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 		return nil, cid.Undef, errors.Wrap(err, " while parsing cid")
 	}
 	//for now we only read the CIDs and not their contents
+	log.Infof("Read new CID from file %s", cid_temp)
 	return nil, cid_temp, nil
 }
 
@@ -111,7 +113,7 @@ func (file_cid_source *FileCIDSource) Type() string {
 
 func (bitswap_cid_source *BitswapCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
 	//TODO function that reads bitswap content
-	return read_content_from_file()
+	return nil, cid.Undef, nil
 }
 
 func (bitswap_cid_source *BitswapCIDSource) Type() string {
