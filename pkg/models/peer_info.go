@@ -19,6 +19,14 @@ type PeerInfo struct {
 	// TODO: Is there anything else to add?
 }
 
+//Creates a new:
+// 	type PeerInfo struct {
+//		ID        peer.ID
+//		MultiAddr []ma.Multiaddr
+//		UserAgent string
+//		Client    string
+//		Version   string
+//	}
 func NewPeerInfo(peerId peer.ID, multiAddr []ma.Multiaddr, userAgent string) *PeerInfo {
 	client, version := FilterClientType(userAgent)
 
