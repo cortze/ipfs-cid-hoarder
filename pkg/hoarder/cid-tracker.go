@@ -182,7 +182,7 @@ func generateCids(tracker *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.
 func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel chan *p2p.MsgNotification) {
 	for {
 		select {
-		case msgNot := <-msgNotChannel:
+		case msgNot := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
 			if msgNot == nil {
 				log.Warn("empty msgNot Received, closing reader for PR Holders")
 				return
@@ -305,7 +305,7 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 			logEntry.Debugf("new cid to publish %s", received_cid.Hash().B58String())
 			received_cidStr := received_cid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
-			//TODO the content type is not necessaliry random content
+			//TODO the content type is not necessarily random content
 			cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, tracker.CidSource.Type(), tracker.host.ID())
 
 			// generate the cidFetcher
