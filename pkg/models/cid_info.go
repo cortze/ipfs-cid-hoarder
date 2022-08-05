@@ -77,7 +77,8 @@ func (c *CidInfo) AddProvideTime(reqTime time.Duration) {
 	c.ProvideTime = reqTime
 }
 
-// AddPRHolder inserts a given Peer selected/attempted to keep the PRs for a CID
+// AddPRHolder inserts a given Peer selected/attempted to keep the PRs for a CID,this is the CidInfo struct's field:
+//	PRHolders     []*PeerInfo // Peers that took the responsability to keep the PR
 func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	c.m.Lock()
 	defer c.m.Unlock()
