@@ -126,8 +126,8 @@ func (p *CidPinger) AddCidInfo(c *models.CidInfo) {
 	p.cidQ.addCid(c)
 }
 
-// PingPRHolder dials a given PR Holder to check whether it's acticve or not, and wheter it has the PRs or not
-func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *models.PRPingResults {
+// PingPRHolder dials a given PR Holder to check whether it's active or not, and whether it has the PRs or not
+func (pinger *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *models.PRPingResults {
 	logEntry := log.WithFields(log.Fields{
 		"cid": c.Hash().B58String(),
 	})
@@ -136,7 +136,7 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 	var connError string
 
 	// connect the peer
-	pingCtx, cancel := context.WithTimeout(p.ctx, DialTimeout)
+	pingCtx, cancel := context.WithTimeout(pinger.ctx, DialTimeout)
 	defer cancel()
 
 	tstart := time.Now()
@@ -144,7 +144,7 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 	// loop over max tries if the connection is connection refused/ connection reset by peer
 	for att := 0; att < maxDialAttempts; att++ {
 		// TODO: attempt at least to see if the connection refused
-		err := p.host.Connect(pingCtx, pAddr)
+		err := pinger.host.Connect(pingCtx, pAddr)
 		if err != nil {
 			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
 			connError = p2p.ParseConError(err)
@@ -157,15 +157,15 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 			active = true
 			connError = p2p.NoConnError
 
-			// if the connection was successfull, request wheter it has the records or not
-			provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
+			// if the connection was successfull, request whether it has the records or not
+			provs, _, _ := pinger.host.DHT.GetProvidersFromPeer(pinger.ctx, pAddr.ID, c.Hash())
 			if len(provs) > 0 {
 				hasRecords = true
 				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
 			}
 
 			// close connection and exit loop
-			err = p.host.Network().ClosePeer(pAddr.ID)
+			err = pinger.host.Network().ClosePeer(pAddr.ID)
 			if err != nil {
 				logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
 			}
@@ -272,9 +272,16 @@ func generatePingOrchester(pinger *CidPinger, pingOrchWG *sync.WaitGroup) {
 //inside the generatePingOrchester goroutine.
 //
 //2.) Requests the status of the PR holders(substeps):
-// 1.) Finds the provider of the CIDs
-// 2.) Recalculates the k closest peers
-// 3.) Pings the PR holders in parallel
+//
+//     1.) Finds the provider of the CIDs
+//
+//     2.) Recalculates the k closest peers
+//The above requests are done to populate the CidFetchRes struct{...} and then
+//
+//3.) Pings the PR holders in parallel calling the:
+//	func PingPRholder(...)
+//which adds the:
+//	PRPingResults to the CidFetchRes field []*PRPingResults
 func createPinger(pinger *CidPinger, wg *sync.WaitGroup, pingerID int) {
 	defer wg.Done()
 
@@ -318,7 +325,7 @@ func createPinger(pinger *CidPinger, wg *sync.WaitGroup, pingerID int) {
 			}(pinger, cidInfo, cidFetchRes)
 
 			wg.Add(1)
-			// recalculate the closest k peers to the content
+			// recalculate the closest k peers to the content. This needs to be done due to node churn.(?)
 			go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 				defer wg.Done()
 				t := time.Now()

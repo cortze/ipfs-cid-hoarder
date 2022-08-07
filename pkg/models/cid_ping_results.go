@@ -130,7 +130,10 @@ func (c *CidFetchResults) GetSummary() (tot, success, failed int) {
 	return tot, success, failed
 }
 
-// AddClosestPeer inserts into the PRFetchResults a peer that is inside the K closest peers in the IPFS DHT in that fetch round
+// AddClosestPeer inserts into the CidFetchResults a peer that is inside the K closest peers in the IPFS DHT in that fetch round.
+//Adds to the:
+//
+// 	CidFetchResults struct{...} for the field ClosestPeers []peer.ID
 func (c *CidFetchResults) AddClosestPeer(pInfo peer.ID) {
 	c.m.Lock()
 	defer c.m.Unlock()
