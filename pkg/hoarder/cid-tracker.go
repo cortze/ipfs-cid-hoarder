@@ -12,9 +12,15 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 )
+
+//TODO this is hacky and terrible
+type Tracker interface {
+	run()
+}
 
 // CidTracker composes the basic object that generates and publishes the set of CIDs defined in the configuration
 type CidTracker struct {
@@ -37,7 +43,34 @@ type CidTracker struct {
 	CidMap        sync.Map
 }
 
-// NewCidTracker returns a CidTracker object from the run parameters
+type CidDiscoverer struct {
+	*CidTracker
+}
+
+type CidPublisher struct {
+	*CidTracker
+}
+
+//Creates a new:
+//	CidTracker struct{
+//		ctx context.Context
+//		wg  *sync.WaitGroup
+//
+//		m sync.Mutex
+//
+//		host      *p2p.Host
+//		DBCli     *db.DBClient
+//		MsgNot    *p2p.Notifier
+//		CidSource CidSource
+//		CidPinger *CidPinger
+//
+//		K             int
+//		CidNumber     int
+//		Workers       int
+//		ReqInterval   time.Duration
+//		StudyDuration time.Duration
+//		CidMap        sync.Map
+//	}
 func NewCidTracker(
 	ctx context.Context,
 	wg *sync.WaitGroup,
@@ -64,93 +97,54 @@ func NewCidTracker(
 	}, nil
 }
 
-// Run initializes and starts the run/study
-func (tracker *CidTracker) Run() {
-	// generate different run routines for the different CID sources
-
-	//switch statement here is not needed because go can call the generate CIDs method polymorphically
-	/*switch tracker.CidSource.Type() {
-	case "random-content-gen":
-		tracker.newRandomCidTracker()
-
-	case "text-file":
-		log.Info("initializing Text-File Cid Tracker (still not supported)")
-	case "bitswap":
-		log.Info("initializing Bitswap Cid Tracker (still not supported)")
-	default:
-		log.Errorf("cid source method not defined. cid source method = %s", tracker.CidSource.Type())
-
-	}*/
-	tracker.newCidTracker()
+func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
+	log.Info("Creating a new CID discoverer")
+	return &CidDiscoverer{
+		CidTracker: tracker,
+	}, nil
 }
 
-// newCidTracker will create a CID tracker and based on the field:
-//	CidSource: cidSource which cidSource is a:
-//	type interface CidSource
-//	will generate-randomly,read the content from a file or from bitswap
-func (tracker *CidTracker) newCidTracker() {
-	defer tracker.wg.Done()
+func NewCidPublisher(tracker *CidTracker) (*CidPublisher, error) {
+	log.Info("Creating a new CID publisher")
+	return &CidPublisher{
+		CidTracker: tracker,
+	}, nil
+}
 
-	log.Info("launching a new Cid Tracker")
+//TODO this is hacky and terrible
+func (tracker *CidTracker) run() {
 
+}
+
+func (publisher *CidPublisher) run() {
 	// launch the PRholder reading routine
-	msgNotChannel := tracker.MsgNot.GetNotifierChan()
-
-	// generate a channel with the same size as the Workers one
-	cidChannel := make(chan *cid.Cid, tracker.Workers)
+	msgNotChannel := publisher.MsgNot.GetNotifierChan()
 
 	var firstCidFetchRes sync.Map
 
+	// generate a channel with the same size as the Workers one
+	cidChannel := make(chan *cid.Cid, publisher.Workers)
+
 	// IPFS DHT Message Notification Listener
 	done := make(chan struct{})
-	go addProviderMsgListener(tracker, &firstCidFetchRes, done, msgNotChannel)
-
+	go publisher.addProviderMsgListener(&firstCidFetchRes, done, msgNotChannel)
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go generateCids(tracker, &genWG, cidChannel)
+	go generateCids(publisher.CidSource, publisher.CidNumber, &genWG, cidChannel)
 
 	var publisherWG sync.WaitGroup
 
 	// CID PR Publishers which are essentially the workers of tracker.
-	for publisher := 0; publisher < tracker.Workers; publisher++ {
+	for publisherCounter := 0; publisherCounter < publisher.Workers; publisherCounter++ {
 		publisherWG.Add(1)
 		// start the providing process
-		go providing_process(tracker, &publisherWG, publisher, cidChannel, &firstCidFetchRes)
+		go publisher.publishing_process(&publisherWG, publisherCounter, cidChannel, &firstCidFetchRes)
 	}
-
-	genWG.Wait()
-	// check if there are still CIDs to generate
-	// loss of time or CPU cicles?
-	for {
-		if len(cidChannel) != 0 {
-			continue
-		} else {
-			close(cidChannel)
-			break
-		}
-	}
-
-	// wait untill all the workers finished generating the CIDs
-	publisherWG.Wait()
-
-	// close Msg Notifier
-	close(msgNotChannel)
 }
 
-//Generate cids function is responsible for generating the CIDs given a specific:
-//	tracker(of type *CidTracker struct {...}).CidSource (of type interface CidSource {...})
-//	it calls the CidSource.GetNewCid() func
-func generateCids(tracker *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
-	defer wg.Done()
-	// generate the CIDs
-	for i := 0; i < tracker.CidNumber; i++ {
-		_, contID, err := tracker.CidSource.GetNewCid()
-		if err != nil {
-			log.Errorf("unable to generate %s content. %s", err.Error(), tracker.CidSource.Type())
-		}
-		cidChannel <- &contID
-	}
+func (discoverer *CidDiscoverer) run() {
+
 }
 
 //addProviderMsgListener listens to a:
@@ -176,10 +170,10 @@ func generateCids(tracker *CidTracker, wg *sync.WaitGroup, cidChannel chan *cid.
 //which is stored inside a cidInfo struct{...}:
 //	cidInfo.AddPRHolder(prHolderInfo)
 //this is taken by the providing_process routine:
-//	cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, tracker.CidSource.Type(), tracker.host.ID())
+//	cidInfo := models.NewCidInfo(*received_cid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 //	// generate the cidFetcher
-//	tracker.CidMap.Store(received_cidStr, cidInfo)
-func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel chan *p2p.MsgNotification) {
+//	publisher.CidMap.Store(received_cidStr, cidInfo)
+func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel chan *p2p.MsgNotification) {
 	for {
 		select {
 		case msgNot := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
@@ -228,17 +222,17 @@ func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, don
 					cidFetRes.AddPRPingResults(pingRes)
 				}
 
-				useragent := tracker.host.GetUserAgentOfPeer(msgNot.RemotePeer)
+				useragent := publisher.host.GetUserAgentOfPeer(msgNot.RemotePeer)
 
 				// Generate the new PeerInfo struct for the new PRHolder
 				prHolderInfo := models.NewPeerInfo(
 					msgNot.RemotePeer,
-					tracker.host.Peerstore().Addrs(msgNot.RemotePeer),
+					publisher.host.Peerstore().Addrs(msgNot.RemotePeer),
 					useragent,
 				)
 
 				// add PRHolder to the CidInfo
-				val, ok = tracker.CidMap.Load(casted_cid.Hash().B58String())
+				val, ok = publisher.CidMap.Load(casted_cid.Hash().B58String())
 				cidInfo := val.(*models.CidInfo)
 				if !ok {
 					log.Warnf("unable to find CidInfo on CidMap for Cid %s", casted_cid.Hash().B58String())
@@ -250,8 +244,8 @@ func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, don
 				log.Debug("msg is not ADD_PROVIDER msg")
 			}
 
-		case <-tracker.ctx.Done():
-			log.Info("context has been closed, finishing Random Cid Tracker")
+		case <-publisher.ctx.Done():
+			log.Info("context has been closed, finishing Cid Tracker")
 			return
 
 		case <-done:
@@ -259,6 +253,10 @@ func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, don
 			return
 		}
 	}
+}
+
+func (discoverer *CidDiscoverer) foundProviderMsgListener() {
+
 }
 
 //The providing process doesn't only publish the CIDs to the network but it's important for setting up the pinging process used later
@@ -289,10 +287,10 @@ func addProviderMsgListener(tracker *CidTracker, firstCidFetchRes *sync.Map, don
 //7.) Adds the cid info to the tracker's:
 //		CidPinger *CidPinger
 //to be later pinged by the pinger.
-func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publisherID int, cidChannel chan *cid.Cid, cidFetchRes *sync.Map) {
+func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, publisherID int, cidChannel chan *cid.Cid, cidFetchRes *sync.Map) {
 	defer publisherWG.Done()
 	logEntry := log.WithField("publisherID", publisherID)
-	ctx := tracker.ctx
+	ctx := publisher.ctx
 	logEntry.Debugf("publisher ready")
 	for {
 		select {
@@ -306,10 +304,10 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 			received_cidStr := received_cid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
 			//TODO the content type is not necessarily random content
-			cidInfo := models.NewCidInfo(*received_cid, tracker.ReqInterval, config.RandomContent, tracker.CidSource.Type(), tracker.host.ID())
+			cidInfo := models.NewCidInfo(*received_cid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 
 			// generate the cidFetcher
-			tracker.CidMap.Store(received_cidStr, cidInfo)
+			publisher.CidMap.Store(received_cidStr, cidInfo)
 
 			// generate a new CidFetchResults
 			fetchRes := models.NewCidFetchResults(*received_cid, 0) // First round = Publish PR
@@ -318,9 +316,9 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 			// necessary stuff to get the different hop measurements
 			var hops dht.Hops
 			// currently linking a ContextKey variable througth the context that we generate
-			ctx := context.WithValue(tracker.ctx, dht.ContextKey("hops"), &hops)
+			ctx := context.WithValue(publisher.ctx, dht.ContextKey("hops"), &hops)
 
-			reqTime, err := provide(ctx, tracker, received_cid)
+			reqTime, err := provide(ctx, publisher, received_cid)
 			if err != nil {
 				logEntry.Errorf("unable to Provide content. %s", err.Error())
 			}
@@ -339,10 +337,10 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 			// the Cid has already being published to the network, we can already save it into the DB
 			// ----- Persist inot DB -------
 			// Add the cidInfo to the DB
-			tracker.DBCli.AddCidInfo(cidInfo)
+			publisher.DBCli.AddCidInfo(cidInfo)
 
 			// Add the fetchResults to the DB
-			tracker.DBCli.AddFetchResult(fetchRes)
+			publisher.DBCli.AddFetchResult(fetchRes)
 			// ----- End of the persist into DB -------
 
 			// Calculate success ratio on adding PR into PRHolders
@@ -355,7 +353,7 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 			}
 
 			// send the cid_info to the cid_pinger adn start pinging PR Holders
-			tracker.CidPinger.AddCidInfo(cidInfo)
+			publisher.CidPinger.AddCidInfo(cidInfo)
 
 		case <-ctx.Done():
 			logEntry.WithField("publisherID", publisherID).Debugf("shutdown detected, closing publisher")
@@ -364,15 +362,44 @@ func providing_process(tracker *CidTracker, publisherWG *sync.WaitGroup, publish
 	}
 }
 
+func (discoverer *CidDiscoverer) discovery_process() {
+
+}
+
+func generateCids(source CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
+	defer wg.Done()
+	// generate the CIDs
+	for i := 0; i < cidNumber; i++ {
+		_, contID, err := source.GetNewCid()
+		if err != nil {
+			log.Errorf("unable to generate %s content. %s", err.Error(), source.Type())
+		}
+		cidChannel <- &contID
+	}
+}
+
 //provide calls:
 //	DHT.Provide(...) method to provide the cid to the network
 // and documents the time it took to publish a CID
-func provide(ctx context.Context, tracker *CidTracker, received_cid *cid.Cid) (time.Duration, error) {
+func provide(ctx context.Context, publisher *CidPublisher, receivedCid *cid.Cid) (time.Duration, error) {
 	tstart := time.Now()
-	err := tracker.host.DHT.Provide(tracker.ctx, *received_cid, true)
+	err := publisher.host.DHT.Provide(publisher.ctx, *receivedCid, true)
 	if err != nil {
 		return -1, err
 	}
 	reqTime := time.Since(tstart)
 	return reqTime, nil
+}
+
+//discover calls:
+//	DHT.FindProviders(...) method to discover the providers for the given CID
+//also documents the discovery time
+func discover(ctx context.Context, discoverer *CidDiscoverer, receivedCid *cid.Cid) (time.Duration, []peer.AddrInfo, error) {
+	tstart := time.Now()
+	peers, err := discoverer.host.DHT.FindProviders(discoverer.ctx, *receivedCid)
+	if err != nil {
+		return -1, nil, err
+	}
+	discoverTime := time.Since(tstart)
+	return discoverTime, peers, nil
 }

@@ -20,7 +20,7 @@ type CidHoarder struct {
 
 	Host       *p2p.Host
 	DBCli      *db.DBClient
-	CidTracker *CidTracker
+	CidTracker Tracker
 	CidPinger  *CidPinger
 }
 
@@ -87,21 +87,39 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		return nil, errors.Wrap(err, " error generating the CID Tracker")
 	}
 	studyWG.Add(1)
-	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
-	if err != nil {
-		return nil, errors.Wrap(err, "error generating the CidTracker")
+
+	if conf.AlreadyPublishedCIDs {
+		cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		if err != nil {
+			return nil, errors.Wrap(err, "error generating the CidTracker")
+		}
+		cidDiscoverer, err := NewCidDiscoverer(cidTracker)
+		log.Debug("CidHoarder Initialized")
+
+		return &CidHoarder{
+			ctx:        ctx,
+			wg:         &studyWG,
+			Host:       h,
+			DBCli:      db,
+			CidTracker: cidDiscoverer,
+			CidPinger:  cidPinger,
+		}, nil
+	} else {
+		cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		if err != nil {
+			return nil, errors.Wrap(err, "error generating the CidTracker")
+		}
+		cidPublisher, err := NewCidPublisher(cidTracker)
+		log.Debug("CidHoarder Initialized")
+		return &CidHoarder{
+			ctx:        ctx,
+			wg:         &studyWG,
+			Host:       h,
+			DBCli:      db,
+			CidTracker: cidPublisher,
+			CidPinger:  cidPinger,
+		}, nil
 	}
-
-	log.Debug("CidHoarder Initialized")
-
-	return &CidHoarder{
-		ctx:        ctx,
-		wg:         &studyWG,
-		Host:       h,
-		DBCli:      db,
-		CidTracker: cidTracker,
-		CidPinger:  cidPinger,
-	}, nil
 }
 
 func (c *CidHoarder) Run() error {
@@ -111,7 +129,7 @@ func (c *CidHoarder) Run() error {
 		return errors.Wrap(err, "unable to boostrap the host with the kdht routing table.")
 	}
 	// Launch the Cid Tracker
-	go c.CidTracker.Run()
+	go c.CidTracker.run()
 	go c.CidPinger.Run()
 
 	c.wg.Wait()
