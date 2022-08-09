@@ -160,13 +160,13 @@ func (discoverer *CidDiscoverer) run() {
 	genWG.Add(1)
 	go generateCids(discoverer.CidSource, discoverer.CidNumber, &genWG, cidChannel)
 
-	var publisherWG sync.WaitGroup
+	var discovererWG sync.WaitGroup
 
 	// CID PR Publishers which are essentially the workers of tracker.
-	for publisherCounter := 0; publisherCounter < discoverer.Workers; publisherCounter++ {
-		publisherWG.Add(1)
+	for discovererCounter := 0; discovererCounter < discoverer.Workers; discovererCounter++ {
+		discovererWG.Add(1)
 		// start the providing process
-		go discoverer.discovery_process(&publisherWG, publisherCounter, cidChannel, &firstCidFetchRes)
+		go discoverer.discovery_process(&discovererWG, discovererCounter, cidChannel, &firstCidFetchRes)
 	}
 }
 
