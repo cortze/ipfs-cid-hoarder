@@ -9,19 +9,20 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	"github.com/prometheus/common/log"
 )
 
 // MessageSender handles sending wire protocol messages to a given peer
 type MessageSender struct {
-	m           pb.MessageSender
+	m             pb.MessageSender
 	blacklistedUA string
-	msgNot      *Notifier
+	msgNot        *Notifier
 }
 
 func NewCustomMessageSender(blacklistedUA string) *MessageSender {
 	return &MessageSender{
 		blacklistedUA: blacklistedUA,
-		msgNot:      NewMsgNotifier(),
+		msgNot:        NewMsgNotifier(),
 	}
 }
 func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSender {
@@ -35,8 +36,25 @@ func (ms *MessageSender) GetMsgNotifier() *Notifier {
 }
 
 // SendRequest is a custom wrapper on top of the pb.MessageSender that sends a peer a message and waits for its response
+//TODO check out if this is a response message
+//Added by fotis bistas
 func (ms *MessageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
-	return ms.m.SendRequest(ctx, p, pmes)
+	// Keep track of the time that takes to send the msg
+	startT := time.Now()
+	respMsg, err := ms.m.SendRequest(ctx, p, pmes)
+	t := time.Since(startT)
+
+	// compose the Notifier
+	not := &MsgNotification{
+		RemotePeer:    p,
+		QueryTime:     startT,
+		QueryDuration: t,
+		Msg:           *pmes,
+		Error:         err,
+	}
+	log.Debugf(respMsg.Type)
+	ms.msgNot.Notify(not)
+	return respMsg, err
 }
 
 // SendMessage is a custom wrapper on top of the pb.MessageSender that sends a given msg to a peer and
