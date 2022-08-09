@@ -59,7 +59,7 @@ func (db *DBClient) addPeerInfo(pInfo *models.PeerInfo) (err error) {
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT DO NOTHING`,
 		pInfo.ID.String(),
-		pInfo.MultiAddr,
+		pInfo.AddrInfo,
 		pInfo.UserAgent,
 		pInfo.Client,
 		pInfo.Version,
