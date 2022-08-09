@@ -483,8 +483,20 @@ func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup,
 			// little not inside the CID to notify when k peers where recorded?
 			time.Sleep(500 * time.Millisecond)
 
+			//TODO instead of receiving from the channel in the get provider listener insert the providers here
+			for _, peer := range peers {
+				useragent := discoverer.host.GetUserAgentOfPeer(peer.ID)
+
+				// Generate the new PeerInfo struct for the new PRHolder
+				prHolderInfo := models.NewPeerInfo(
+					peer.ID,
+					peer.Addrs,
+					useragent,
+				)
+				cidInfo.AddPRHolder(prHolderInfo)
+			}
 			// add the request time to the CidInfo
-			cidInfo.AddProvideTime(reqTime)
+			cidInfo.AddProvideTime(reqTime) //TODO kinda of a useless metric here
 			cidInfo.AddPRFetchResults(fetchRes)
 
 			// the Cid has already being published to the network, we can already save it into the DB
