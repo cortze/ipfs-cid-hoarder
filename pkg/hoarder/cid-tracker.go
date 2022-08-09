@@ -144,7 +144,30 @@ func (publisher *CidPublisher) run() {
 }
 
 func (discoverer *CidDiscoverer) run() {
+	// launch the PRholder reading routine
+	msgNotChannel := discoverer.MsgNot.GetNotifierChan()
 
+	var firstCidFetchRes sync.Map
+
+	// generate a channel with the same size as the Workers one
+	cidChannel := make(chan *cid.Cid, discoverer.Workers)
+
+	// IPFS DHT Message Notification Listener
+	done := make(chan struct{})
+	go discoverer.foundProviderMsgListener(&firstCidFetchRes, done, msgNotChannel)
+	// CID generator
+	var genWG sync.WaitGroup
+	genWG.Add(1)
+	go generateCids(discoverer.CidSource, discoverer.CidNumber, &genWG, cidChannel)
+
+	var publisherWG sync.WaitGroup
+
+	// CID PR Publishers which are essentially the workers of tracker.
+	for publisherCounter := 0; publisherCounter < discoverer.Workers; publisherCounter++ {
+		publisherWG.Add(1)
+		// start the providing process
+		go discoverer.discovery_process(&publisherWG, publisherCounter, cidChannel, &firstCidFetchRes)
+	}
 }
 
 //addProviderMsgListener listens to a:
