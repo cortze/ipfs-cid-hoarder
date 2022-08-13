@@ -1,11 +1,10 @@
 package hoarder
 
 import (
-	"bufio"
-	"io"
+	"encoding/json"
+	"io/ioutil"
 	"math/rand"
 	"os"
-	"strings"
 
 	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
@@ -26,8 +25,9 @@ type CidSource interface {
 //read the file until the end.
 type FileCIDSource struct {
 	filename string
-	file     *os.File
-	scanner  *bufio.Scanner
+	jsonFile *os.File
+	records  ProviderRecords
+	index    int
 }
 
 type BitswapCIDSource struct {
@@ -52,19 +52,24 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 // 	}
 //If the file cannot be opened it returns the corresponding error.
 func newFileCIDSource(filename string) (*FileCIDSource, error) {
-	file, err := os.Open(filename)
+	jsonFile, err := os.Open(filename)
 	if err != nil {
-		return nil, errors.Wrap(err, "opening CID file")
+		return nil, err
 	}
 
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
+	var records ProviderRecords
+	byteValue, err := ioutil.ReadAll(jsonFile)
 
-	log.Info("Creating a new file cid source struct")
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal(byteValue, &records)
+
 	return &FileCIDSource{
 		filename: filename,
-		file:     file,    //this a pointer to a file
-		scanner:  scanner, //this a pointer to the scanner
+		jsonFile: jsonFile, //this a pointer to a file
+		records:  records,
 	}, nil
 }
 
@@ -80,35 +85,33 @@ func (g *RandomCidGen) Type() string {
 	return "random-content-gen"
 }
 
+func (fileCidSource *FileCIDSource) Close() {
+	fileCidSource.jsonFile.Close()
+}
+
+func (fileCIDSource *FileCIDSource) ResetIndex() {
+	fileCIDSource.index = 0
+}
+
 //Scans the file and reads each line of the file. When it reaches the end of file it returns an EOF error. If another error occurs
 //it returns the error. The end of file error means that the file was read successfully.
 func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
-	//returns false when the scan stops (reaching the end of the file) or there's an error.
-	error_flag := file_cid_source.scanner.Scan()
-	if !error_flag {
-		//scanner.Err() returns a nil when error_flag = false and the error is an EOF error. Else it return the error normally.
-		err := file_cid_source.scanner.Err()
-		if err != io.EOF {
-			file_cid_source.file.Close()
-			return nil, cid.Undef, errors.Wrap(err, " while scanning the file")
-		}
-		file_cid_source.file.Close()
-		return nil, cid.Undef, errors.Wrap(io.EOF, " while scanning the file")
-	}
-	temp := strings.Fields(file_cid_source.scanner.Text())
 
-	//TODO check if parse function gives the desired functionality
-	cid_temp, err := cid.Parse(temp[0])
-	if err != nil {
-		return nil, cid.Undef, errors.Wrap(err, " while parsing cid")
+	if file_cid_source.index < len(file_cid_source.records.EncapsulatedJSONProviderRecords) {
+		providerRecord := file_cid_source.records.EncapsulatedJSONProviderRecords[file_cid_source.index]
+		file_cid_source.index++
+		newCid, err := cid.Parse(providerRecord.CID)
+		if err != nil {
+			return make([]byte, 0), cid.Undef, errors.Wrap(err, " could not parse CID")
+		}
+		return make([]byte, 0), newCid, nil
 	}
-	//for now we only read the CIDs and not their contents
-	log.Infof("Read new CID from file %s", cid_temp)
-	return nil, cid_temp, nil
+	return make([]byte, 0), cid.Undef, errors.New("All the provider records were read from the file")
 }
 
+//TODO type returning a string is not a good idea
 func (file_cid_source *FileCIDSource) Type() string {
-	return "text-file"
+	return "json-file"
 }
 
 func (bitswap_cid_source *BitswapCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
