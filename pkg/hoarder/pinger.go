@@ -101,7 +101,7 @@ func (p *CidPinger) Run() {
 					}
 					cStr := c.CID.Hash().B58String()
 					// check if the time for next ping has arrived
-					if time.Now().Sub(c.NextPing) < time.Duration(0) {
+					if time.Since(c.NextPing) < time.Duration(0) {
 						logEntry.Debugf("not in time to ping %s", cStr)
 						break
 					}
@@ -169,7 +169,7 @@ func (p *CidPinger) Run() {
 					// DHT FindProviders call to see if the content is acutally retrievable from the network
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
-						var isRetrievable bool
+						var isRetrievable bool = false
 						t := time.Now()
 						providers, err := p.host.DHT.LookupForProviders(p.ctx, c.CID)
 						pingTime := time.Since(t)
@@ -177,9 +177,13 @@ func (p *CidPinger) Run() {
 						if err != nil {
 							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
 						}
-						if len(providers) > 0 { // is this assumption naive?
-							isRetrievable = true
+						// iter through the providers to see if it matches with the host's peerID
+						for _, paddrs := range providers {
+							if p.host.ID() == paddrs.ID {
+								isRetrievable = true
+							}
 						}
+
 						cidFetchRes.IsRetrievable = isRetrievable
 					}(p, c, cidFetchRes)
 
@@ -289,10 +293,17 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 			connError = p2p.NoConnError
 
 			// if the connection was successfull, request wheter it has the records or not
-			provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
-			if len(provs) > 0 {
-				hasRecords = true
+			provs, _, err := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
+			if err != nil {
+				log.Warnf("unable to retrieve providers from peer %s - error: %s", pAddr.ID, err.Error())
+			} else {
 				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
+			}
+			// iter through the providers to see if it matches with the host's peerID
+			for _, paddrs := range provs {
+				if p.host.ID() == paddrs.ID {
+					hasRecords = true
+				}
 			}
 
 			// close connection and exit loop
@@ -348,8 +359,6 @@ func (q *cidQueue) addCid(c *models.CidInfo) {
 
 	q.cidMap[c.CID.Hash().B58String()] = c
 	q.cidArray = append(q.cidArray, c)
-
-	return
 }
 
 func (q *cidQueue) removeCid(cStr string) {
@@ -382,7 +391,6 @@ func (q *cidQueue) getCid(cStr string) (*models.CidInfo, bool) {
 
 func (q *cidQueue) sortCidList() {
 	sort.Sort(q)
-	return
 }
 
 // Swap is part of sort.Interface.

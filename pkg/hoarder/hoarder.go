@@ -39,7 +39,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	if conf.PrivKey != "" {
 		priv, err = p2p.ParsePrivateKey(conf.PrivKey)
 		if err != nil {
-			log.Error("unable to parse PrivKey %s", conf.PrivKey)
+			log.Errorf("unable to parse PrivKey %s", conf.PrivKey)
 		} else {
 			genKey = false
 			log.Debugf("Readed PrivKey %s", p2p.PrivKeyToString(priv))
