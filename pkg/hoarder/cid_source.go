@@ -155,7 +155,9 @@ func (file_cid_source *FileCIDSource) GetNewCid() (ProviderAndCID, error) {
 		ProviderAndCidInstance := newProvideAndCID(newPid, newCid, multiaddr)
 		return ProviderAndCidInstance, nil
 	}
-	return Undef, errors.New("All the provider records were read from the file")
+	file_cid_source.Close()
+	file_cid_source.ResetIndex()
+	return Undef, nil
 }
 
 //TODO type returning a string is not a good idea

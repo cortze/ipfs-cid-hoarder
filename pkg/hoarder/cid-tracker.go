@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"time"
 
@@ -119,6 +120,9 @@ func (discoverer *CidDiscoverer) readCIDs(source CidSource, wg *sync.WaitGroup, 
 		if err != nil {
 			log.Errorf("unable to read %s content. %s", err.Error(), source.Type())
 			continue
+		}
+		if reflect.DeepEqual(providersAndCidInstance, Undef) {
+			break
 		}
 		providersAndCidChannel <- &providersAndCidInstance
 	}
