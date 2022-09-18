@@ -36,7 +36,7 @@ func (publisher *CidPublisher) run() {
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go generateCids(publisher.CidSource, publisher.CidNumber, &genWG, cidChannel)
+	go publisher.generateCids(publisher.CidSource, publisher.CidNumber, &genWG, cidChannel)
 
 	var publisherWG sync.WaitGroup
 
