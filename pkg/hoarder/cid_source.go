@@ -7,18 +7,37 @@ import (
 	"os"
 
 	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
 )
 
 var DefCIDContLen = 1024 // 1KB
 
 type CidSource interface {
-	GetNewCid() ([]byte, cid.Cid, error)
+	//return pid,multiaddresses and cid
+	GetNewCid() (ProviderAndCID, error)
 	Type() string
 }
+
+type ProviderAndCID struct {
+	ID        peer.ID        `json:"PeerID"`
+	CID       cid.Cid        `json:"ContentID"`
+	Addresses []ma.Multiaddr `json:"PeerMultiaddresses"`
+}
+
+func newProvideAndCID(ID peer.ID, CID cid.Cid, Addresses []ma.Multiaddr) ProviderAndCID {
+	return ProviderAndCID{
+		ID:        ID,
+		CID:       CID,
+		Addresses: Addresses,
+	}
+}
+
+var Undef = ProviderAndCID{}
 
 //Read CIDs and their content from a file. The struct will contain the file pointer that it's opened along with a pointer to a scanner
 //struct. When you want to access a new CID from the file the GetNewCid() function must be called. The scanner keeps the state and will
@@ -77,7 +96,7 @@ func newBitswapCIDSource() *BitswapCIDSource {
 	return &BitswapCIDSource{}
 }
 
-func (g *RandomCidGen) GetNewCid() ([]byte, cid.Cid, error) {
+func (g *RandomCidGen) GetNewCid() (ProviderAndCID, error) {
 	return genRandomContent(g.contentSize)
 }
 
@@ -95,18 +114,27 @@ func (fileCIDSource *FileCIDSource) ResetIndex() {
 
 //Scans the file and reads each line of the file. When it reaches the end of file it returns an EOF error. If another error occurs
 //it returns the error. The end of file error means that the file was read successfully.
-func (file_cid_source *FileCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
+//Returns the tuple of providers,cid.Cid
+func (file_cid_source *FileCIDSource) GetNewCid() (ProviderAndCID, error) {
 
 	if file_cid_source.index < len(file_cid_source.records.EncapsulatedJSONProviderRecords) {
 		providerRecord := file_cid_source.records.EncapsulatedJSONProviderRecords[file_cid_source.index]
 		file_cid_source.index++
+		//TODO check if this is right
 		newCid, err := cid.Parse(providerRecord.CID)
 		if err != nil {
-			return make([]byte, 0), cid.Undef, errors.Wrap(err, " could not parse CID")
+			return Undef, errors.Wrap(err, " could not parse CID")
 		}
-		return make([]byte, 0), newCid, nil
+		newPid, err := peer.IDFromString(providerRecord.ID)
+		if err != nil {
+			return Undef, errors.Wrap(err, " could not parse PID")
+		}
+		multiaddr := providerRecord.Address
+		log.Infof("Read a new provider ID %s. The multiaddresses are %v.The new CID is %s", newPid, multiaddr, newCid)
+		ProviderAndCidInstance := newProvideAndCID(newPid, newCid, multiaddr)
+		return ProviderAndCidInstance, nil
 	}
-	return make([]byte, 0), cid.Undef, errors.New("All the provider records were read from the file")
+	return Undef, errors.New("All the provider records were read from the file")
 }
 
 //TODO type returning a string is not a good idea
@@ -114,18 +142,18 @@ func (file_cid_source *FileCIDSource) Type() string {
 	return "json-file"
 }
 
-func (bitswap_cid_source *BitswapCIDSource) GetNewCid() ([]byte, cid.Cid, error) {
+func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (ProviderAndCID, error) {
 	//TODO function that reads bitswap content
-	return nil, cid.Undef, nil
+	return Undef, nil
 }
 
 func (bitswap_cid_source *BitswapCIDSource) Type() string {
 	return "bitswap"
 }
 
-// TODO: is it worth keeping the content?
+// TODO: is it worth keeping the content? -> replace with the providers and cid struct
 // getRandomContent returns generates an array of random bytes with the given size and the composed CID of the content
-func genRandomContent(byteLen int) ([]byte, cid.Cid, error) {
+func genRandomContent(byteLen int) (ProviderAndCID, error) {
 	// generate random bytes
 	content := make([]byte, byteLen)
 	rand.Read(content)
@@ -142,9 +170,10 @@ func genRandomContent(byteLen int) ([]byte, cid.Cid, error) {
 	// get the CID of the content we just generated
 	contID, err := pref.Sum(content)
 	if err != nil {
-		return content, cid.Cid{}, errors.Wrap(err, "composing CID")
+		return Undef, errors.Wrap(err, "composing CID")
 	}
 
 	log.Infof("generated new CID %s", contID.Hash().B58String())
-	return content, contID, nil
+	ProvidersAndCidInstance := newProvideAndCID("", contID, make([]ma.Multiaddr, 0))
+	return ProvidersAndCidInstance, nil
 }
