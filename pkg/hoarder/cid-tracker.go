@@ -31,12 +31,13 @@ type CidTracker struct {
 	CidSource CidSource
 	CidPinger *CidPinger
 
-	K             int
-	CidNumber     int
-	Workers       int
-	ReqInterval   time.Duration
-	StudyDuration time.Duration
-	CidMap        sync.Map
+	K              int
+	CidNumber      int
+	Workers        int
+	ReqInterval    time.Duration
+	StudyDuration  time.Duration
+	CidMap         sync.Map
+	ProviderAndCID sync.Map
 }
 
 type CidPublisher struct {
