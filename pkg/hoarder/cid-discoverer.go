@@ -7,6 +7,10 @@ import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -78,6 +82,7 @@ func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup,
 			)
 			fetchRes.AddPRPingResults(pingRes)
 			//TODO will this work, because no add provider RPC has been completed
+			addAddrtoPeerstore(discoverer.host, received_ProvideAndCid.ID, received_ProvideAndCid.Addresses)
 			useragent := discoverer.host.GetUserAgentOfPeer(received_ProvideAndCid.ID)
 
 			prHolderInfo := models.NewPeerInfo(
@@ -93,4 +98,8 @@ func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup,
 			return
 		}
 	}
+}
+
+func addAddrtoPeerstore(h host.Host, pid peer.ID, multiaddr []ma.Multiaddr) {
+	h.Peerstore().AddAddrs(pid, multiaddr, peerstore.PermanentAddrTTL)
 }
