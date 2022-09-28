@@ -18,7 +18,8 @@ type CidHoarder struct {
 	ctx context.Context
 	wg  *sync.WaitGroup
 
-	Host       *p2p.Host
+	PubHost    *p2p.Host
+	PingerHost *p2p.Host
 	DBCli      *db.DBClient
 	CidTracker *CidTracker
 	CidPinger  *CidPinger
@@ -53,13 +54,26 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		}
 		log.Debugf("Generated Priv Key for the host %s", p2p.PrivKeyToString(priv))
 	}
+	// generate new fresh key for pinger host
+	priv2, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
+	}
 
-	// ----- Compose the Libp2p host -----
-	h, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	// ----- Compose Publisher Libp2p host -----
+	pubHost, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
 	}
 
+	// ----- Compose Pinger Libp2p Host -----
+
+	pingerHost, err := p2p.NewHost(ctx, priv2, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	if err != nil {
+		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
+	}
+
+	//  ------ Study Parameters ---------
 	var studyWG sync.WaitGroup
 
 	reqInterval, err := time.ParseDuration(conf.ReqInterval)
@@ -79,12 +93,12 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	// ----- Generate the CidPinger -----
 	studyWG.Add(1)
-	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds, conf.Workers)
+	cidPinger := NewCidPinger(ctx, &studyWG, pingerHost, db, reqInterval, rounds, conf.Workers)
 
 	// ----- Generate the CidTracker -----
 	cidSource := NewRandomCidGen(conf.CidContentSize)
 	studyWG.Add(1)
-	cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+	cidTracker, err := NewCidTracker(ctx, &studyWG, pubHost, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating the CidTracker")
 	}
@@ -94,7 +108,8 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	return &CidHoarder{
 		ctx:        ctx,
 		wg:         &studyWG,
-		Host:       h,
+		PubHost:    pubHost,
+		PingerHost: pingerHost,
 		DBCli:      db,
 		CidTracker: cidTracker,
 		CidPinger:  cidPinger,
@@ -103,10 +118,16 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 func (c *CidHoarder) Run() error {
 	// Boostrap the kdht host
-	err := c.Host.Boostrap(c.ctx)
+	err := c.PubHost.Boostrap(c.ctx)
 	if err != nil {
-		return errors.Wrap(err, "unable to boostrap the host with the kdht routing table.")
+		return errors.Wrap(err, "unable to boostrap the publisher host with the kdht routing table.")
 	}
+
+	err = c.PingerHost.Boostrap(c.ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to boostrap the pinger host with the kdht routing table.")
+	}
+
 	// Launch the Cid Tracker
 	go c.CidTracker.Run()
 	go c.CidPinger.Run()

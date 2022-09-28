@@ -21,7 +21,7 @@ func TestRecreateRetrievavilityError(t *testing.T) {
 
 	// 1. CIDs
 	// RFM 19 Report's CID = "bafybeigdjyzepom74haqau7ojzay7zgwula4kss6nxoyqmrrrwwzjphf5q"
-	cidStrB58 := "QmaniDqoEobVH1TpUf9gfa8eE3F9TSr4XM8VY4oqzcwJYw"
+	cidStrB58 := "QmaniDqoEobVH1TpUf9gfa8eE3F9TSr4XM8VY4oqzcwJYw" // "bafkreihbqpjpybzekyqjtyi5wibkgggvo335poijs5u5adhpbxhidby5va"
 	c, err := cid.Decode(cidStrB58)
 	require.NoError(t, err)
 	fmt.Println("CID = ", c.Hash().B58String())
