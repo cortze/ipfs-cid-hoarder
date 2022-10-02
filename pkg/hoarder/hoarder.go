@@ -84,7 +84,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds, conf.Workers)
 
 	// ----- Generate the CidTracker -----
-	cidSource, err := find_cid_source(conf)
+	cidSource, err := findCidSource(conf)
 	if err != nil {
 		return nil, errors.Wrap(err, " error generating the CID Tracker")
 	}
@@ -154,11 +154,11 @@ func (c *CidHoarder) Run() error {
 //	RandomContent  = "random"
 //  )
 //
-func find_cid_source(conf *config.Config) (CidSource, error) {
+func findCidSource(conf *config.Config) (CidSource, error) {
 	switch conf.CidSource {
 	case config.TextFileSource:
 		return newFileCIDSource(conf.CidFile)
-	case config.RandomContent:
+	case config.RandomSource:
 		return NewRandomCidGen(conf.CidContentSize), nil
 	case config.BitswapSource:
 		return newBitswapCIDSource(), nil

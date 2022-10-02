@@ -18,7 +18,7 @@ const (
 	RandomSource   = "random-content-gen"
 	TextFileSource = "text-file"
 	BitswapSource  = "bitswap"
-	RandomContent  = "random"
+	RandomContent  = "random-content-gen"
 )
 
 // Harcoded variables for the tool's profiling

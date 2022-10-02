@@ -39,7 +39,7 @@ type Host struct {
 }
 
 func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int, hydraFilter bool) (*Host, error) {
-	log.Debug("generating random cid generator")
+	log.Debug("Creating host")
 
 	// set the max limit of connections to 30000
 	os.Setenv("LIBP2P_SWARM_FD_LIMIT", "30000")
