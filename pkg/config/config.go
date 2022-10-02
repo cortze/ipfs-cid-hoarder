@@ -37,6 +37,7 @@ var DefaultBlacklistUserAgent = "hydra-booster"
 var DefaultConfig = Config{
 	LogLevel:             "info",
 	Database:             "./data/ipfs-hoarder-db.db",
+	ConfigJsonFile:       "config.json",
 	CidSource:            "random-content-gen",
 	AlreadyPublishedCIDs: false,
 	CidFile:              "cids/cid-list.json",
@@ -57,6 +58,7 @@ type Config struct {
 	Database             string `json:"database-endpoint"`
 	CidSource            string `json:"cid-source"`
 	CidFile              string `json:"cid-file"`
+	ConfigJsonFile       string `json:"config-json-file"`
 	CidContentSize       int    `json:"cid-content-size"`
 	CidNumber            int    `json:"cid-number"` // in KBs
 	Workers              int    `json:"workers"`
@@ -69,12 +71,15 @@ type Config struct {
 
 // Init takes the command line argumenst from the urfave/cli context and composes the configuration
 func NewConfig(ctx *cli.Context) (*Config, error) {
-
+	c := &Config{}
 	// TODO: work on reading config file from custom path/file (reproducibility)
 	// 		 export the current conf into a file?
+	if ctx.IsSet("name-of-config-json-file") {
+		c.ImportConfigFromJsonFile()
+	} else {
+		c.apply(ctx)
+	}
 
-	c := &Config{}
-	c.apply(ctx)
 	return c, nil
 
 }

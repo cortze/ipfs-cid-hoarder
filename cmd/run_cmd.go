@@ -98,6 +98,12 @@ var RunCmd = &cli.Command{
 			DefaultText: "false",
 			Value:       config.DefaultConfig.AlreadyPublishedCIDs,
 		},
+		&cli.StringFlag{
+			Name:        "name-of-config-json-file",
+			Usage:       "reads a config struct from the specified json file",
+			DefaultText: "config.json",
+			Value:       config.DefaultConfig.ConfigJsonFile,
+		},
 		&cli.BoolFlag{
 			Name:        "hydra-filter",
 			Usage:       "boolean representation to activate or not the filter to avoid connections to hydras",
@@ -122,7 +128,13 @@ func RunHoarder(ctx *cli.Context) error {
 	log.SetOutput(config.ParseLogOutput("terminal"))
 	log.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
-	log.Debug("get configuration:", conf)
+	jsonConf, err := conf.JsonConfig()
+
+	if err != nil {
+		log.Errorf("error %s while converting config into json", err)
+	}
+
+	log.Debug(string(jsonConf))
 
 	// expose the pprof and prometheus metrics
 	go func() {
