@@ -266,7 +266,7 @@ func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, p
 func provide(ctx context.Context, publisher *CidPublisher, receivedCid *cid.Cid) (time.Duration, error) {
 	log.Debug("calling provide method")
 	tstart := time.Now()
-	err := publisher.host.DHT.Provide(publisher.ctx, *receivedCid, true)
+	err := publisher.host.DHT.Provide(ctx, *receivedCid, true)
 	if err != nil {
 		return -1, err
 	}
