@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -53,7 +54,7 @@ var DefaultConfig = Config{
 type Config struct {
 	PrivKey              string `json:"priv-key"`
 	LogLevel             string `json:"log-level"`
-	Database             string `json:"database-enpoint"`
+	Database             string `json:"database-endpoint"`
 	CidSource            string `json:"cid-source"`
 	CidFile              string `json:"cid-file"`
 	CidContentSize       int    `json:"cid-content-size"`
@@ -76,6 +77,34 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	c.apply(ctx)
 	return c, nil
 
+}
+
+//Exports the config struct into a json file
+func (c *Config) ExportConfigIntoJsonFile() error {
+	content, err := c.JsonConfig()
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile("config.json", content, 0644)
+	if err != nil {
+		return errors.Wrap(err, " while trying to write struct to file")
+	}
+
+	return nil
+}
+
+//Imports config struct from json file
+func (c *Config) ImportConfigFromJsonFile() error {
+	content, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		return errors.Wrap(err, " while trying to import config from json file")
+	}
+	err = json.Unmarshal(content, &c)
+	if err != nil {
+		return errors.Wrap(err, " while trying to unmarshal json config")
+	}
+	return nil
 }
 
 //Returns a json representation of the config struct
@@ -137,41 +166,42 @@ func (c *Config) apply(ctx *cli.Context) {
 		}
 		if ctx.IsSet("cid-source") {
 			c.CidSource = ctx.String("cid-source")
-			// if the TEXT mode was selected, read the file from the cid-file
-			switch c.CidSource {
-			case RandomSource:
-				// check the size of the random content to generate
-				if ctx.IsSet("cid-content-size") {
-					c.CidContentSize = ctx.Int("cid-content-size")
-				} else {
-					c.CidContentSize = DefaultConfig.CidContentSize
-				}
-				// check the number of random CIDs that we want to generate
-				if ctx.IsSet("cid-number") {
-					c.CidNumber = ctx.Int("cid-number")
-				} else {
-					c.CidNumber = DefaultConfig.CidNumber
-				}
-				// batch of CIDs for the entire study
-				if ctx.IsSet("workers") {
-					c.Workers = ctx.Int("workers")
-				} else {
-					c.Workers = DefaultConfig.Workers
-				}
-			//TODO support different types of cid files
-			case TextFileSource:
-				if ctx.IsSet("cid-file") {
-					c.CidFile = ctx.String("cid-file")
-				} else {
-					c.CidFile = DefaultConfig.CidFile
-				}
-			case BitswapSource:
-				log.Info("bitswap content discovery not supported yet.")
-				os.Exit(0)
-			default:
-				log.Info("no cid source was given.")
-				os.Exit(0)
+		} else {
+			c.CidSource = DefaultConfig.CidSource
+		}
+		switch c.CidSource {
+		case RandomSource:
+			// check the size of the random content to generate
+			if ctx.IsSet("cid-content-size") {
+				c.CidContentSize = ctx.Int("cid-content-size")
+			} else {
+				c.CidContentSize = DefaultConfig.CidContentSize
 			}
+			// check the number of random CIDs that we want to generate
+			if ctx.IsSet("cid-number") {
+				c.CidNumber = ctx.Int("cid-number")
+			} else {
+				c.CidNumber = DefaultConfig.CidNumber
+			}
+			// batch of CIDs for the entire study
+			if ctx.IsSet("workers") {
+				c.Workers = ctx.Int("workers")
+			} else {
+				c.Workers = DefaultConfig.Workers
+			}
+			//TODO support different types of cid files
+		case TextFileSource:
+			if ctx.IsSet("cid-file") {
+				c.CidFile = ctx.String("cid-file")
+			} else {
+				c.CidFile = DefaultConfig.CidFile
+			}
+		case BitswapSource:
+			log.Info("bitswap content discovery not supported yet.")
+			os.Exit(0)
+		default:
+			log.Info("no cid source was given.")
+			os.Exit(0)
 		}
 	}
 }
