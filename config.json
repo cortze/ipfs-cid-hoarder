@@ -1,0 +1,1 @@
+{"priv-key":"","log-level":"info","database-endpoint":"user=postgres password=docker host=localhost port=5432 sslmode=disable","cid-source":"random-content-gen","cid-file":"","cid-content-size":1000,"cid-number":10,"workers":250,"already-published":false,"req-interval":"30m","study-duration":"48h","k":20,"hydra-filter":false}
