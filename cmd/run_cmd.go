@@ -92,6 +92,12 @@ var RunCmd = &cli.Command{
 			Value:       config.DefaultConfig.CidNumber,
 		},
 		&cli.BoolFlag{
+			Name:        "already-published-cids",
+			Usage:       "if the cids are already published in the network the tool has to only ping them and not publish them",
+			DefaultText: "false",
+			Value:       config.DefaultConfig.AlreadyPublishedCIDs,
+		},
+		&cli.BoolFlag{
 			Name:        "hydra-filter",
 			Usage:       "boolean representation to activate or not the filter to avoid connections to hydras",
 			EnvVars:     []string{"IPFS_CID_HOARDER_HYDRA_FILTER"},

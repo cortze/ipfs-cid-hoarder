@@ -32,17 +32,18 @@ var DefaultBlacklistUserAgent = "hydra-booster"
 
 // default configuration
 var DefaultConfig = Config{
-	LogLevel:       "info",
-	Database:       "./data/ipfs-hoarder-db.db",
-	CidSource:      "random-content-gen",
-	CidFile:        "cids/cid-list.txt",
-	CidContentSize: 1000, // 1MB in KBs
-	CidNumber:      10,
-	Workers:        250,
-	ReqInterval:    "30m",
-	StudyDuration:  "48h",
-	K:              20, // K-bucket parameter
-	HydraFilter:    false,
+	LogLevel:             "info",
+	Database:             "./data/ipfs-hoarder-db.db",
+	CidSource:            "random-content-gen",
+	AlreadyPublishedCIDs: false,
+	CidFile:              "cids/cid-list.txt",
+	CidContentSize:       1000, // 1MB in KBs
+	CidNumber:            10,
+	Workers:              250,
+	ReqInterval:          "30m",
+	StudyDuration:        "48h",
+	K:                    20, // K-bucket parameter
+	HydraFilter:          false,
 }
 
 // Config compiles all the set of flags that can be readed from the user while launching the cli
