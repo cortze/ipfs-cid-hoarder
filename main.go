@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cortze/ipfs-cid-hoarder/cmd"
+	"ipfs-cid-hoarder/cmd"
 
 	"github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"

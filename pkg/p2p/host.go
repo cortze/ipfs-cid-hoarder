@@ -10,8 +10,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/crawler"
+	"ipfs-cid-hoarder/pkg/config"
+	"ipfs-cid-hoarder/pkg/crawler"
+
 	log "github.com/sirupsen/logrus"
 
 	libp2p "github.com/libp2p/go-libp2p"

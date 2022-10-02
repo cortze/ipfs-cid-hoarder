@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
+	"ipfs-cid-hoarder/pkg/config"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"

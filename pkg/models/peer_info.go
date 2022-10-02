@@ -3,7 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
+	"ipfs-cid-hoarder/pkg/p2p"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"

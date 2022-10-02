@@ -9,7 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
-	"github.com/prometheus/common/log"
 )
 
 // MessageSender handles sending wire protocol messages to a given peer
@@ -52,7 +51,6 @@ func (ms *MessageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 		Msg:           *pmes,
 		Error:         err,
 	}
-	log.Debugf(respMsg.Type)
 	ms.msgNot.Notify(not)
 	return respMsg, err
 }

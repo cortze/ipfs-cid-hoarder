@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
+	"ipfs-cid-hoarder/pkg/models"
 )
 
 // cidQueue is a simple queue of CIDs that allows rapid access to content through maps,

@@ -5,12 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/db"
+	"ipfs-cid-hoarder/pkg/config"
+	"ipfs-cid-hoarder/pkg/db"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
+	"ipfs-cid-hoarder/pkg/p2p"
+
 	"github.com/libp2p/go-libp2p-core/crypto"
 )
 
@@ -93,7 +95,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
-		cidDiscoverer, err := NewCidDiscoverer(cidTracker)
+		cidDiscoverer, err := NewCidDiscover(cidTracker)
 		log.Debug("CidHoarder Initialized")
 
 		return &CidHoarder{

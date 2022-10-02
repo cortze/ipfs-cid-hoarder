@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/db"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
+	"ipfs-cid-hoarder/pkg/db"
+	"ipfs-cid-hoarder/pkg/models"
+	"ipfs-cid-hoarder/pkg/p2p"
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"

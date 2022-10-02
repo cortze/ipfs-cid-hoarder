@@ -6,8 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/db"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
+	"ipfs-cid-hoarder/pkg/db"
+
+	"ipfs-cid-hoarder/pkg/p2p"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/ipfs/go-cid"

@@ -4,8 +4,9 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/hoarder"
+	"ipfs-cid-hoarder/pkg/config"
+	"ipfs-cid-hoarder/pkg/hoarder"
+
 	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
