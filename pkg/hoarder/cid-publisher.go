@@ -143,7 +143,7 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 				}
 
 			default:
-				log.Debug("msg is not ADD_PROVIDER msg")
+				log.Debugf("msg is not ADD_PROVIDER msg. It is of type %s", msgNot.Msg.Type.String())
 			}
 
 		case <-publisher.ctx.Done():
@@ -264,6 +264,7 @@ func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, p
 //	DHT.Provide(...) method to provide the cid to the network
 // and documents the time it took to publish a CID
 func provide(ctx context.Context, publisher *CidPublisher, receivedCid *cid.Cid) (time.Duration, error) {
+	log.Debug("calling provide method")
 	tstart := time.Now()
 	err := publisher.host.DHT.Provide(publisher.ctx, *receivedCid, true)
 	if err != nil {
