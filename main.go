@@ -20,7 +20,7 @@ var (
 )
 
 func main() {
-	fmt.Println(CliName, CliVersion, "\n")
+	fmt.Println(CliName, CliVersion)
 
 	cidHoarder := cli.App{
 		Name:      CliName,
@@ -34,6 +34,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			cmd.RunCmd,
+			cmd.CrawlerCmd,
 		},
 	}
 

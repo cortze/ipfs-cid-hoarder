@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
+	log "github.com/sirupsen/logrus"
 )
 
 // Parse a Secp256k1PrivateKey from string, checking if it has the proper curve

@@ -9,13 +9,8 @@ import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/hoarder"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
-)
-
-var CmdName = "Run CMD"
-var log = logrus.WithField(
-	"Run Cmd", CmdName,
 )
 
 var RunCmd = &cli.Command{
@@ -97,6 +92,13 @@ var RunCmd = &cli.Command{
 			DefaultText: "K=20",
 			Value:       config.DefaultConfig.CidNumber,
 		},
+		&cli.BoolFlag{
+			Name:        "hydra-filter",
+			Usage:       "boolean representation to activate or not the filter to avoid connections to hydras",
+			EnvVars:     []string{"IPFS_CID_HOARDER_HYDRA_FILTER"},
+			DefaultText: "false",
+			Value:       config.DefaultConfig.HydraFilter,
+		},
 	},
 }
 
@@ -110,9 +112,9 @@ func RunHoarder(ctx *cli.Context) error {
 	}
 
 	// set the logs configurations
-	log.Logger.SetFormatter(config.ParseLogFormatter("text"))
-	log.Logger.SetOutput(config.ParseLogOutput("terminal"))
-	log.Logger.SetLevel(config.ParseLogLevel(conf.LogLevel))
+	log.SetFormatter(config.ParseLogFormatter("text"))
+	log.SetOutput(config.ParseLogOutput("terminal"))
+	log.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
 	log.Debug("get configuration:", conf)
 
