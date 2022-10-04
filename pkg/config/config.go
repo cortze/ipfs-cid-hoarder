@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -63,7 +64,7 @@ type Config struct {
 	CidContentSize       int    `json:"cid-content-size"`
 	CidNumber            int    `json:"cid-number"` // in KBs
 	Workers              int    `json:"workers"`
-	AlreadyPublishedCIDs bool   `json:"already-published"` //already published CIDs skips the tracking phase of the hoarder.
+	AlreadyPublishedCIDs bool   `json:"already-published-cids"` //already published CIDs skips the publishing phase of the hoarder.
 	ReqInterval          string `json:"req-interval"`
 	StudyDuration        string `json:"study-duration"`
 	K                    int    `json:"k"`
@@ -153,8 +154,8 @@ func (c *Config) apply(ctx *cli.Context) {
 		} else {
 			c.ReqInterval = DefaultConfig.ReqInterval
 		}
-		if ctx.IsSet("already-published") {
-			c.AlreadyPublishedCIDs = ctx.Bool("already-published")
+		if ctx.IsSet("already-published-cids") {
+			c.AlreadyPublishedCIDs = ctx.Bool("already-published-cids")
 		} else {
 			c.AlreadyPublishedCIDs = DefaultConfig.AlreadyPublishedCIDs
 		}
@@ -178,7 +179,7 @@ func (c *Config) apply(ctx *cli.Context) {
 		switch c.CidSource {
 		case RandomSource:
 			// check the size of the random content to generate
-			log.Debug("random source for cids found")
+			fmt.Println("random source for cids found")
 			if ctx.IsSet("cid-content-size") {
 				c.CidContentSize = ctx.Int("cid-content-size")
 			} else {
@@ -198,14 +199,14 @@ func (c *Config) apply(ctx *cli.Context) {
 			}
 			//TODO support different types of cid files
 		case TextFileSource, JsonFileSource:
-			log.Debug("text file source or json file source was found")
+			fmt.Println("text file source or json file source was found")
 			if ctx.IsSet("cid-file") {
 				c.CidFile = ctx.String("cid-file")
 			} else {
 				c.CidFile = DefaultConfig.CidFile
 			}
 		case BitswapSource:
-			log.Info("bitswap content discovery not supported yet.")
+			fmt.Println("bitswap content discovery not supported yet.")
 			os.Exit(0)
 		default:
 			log.Info("no cid source was given.")
