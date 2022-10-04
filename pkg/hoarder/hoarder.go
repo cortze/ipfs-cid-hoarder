@@ -96,7 +96,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
 		cidDiscoverer, err := NewCidDiscover(cidTracker)
-		log.Debug("CidHoarder Initialized")
+		log.Debug("CidHoarder Initialized with cid discoverer")
 
 		return &CidHoarder{
 			ctx:        ctx,
@@ -112,7 +112,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
 		cidPublisher, err := NewCidPublisher(cidTracker)
-		log.Debug("CidHoarder Initialized")
+		log.Debug("CidHoarder Initialized with cid publisher")
 		return &CidHoarder{
 			ctx:        ctx,
 			wg:         &studyWG,
@@ -150,6 +150,7 @@ func (c *CidHoarder) Run() error {
 //  const (
 //	RandomSource   = "random-content-gen"
 //	TextFileSource = "text-file"
+//	JsonFileSource = "json-file"
 //	BitswapSource  = "bitswap"
 //	RandomContent  = "random"
 //  )
@@ -157,11 +158,13 @@ func (c *CidHoarder) Run() error {
 func findCidSource(conf *config.Config) (CidSource, error) {
 	switch conf.CidSource {
 	case config.TextFileSource:
-		return newFileCIDSource(conf.CidFile)
+		return nil, errors.New("text file source not yet implemented")
+	case config.JsonFileSource:
+		return NewJsonFileCIDSource(conf.CidFile)
 	case config.RandomSource:
 		return NewRandomCidGen(conf.CidContentSize), nil
 	case config.BitswapSource:
-		return newBitswapCIDSource(), nil
+		return nil, errors.New("bitswap source not yet implemented")
 
 	default:
 		return nil, errors.New("Could not figure out cid source")
