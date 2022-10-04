@@ -85,7 +85,7 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 			}
 			casted_cid, err := cid.Cast(msgNot.Msg.GetKey())
 			if err != nil {
-				log.Error("unable to cast msg key into cid. %s", err.Error())
+				log.Errorf("unable to cast msg key into cid. %s", err.Error())
 			}
 			switch msgNot.Msg.Type {
 			case pb.Message_ADD_PROVIDER:
