@@ -17,6 +17,7 @@ var log = logrus.WithField(
 const (
 	RandomSource   = "random-content-gen"
 	TextFileSource = "text-file"
+	JsonFileSource = "json-file"
 	BitswapSource  = "bitswap"
 	RandomContent  = "random-content-gen"
 )
@@ -51,7 +52,7 @@ var DefaultConfig = Config{
 	HydraFilter:    false,
 }
 
-// Config compiles all the set of flags that can be readed from the user while launching the cli
+// Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
 	PrivKey              string `json:"priv-key"`
 	LogLevel             string `json:"log-level"`
@@ -177,6 +178,7 @@ func (c *Config) apply(ctx *cli.Context) {
 		switch c.CidSource {
 		case RandomSource:
 			// check the size of the random content to generate
+			log.Debug("random source for cids found")
 			if ctx.IsSet("cid-content-size") {
 				c.CidContentSize = ctx.Int("cid-content-size")
 			} else {
@@ -195,7 +197,8 @@ func (c *Config) apply(ctx *cli.Context) {
 				c.Workers = DefaultConfig.Workers
 			}
 			//TODO support different types of cid files
-		case TextFileSource:
+		case TextFileSource, JsonFileSource:
+			log.Debug("text file source or json file source was found")
 			if ctx.IsSet("cid-file") {
 				c.CidFile = ctx.String("cid-file")
 			} else {
