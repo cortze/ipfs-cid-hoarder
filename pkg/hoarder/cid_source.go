@@ -3,6 +3,7 @@ package hoarder
 import (
 	"encoding/json"
 	"io/ioutil"
+	"ipfs-cid-hoarder/pkg/config"
 	"math/rand"
 	"os"
 
@@ -136,7 +137,7 @@ func (g *RandomCidGen) GetNewCid() (GetNewCidReturnType, error) {
 }
 
 func (g *RandomCidGen) Type() string {
-	return "random-content-gen"
+	return config.RandomContent
 }
 
 func (fileCIDSource *JsonFileCIDSource) ResetIndex() {
@@ -169,7 +170,7 @@ func (file_cid_source *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, erro
 
 //TODO type returning a string is not a good idea
 func (file_cid_source *JsonFileCIDSource) Type() string {
-	return "json-file"
+	return config.JsonFileSource
 }
 
 func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (GetNewCidReturnType, error) {
@@ -178,5 +179,5 @@ func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (GetNewCidReturnType, er
 }
 
 func (bitswap_cid_source *BitswapCIDSource) Type() string {
-	return "bitswap"
+	return config.BitswapSource
 }
