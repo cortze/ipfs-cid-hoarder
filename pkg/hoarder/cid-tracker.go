@@ -101,8 +101,7 @@ func (tracker *CidTracker) run() {
 
 }
 
-//A shared method among the types that implement the tracker interface. Generates the CIDs along with the provider if its exists
-//with it's multiaddresses.
+//Generates cids randomly
 func (publisher *CidPublisher) generateCids(source CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
 	defer wg.Done()
 	// generate the CIDs
@@ -116,6 +115,7 @@ func (publisher *CidPublisher) generateCids(source CidSource, cidNumber int, wg 
 	}
 }
 
+//Reads cids from a file
 func (discoverer *CidDiscoverer) readCIDs(source CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan *GetNewCidReturnType) {
 	defer wg.Done()
 	for {
