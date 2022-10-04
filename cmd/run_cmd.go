@@ -35,6 +35,7 @@ var RunCmd = &cli.Command{
 			Usage:       "database endpoint",
 			EnvVars:     []string{"IPFS_CID_HOARDER_DATABASE_ENDPOINT"},
 			DefaultText: "postgresql://user:password@localhost:5432/database",
+			Required:    true,
 			Value:       config.DefaultConfig.Database,
 		},
 		&cli.StringFlag{
@@ -96,6 +97,7 @@ var RunCmd = &cli.Command{
 			Name:        "already-published-cids",
 			Usage:       "if the cids are already published in the network the tool has to only ping them and not publish them",
 			DefaultText: "false",
+			Required:    true,
 			Value:       config.DefaultConfig.AlreadyPublishedCIDs,
 		},
 		&cli.StringFlag{
