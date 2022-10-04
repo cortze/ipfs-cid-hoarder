@@ -1,9 +1,5 @@
 package hoarder
 
-import (
-	ma "github.com/multiformats/go-multiaddr"
-)
-
 const filename = "providers.json"
 
 //A container for the encapsulated struct.
@@ -17,9 +13,9 @@ type ProviderRecords struct {
 //This struct will be used to create,read and store the encapsulated data necessary for reading the
 //provider records.
 type EncapsulatedJSONProviderRecord struct {
-	ID      string         `json:"PeerID"`
-	CID     string         `json:"ContentID"`
-	Address []ma.Multiaddr `json:"PeerMultiaddress"`
+	ID        string   `json:"PeerID"`
+	CID       string   `json:"ContentID"`
+	Addresses []string `json:"PeerMultiaddress"`
 }
 
 //Creates a new:
@@ -28,10 +24,10 @@ type EncapsulatedJSONProviderRecord struct {
 //		CID     string
 //		Address ma.Multiaddr
 //	}
-func NewEncapsulatedJSONCidProvider(id string, cid string, address []ma.Multiaddr) EncapsulatedJSONProviderRecord {
+func NewEncapsulatedJSONCidProvider(id string, cid string, addresses []string) EncapsulatedJSONProviderRecord {
 	return EncapsulatedJSONProviderRecord{
-		ID:      id,
-		CID:     cid,
-		Address: address,
+		ID:        id,
+		CID:       cid,
+		Addresses: addresses,
 	}
 }
