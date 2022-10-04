@@ -91,6 +91,12 @@ func (t *CidTracker) Run() {
 func (t *CidTracker) newRandomCidTracker() {
 	defer t.wg.Done()
 
+	var genWG sync.WaitGroup
+	var genDoneFlag bool
+
+	var publisherWG sync.WaitGroup
+	var pubDoneFlag bool
+
 	log.Info("launching the Random Cid Tracker")
 
 	// launch the PRholder reading routine
@@ -102,20 +108,26 @@ func (t *CidTracker) newRandomCidTracker() {
 	var firstCidFetchRes sync.Map
 
 	// IPFS DHT Message Notification Listener
-	done := make(chan struct{})
 	go func() {
-
 		for {
+			// check if the publisher has finish and if the msgNotChannel is empty
+			if pubDoneFlag && len(msgNotC) == 0 {
+				log.Debug("no more msg notifications to read, closing reader for PR Holders")
+				return
+			}
+
 			select {
-			case msgNot := <-msgNotC:
-				if msgNot == nil {
-					log.Warn("empty msgNot Received, closing reader for PR Holders")
+			case msgNot, ok := <-msgNotC:
+				if !ok {
+					log.Warn("msgNotChannel is closed, closing reader for PR Holders")
 					return
 				}
+
 				c, err := cid.Cast(msgNot.Msg.GetKey())
 				if err != nil {
-					log.Error("unable to cast msg key into cid. %s", err.Error())
+					log.Errorf("unable to cast msg key into cid. %s", err.Error())
 				}
+
 				switch msgNot.Msg.Type {
 				case pb.Message_ADD_PROVIDER:
 					var active, hasRecords bool
@@ -176,16 +188,12 @@ func (t *CidTracker) newRandomCidTracker() {
 			case <-t.ctx.Done():
 				log.Info("context has been closed, finishing Random Cid Tracker")
 				return
-
-			case <-done:
-				log.Info("all the CIDs have been generated")
-				return
 			}
 		}
 	}()
 
 	// CID generator
-	var genWG sync.WaitGroup
+
 	genWG.Add(1)
 	go func(t *CidTracker, wg *sync.WaitGroup, cidC chan *cid.Cid) {
 		defer wg.Done()
@@ -199,22 +207,26 @@ func (t *CidTracker) newRandomCidTracker() {
 		}
 	}(t, &genWG, cidC)
 
-	var publisherWG sync.WaitGroup
-
 	// CID PR Publishers
 	for publisher := 0; publisher < t.Workers; publisher++ {
 		publisherWG.Add(1)
 		// launch publisher
-		go func(ctx context.Context, publisherWG *sync.WaitGroup, publisherID int, cidC chan *cid.Cid, cidFetchRes *sync.Map) {
+		go func(ctx context.Context, publisherWG *sync.WaitGroup, genDoneFlag *bool, publisherID int, cidC chan *cid.Cid, cidFetchRes *sync.Map) {
 			defer publisherWG.Done()
 			logEntry := log.WithField("publisherID", publisherID)
 			logEntry.Debugf("publisher ready")
+
 			for {
+				// check if the generator was finished and if the len of the channel is 0 (empty)
+				if *genDoneFlag && len(cidC) == 0 {
+					logEntry.Warn("done publishing with the cids, closing publisher")
+					return
+				}
+
 				select {
-				case c := <-cidC:
-					if c == nil {
-						logEntry.Warn("received empty CID to track, closing publisher")
-						// not needed
+				case c, ok := <-cidC:
+					if !ok {
+						logEntry.Warn("channel closed, closing publisher")
 						return
 					}
 					logEntry.Debugf("new cid to publish %s", c.Hash().B58String())
@@ -245,8 +257,8 @@ func (t *CidTracker) newRandomCidTracker() {
 					fetchRes.TotalHops = hops.Total
 					fetchRes.HopsToClosest = hops.ToClosest
 
-					// TODO: fix this little wait to comput last PR Holder status
-					// little not inside the CID to notify when k peers where recorded?
+					// TODO: fix this little wait to compute last PR Holder status
+					// possible solution? little notification inside the CID to know when k peers where recorded?
 					time.Sleep(500 * time.Millisecond)
 
 					// add the request time to the CidInfo
@@ -280,24 +292,23 @@ func (t *CidTracker) newRandomCidTracker() {
 				}
 			}
 
-		}(t.ctx, &publisherWG, publisher, cidC, &firstCidFetchRes)
+		}(t.ctx, &publisherWG, &genDoneFlag, publisher, cidC, &firstCidFetchRes)
 	}
 
 	genWG.Wait()
-	// check if there are still CIDs to generate
-	// loss of time or CPU cicles?
-	for {
-		if len(cidC) != 0 {
-			continue
-		} else {
-			close(cidC)
-			break
-		}
-	}
+	genDoneFlag = true
 
 	// wait untill all the workers finished generating the CIDs
 	publisherWG.Wait()
+	pubDoneFlag = true
+
+	// close CID channel
+	close(cidC)
 
 	// close Msg Notifier
 	close(msgNotC)
+
+	// close host
+	t.host.Close()
+
 }
