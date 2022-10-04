@@ -155,13 +155,22 @@ func (file_cid_source *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, erro
 		if err != nil {
 			return Undef, errors.Wrap(err, " could not parse CID")
 		}
-		newPid, err := peer.IDFromString(providerRecord.ID)
+		newPid, err := peer.IDFromBytes([]byte(providerRecord.ID))
 		if err != nil {
 			return Undef, errors.Wrap(err, " could not parse PID")
 		}
-		multiaddr := providerRecord.Address
-		log.Infof("Read a new provider ID %s. The multiaddresses are %v.The new CID is %s", newPid, multiaddr, newCid)
-		ProviderAndCidInstance := NewGetNewCidReturnType(newPid, newCid, multiaddr)
+
+		multiaddresses := make([]ma.Multiaddr, 0)
+		for i := 0; i < len(providerRecord.Addresses); i++ {
+			multiaddr, err := ma.NewMultiaddr(providerRecord.Addresses[i])
+			if err != nil {
+				log.Errorf("could not convert string to multiaddress %s", err)
+			}
+			multiaddresses = append(multiaddresses, multiaddr)
+		}
+
+		log.Infof("Read a new provider ID %s. The multiaddresses are %v.The new CID is %s", string(newPid), multiaddresses, newCid)
+		ProviderAndCidInstance := NewGetNewCidReturnType(newPid, newCid, multiaddresses)
 		return ProviderAndCidInstance, nil
 	}
 	file_cid_source.ResetIndex()

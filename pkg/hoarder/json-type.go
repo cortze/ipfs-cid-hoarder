@@ -15,7 +15,7 @@ type ProviderRecords struct {
 type EncapsulatedJSONProviderRecord struct {
 	ID        string   `json:"PeerID"`
 	CID       string   `json:"ContentID"`
-	Addresses []string `json:"PeerMultiaddress"`
+	Addresses []string `json:"PeerMultiaddresses"`
 }
 
 //Creates a new:
