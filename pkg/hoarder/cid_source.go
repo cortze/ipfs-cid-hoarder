@@ -18,37 +18,39 @@ import (
 var DefCIDContLen = 1024 // 1KB
 
 type CidSource interface {
-	//return pid,multiaddresses and cid
-	GetNewCid() (ProviderAndCID, error)
+	GetNewCid() (GetNewCidReturnType, error)
 	Type() string
 }
 
-type ProviderAndCID struct {
+//Encapsulates the return type of the GetNewCid()
+type GetNewCidReturnType struct {
 	ID        peer.ID        `json:"PeerID"`
 	CID       cid.Cid        `json:"ContentID"`
+	Content   []byte         `json:"Content"`
 	Addresses []ma.Multiaddr `json:"PeerMultiaddresses"`
 }
 
-func newProvideAndCID(ID peer.ID, CID cid.Cid, Addresses []ma.Multiaddr) ProviderAndCID {
-	return ProviderAndCID{
+func NewGetNewCidReturnType(ID peer.ID, CID cid.Cid, Addresses []ma.Multiaddr) GetNewCidReturnType {
+	return GetNewCidReturnType{
 		ID:        ID,
 		CID:       CID,
+		Content:   make([]byte, 0),
 		Addresses: Addresses,
 	}
 }
 
-var Undef = ProviderAndCID{}
+var Undef = GetNewCidReturnType{}
 
-//Read CIDs and their content from a file. The struct will contain the file pointer that it's opened along with a pointer to a scanner
-//struct. When you want to access a new CID from the file the GetNewCid() function must be called. The scanner keeps the state and will
-//read the file until the end.
-type FileCIDSource struct {
+// JsonFileCIDSource reads CIDs and their content from a json file.
+//When you want to access a new CID from the file the GetNewCid() function must be called.
+//The Json contents are stored inside the struct and can be accessed with the index
+type JsonFileCIDSource struct {
 	filename string
-	jsonFile *os.File
 	records  ProviderRecords
 	index    int
 }
 
+//Not yet implemented
 type BitswapCIDSource struct {
 }
 
@@ -62,16 +64,21 @@ func NewRandomCidGen(contentSize int) *RandomCidGen {
 	}
 }
 
-//Creates a new:
+// NewJsonFileCIDSource Creates a new:
 //
-// 	type FileCIDSource struct {
+// 	type JsonFileCIDSource struct {
 //		filename string
-//		file     *os.File
 //		scanner  *bufio.Scanner
 // 	}
-//If the file cannot be opened it returns the corresponding error.
-func newFileCIDSource(filename string) (*FileCIDSource, error) {
+//If the file cannot be opened or the data fail to unmarshall it returns the corresponding error.
+func NewJsonFileCIDSource(filename string) (*JsonFileCIDSource, error) {
 	jsonFile, err := os.Open(filename)
+	defer func(jsonFile *os.File) {
+		err := jsonFile.Close()
+		if err != nil {
+			log.Errorf("failed to close file: %s")
+		}
+	}(jsonFile)
 	if err != nil {
 		return nil, err
 	}
@@ -80,25 +87,30 @@ func newFileCIDSource(filename string) (*FileCIDSource, error) {
 	byteValue, err := ioutil.ReadAll(jsonFile)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "while trying to read the json file")
 	}
 
-	json.Unmarshal(byteValue, &records)
+	err = json.Unmarshal(byteValue, &records)
+	if err != nil {
+		return nil, errors.Wrap(err, "while trying to unmarshal json file contents")
+	}
 
-	return &FileCIDSource{
+	log.Debugf("Read providers and cid from file:%s", string(byteValue))
+
+	return &JsonFileCIDSource{
 		filename: filename,
-		jsonFile: jsonFile, //this a pointer to a file
 		records:  records,
 	}, nil
 }
 
-func newBitswapCIDSource() *BitswapCIDSource {
+//Not yet implemented
+func NewBitswapCIDSource() *BitswapCIDSource {
 	return &BitswapCIDSource{}
 }
 
 // TODO: is it worth keeping the content? -> replace with the providers and cid struct
 // getRandomContent returns generates an array of random bytes with the given size and the composed CID of the content
-func (g *RandomCidGen) GetNewCid() (ProviderAndCID, error) {
+func (g *RandomCidGen) GetNewCid() (GetNewCidReturnType, error) {
 	// generate random bytes
 	content := make([]byte, g.contentSize)
 	rand.Read(content)
@@ -119,7 +131,7 @@ func (g *RandomCidGen) GetNewCid() (ProviderAndCID, error) {
 	}
 
 	log.Infof("generated new CID %s", contID.Hash().B58String())
-	ProvidersAndCidInstance := newProvideAndCID("", contID, make([]ma.Multiaddr, 0))
+	ProvidersAndCidInstance := NewGetNewCidReturnType("", contID, make([]ma.Multiaddr, 0))
 	return ProvidersAndCidInstance, nil
 }
 
@@ -127,16 +139,12 @@ func (g *RandomCidGen) Type() string {
 	return "random-content-gen"
 }
 
-func (fileCidSource *FileCIDSource) Close() {
-	fileCidSource.jsonFile.Close()
-}
-
-func (fileCIDSource *FileCIDSource) ResetIndex() {
+func (fileCIDSource *JsonFileCIDSource) ResetIndex() {
 	fileCIDSource.index = 0
 }
 
 //Returns the json records read from the file when creating the file_cid_source instance.
-func (file_cid_source *FileCIDSource) GetNewCid() (ProviderAndCID, error) {
+func (file_cid_source *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error) {
 
 	if file_cid_source.index < len(file_cid_source.records.EncapsulatedJSONProviderRecords) {
 		providerRecord := file_cid_source.records.EncapsulatedJSONProviderRecords[file_cid_source.index]
@@ -152,20 +160,19 @@ func (file_cid_source *FileCIDSource) GetNewCid() (ProviderAndCID, error) {
 		}
 		multiaddr := providerRecord.Address
 		log.Infof("Read a new provider ID %s. The multiaddresses are %v.The new CID is %s", newPid, multiaddr, newCid)
-		ProviderAndCidInstance := newProvideAndCID(newPid, newCid, multiaddr)
+		ProviderAndCidInstance := NewGetNewCidReturnType(newPid, newCid, multiaddr)
 		return ProviderAndCidInstance, nil
 	}
-	file_cid_source.Close()
 	file_cid_source.ResetIndex()
 	return Undef, nil
 }
 
 //TODO type returning a string is not a good idea
-func (file_cid_source *FileCIDSource) Type() string {
+func (file_cid_source *JsonFileCIDSource) Type() string {
 	return "json-file"
 }
 
-func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (ProviderAndCID, error) {
+func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (GetNewCidReturnType, error) {
 	//TODO function that reads bitswap content
 	return Undef, nil
 }
