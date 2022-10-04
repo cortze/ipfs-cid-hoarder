@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	log "github.com/sirupsen/logrus"
@@ -61,25 +61,28 @@ func NewCidPinger(
 		rounds:       rounds,
 		cidQ:         newCidQueue(),
 		initC:        make(chan struct{}),
-		pingTaskC:    make(chan *models.CidInfo, workers), // TODO: harcoded
+		pingTaskC:    make(chan *models.CidInfo, workers), // TODO: hardcoded
 		workers:      workers,
 	}
 }
 
 // Run executes the main logic of the CID Pinger.
 // 1. runs the queue logic that schedules the pings
-// 2. launchs the pinger pool that will perform all the CID monitoring calls
+// 2. launches the pinger pool that will perform all the CID monitoring calls
 func (p *CidPinger) Run() {
 	defer p.wg.Done()
 
 	var pingOrchWG sync.WaitGroup
+	var pingOrcDoneFlag bool
+	var pingerWG sync.WaitGroup
+
 	pingOrchWG.Add(1)
 	// Generate the Ping Orchester
 	go func(p *CidPinger, wg *sync.WaitGroup) {
 		defer pingOrchWG.Done()
 
 		logEntry := log.WithField("mod", "cid-orchester")
-		// we need to wait unitil the first CID is added, wait otherwise
+		// we need to wait until the first CID is added, wait otherwise
 		<-p.initC
 
 		// generate a timer to determine
@@ -101,7 +104,7 @@ func (p *CidPinger) Run() {
 					}
 					cStr := c.CID.Hash().B58String()
 					// check if the time for next ping has arrived
-					if time.Now().Sub(c.NextPing) < time.Duration(0) {
+					if time.Since(c.NextPing) < time.Duration(0) {
 						logEntry.Debugf("not in time to ping %s", cStr)
 						break
 					}
@@ -138,27 +141,32 @@ func (p *CidPinger) Run() {
 	}(p, &pingOrchWG)
 
 	// Launch CID pingers (workers)
-	var pingerWG sync.WaitGroup
 	for pinger := 0; pinger < p.workers; pinger++ {
 		pingerWG.Add(1)
-		go func(p *CidPinger, wg *sync.WaitGroup, pingerID int) {
+		go func(p *CidPinger, wg *sync.WaitGroup, pingOrcDoneFlag *bool, pingerID int) {
 			defer wg.Done()
 
 			logEntry := log.WithField("pinger", pingerID)
 			logEntry.Debug("Initialized")
 			for {
+				// check if the ping orcherster has finished
+				if *pingOrcDoneFlag && len(p.pingTaskC) == 0 {
+					logEntry.Info("no more pings to orchestrate, finishing worker")
+					return
+				}
+
 				select {
-				case c := <-p.pingTaskC:
+				case c, ok := <-p.pingTaskC:
 					// check if the models.CidInfo id not nil
-					if c == nil {
+					if !ok {
 						logEntry.Warn("empty CID received from channel, finishing worker")
-						continue
+						return
 					}
 
 					cStr := c.CID.Hash().B58String()
 					pingCounter := c.GetPingCounter()
 
-					logEntry.Infof("pinging CID %s for round %d", cStr, pingCounter)
+					logEntry.Infof("pinging CID %s created by %d | round %d from host %d", cStr, c.Creator.String(), pingCounter, p.host.ID().String())
 
 					// request the status of PR Holders
 					cidFetchRes := models.NewCidFetchResults(c.CID, pingCounter)
@@ -166,20 +174,25 @@ func (p *CidPinger) Run() {
 					var wg sync.WaitGroup
 
 					wg.Add(1)
-					// DHT FindProviders call to see if the content is acutally retrievable from the network
+					// DHT FindProviders call to see if the content is actually retrievable from the network
 					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 						defer wg.Done()
-						var isRetrievable bool
+						var isRetrievable bool = false
 						t := time.Now()
-						providers, err := p.host.DHT.FindProviders(p.ctx, c.CID)
+						providers, err := p.host.DHT.LookupForProviders(p.ctx, c.CID)
 						pingTime := time.Since(t)
 						fetchRes.FindProvDuration = pingTime
 						if err != nil {
 							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
 						}
-						if len(providers) > 0 { // is this assumption naive?
-							isRetrievable = true
+						// iter through the providers to see if it matches with the host's peerID
+						for _, paddrs := range providers {
+							if paddrs.ID == c.Creator {
+								isRetrievable = true
+							}
 						}
+						fmt.Println(time.Now(), "Providers for", c.CID.Hash().B58String(), "->", providers)
+
 						cidFetchRes.IsRetrievable = isRetrievable
 					}(p, c, cidFetchRes)
 
@@ -207,11 +220,11 @@ func (p *CidPinger) Run() {
 					// Ping in parallel each of the PRHolders
 					for _, peerInfo := range c.PRHolders {
 						wg.Add(1)
-						go func(wg *sync.WaitGroup, c cid.Cid, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
+						go func(wg *sync.WaitGroup, c *models.CidInfo, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
 							defer wg.Done()
 							pingRes := p.PingPRHolder(c, pingCounter, peerInfo.GetAddrInfo())
 							fetchRes.AddPRPingResults(pingRes)
-						}(&wg, c.CID, peerInfo, cidFetchRes)
+						}(&wg, c, peerInfo, cidFetchRes)
 					}
 
 					wg.Wait()
@@ -228,22 +241,16 @@ func (p *CidPinger) Run() {
 				}
 			}
 
-		}(p, &pingerWG, pinger)
+		}(p, &pingerWG, &pingOrcDoneFlag, pinger)
 	}
 
 	pingOrchWG.Wait()
 	log.Infof("finished pinging the CIDs on %d rounds", p.rounds)
 
-	// after the orchester has pinged all the CIDs for the given number of rounds
-	// check if the tasks have been completed and close the pingers
-	for {
-		if len(p.pingTaskC) != 0 {
-			continue
-		} else {
-			close(p.pingTaskC)
-			break
-		}
-	}
+	pingOrcDoneFlag = true
+
+	pingerWG.Wait()
+	close(p.pingTaskC)
 
 	log.Debug("done from the CID Pinger")
 }
@@ -257,10 +264,10 @@ func (p *CidPinger) AddCidInfo(c *models.CidInfo) {
 	p.cidQ.addCid(c)
 }
 
-// PingPRHolder dials a given PR Holder to check whether it's acticve or not, and wheter it has the PRs or not
-func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *models.PRPingResults {
+// PingPRHolder dials a given PR Holder to check whether it's active or not, and whether it has the PRs or not
+func (p *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.AddrInfo) *models.PRPingResults {
 	logEntry := log.WithFields(log.Fields{
-		"cid": c.Hash().B58String(),
+		"cid": c.CID.Hash().B58String(),
 	})
 
 	var active, hasRecords bool
@@ -277,22 +284,30 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 		// TODO: attempt at least to see if the connection refused
 		err := p.host.Connect(pingCtx, pAddr)
 		if err != nil {
-			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
+			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.CID.Hash().B58String(), err.Error())
 			connError = p2p.ParseConError(err)
 			// If the error is not linked to an connection refused or reset by peer, just break the look
 			if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
 				break
 			}
 		} else {
-			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
+			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.CID.Hash().B58String())
 			active = true
 			connError = p2p.NoConnError
 
-			// if the connection was successfull, request wheter it has the records or not
-			provs, _, _ := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.Hash())
-			if len(provs) > 0 {
-				hasRecords = true
-				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
+			// if the connection was successful, request whether it has the records or not
+			provs, _, err := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.CID.Hash())
+			if err != nil {
+				log.Warnf("unable to retrieve providers from peer %s - error: %s", pAddr.ID, err.Error())
+			} else {
+				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
+			}
+			// iter through the providers to see if it matches with the host's peerID
+			for _, paddrs := range provs {
+				if paddrs.ID == c.Creator {
+					hasRecords = true
+					fmt.Println(time.Now(), "Peer", pAddr.ID.String(), "reporting on", c.CID.Hash().B58String(), " -> ", paddrs)
+				}
 			}
 
 			// close connection and exit loop
@@ -307,7 +322,7 @@ func (p *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *mod
 	fetchTime := time.Since(tstart)
 
 	return models.NewPRPingResults(
-		c,
+		c.CID,
 		pAddr.ID,
 		round,
 		tstart,
@@ -348,8 +363,6 @@ func (q *cidQueue) addCid(c *models.CidInfo) {
 
 	q.cidMap[c.CID.Hash().B58String()] = c
 	q.cidArray = append(q.cidArray, c)
-
-	return
 }
 
 func (q *cidQueue) removeCid(cStr string) {
@@ -382,7 +395,6 @@ func (q *cidQueue) getCid(cStr string) (*models.CidInfo, bool) {
 
 func (q *cidQueue) sortCidList() {
 	sort.Sort(q)
-	return
 }
 
 // Swap is part of sort.Interface.
