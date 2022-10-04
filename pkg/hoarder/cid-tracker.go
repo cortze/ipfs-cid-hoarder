@@ -107,26 +107,26 @@ func (publisher *CidPublisher) generateCids(source CidSource, cidNumber int, wg 
 	defer wg.Done()
 	// generate the CIDs
 	for i := 0; i < cidNumber; i++ {
-		ProvidersAndCidInstance, err := source.GetNewCid()
+		GetNewCidReturnTypeInstance, err := source.GetNewCid()
 		if err != nil {
 			log.Errorf("unable to generate %s content. %s", err.Error(), source.Type())
 			continue
 		}
-		cidChannel <- &ProvidersAndCidInstance.CID
+		cidChannel <- &GetNewCidReturnTypeInstance.CID
 	}
 }
 
-func (discoverer *CidDiscoverer) readCIDs(source CidSource, wg *sync.WaitGroup, providersAndCidChannel chan *ProviderAndCID) {
+func (discoverer *CidDiscoverer) readCIDs(source CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan *GetNewCidReturnType) {
 	defer wg.Done()
 	for {
-		providersAndCidInstance, err := source.GetNewCid()
+		GetNewCidReturnTypeInstance, err := source.GetNewCid()
 		if err != nil {
 			log.Errorf("unable to read %s content. %s", err.Error(), source.Type())
 			continue
 		}
-		if reflect.DeepEqual(providersAndCidInstance, Undef) {
+		if reflect.DeepEqual(GetNewCidReturnTypeInstance, Undef) {
 			break
 		}
-		providersAndCidChannel <- &providersAndCidInstance
+		GetNewCidReturnTypeChannel <- &GetNewCidReturnTypeInstance
 	}
 }
