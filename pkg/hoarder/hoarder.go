@@ -31,7 +31,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	var err error
 
 	// ----- Compose the DB client -----
-	db, err := db.NewDBClient(ctx, conf.Database)
+	dbInstance, err := db.NewDBClient(ctx, conf.Database)
 	if err != nil {
 		return nil, errors.Wrap(err, "initialise the DB")
 	}
@@ -81,7 +81,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	// ----- Generate the CidPinger -----
 	studyWG.Add(1)
-	cidPinger := NewCidPinger(ctx, &studyWG, h, db, reqInterval, rounds, conf.Workers)
+	cidPinger := NewCidPinger(ctx, &studyWG, h, dbInstance, reqInterval, rounds, conf.Workers)
 
 	// ----- Generate the CidTracker -----
 	cidSource, err := findCidSource(conf)
@@ -91,23 +91,23 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	studyWG.Add(1)
 
 	if conf.AlreadyPublishedCIDs {
-		cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		cidTracker, err := NewCidTracker(ctx, &studyWG, h, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
-		cidDiscoverer, err := NewCidDiscover(cidTracker)
+		cidDiscoverer, err := NewCidDiscoverer(cidTracker)
 		log.Debug("CidHoarder Initialized with cid discoverer")
 
 		return &CidHoarder{
 			ctx:        ctx,
 			wg:         &studyWG,
 			Host:       h,
-			DBCli:      db,
+			DBCli:      dbInstance,
 			CidTracker: cidDiscoverer,
 			CidPinger:  cidPinger,
 		}, nil
 	} else {
-		cidTracker, err := NewCidTracker(ctx, &studyWG, h, db, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		cidTracker, err := NewCidTracker(ctx, &studyWG, h, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
@@ -117,7 +117,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 			ctx:        ctx,
 			wg:         &studyWG,
 			Host:       h,
-			DBCli:      db,
+			DBCli:      dbInstance,
 			CidTracker: cidPublisher,
 			CidPinger:  cidPinger,
 		}, nil
