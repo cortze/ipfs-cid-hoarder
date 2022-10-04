@@ -15,7 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewCidDiscover(tracker *CidTracker) (*CidDiscoverer, error) {
+func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 	log.Info("Creating a new CID discoverer")
 	return &CidDiscoverer{
 		CidTracker: tracker,
