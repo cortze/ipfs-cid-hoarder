@@ -23,7 +23,7 @@ type JsonFileCIDSource struct {
 }
 
 //Opens and reads the content of a json file that has used the encode method to store the data
-func openEncodedJSONFile(filename string) (*JsonFileCIDSource, error) {
+func OpenEncodedJSONFile(filename string) (*JsonFileCIDSource, error) {
 	jsonFile, err := os.Open(filename)
 	defer func(jsonFile *os.File) {
 		err := jsonFile.Close()
@@ -54,7 +54,7 @@ func openEncodedJSONFile(filename string) (*JsonFileCIDSource, error) {
 	return newIn, nil
 }
 
-func openSimpleJSONFile(filename string) (*JsonFileCIDSource, error) {
+func OpenSimpleJSONFile(filename string) (*JsonFileCIDSource, error) {
 	jsonFile, err := os.Open(filename)
 	defer func(jsonFile *os.File) {
 		err := jsonFile.Close()
