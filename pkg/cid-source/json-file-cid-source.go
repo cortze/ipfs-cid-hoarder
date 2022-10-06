@@ -22,6 +22,59 @@ type JsonFileCIDSource struct {
 	iter     func() EncapsulatedJSONProviderRecord
 }
 
+func OpenMultipleSimpleJSONFiles(filenames []string) (*JsonFileCIDSource, error) {
+	var recordsIn ProviderRecords
+	for i := 0; i < len(filenames); i++ {
+		jsonFile, err := os.Open(filenames[i])
+		if err != nil {
+			return nil, err
+		}
+		var records ProviderRecords
+
+		byteValue, err := ioutil.ReadAll(jsonFile)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "while trying to read the json file")
+		}
+
+		err = json.Unmarshal(byteValue, &records)
+		if err != nil {
+			return nil, errors.Wrap(err, "while trying to unmarshal json file contents")
+		}
+		recordsIn.EncapsulatedJSONProviderRecords = append(recordsIn.EncapsulatedJSONProviderRecords, records.EncapsulatedJSONProviderRecords...)
+	}
+	newjsonsource := &JsonFileCIDSource{
+		records: recordsIn,
+	}
+	newjsonsource.initializeIter()
+	return newjsonsource, nil
+}
+
+func OpenMultipleEncodedJSONFiles(filenames []string) (*JsonFileCIDSource, error) {
+	var recordsIn ProviderRecords
+	for i := 0; i < len(filenames); i++ {
+		jsonFile, err := os.Open(filenames[i])
+		if err != nil {
+			return nil, err
+		}
+		var records ProviderRecords
+		decoder := json.NewDecoder(jsonFile)
+
+		for decoder.More() {
+			err := decoder.Decode(&records)
+			if err != nil {
+				return nil, errors.Wrap(err, " while decoding encoded json")
+			}
+			recordsIn.EncapsulatedJSONProviderRecords = append(recordsIn.EncapsulatedJSONProviderRecords, records.EncapsulatedJSONProviderRecords...)
+		}
+	}
+	newjsonsource := &JsonFileCIDSource{
+		records: recordsIn,
+	}
+	newjsonsource.initializeIter()
+	return newjsonsource, nil
+}
+
 //Opens and reads the content of a json file that has used the encode method to store the data
 func OpenEncodedJSONFile(filename string) (*JsonFileCIDSource, error) {
 	jsonFile, err := os.Open(filename)
