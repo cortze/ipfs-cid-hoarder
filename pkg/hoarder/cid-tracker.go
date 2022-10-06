@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	src "ipfs-cid-hoarder/pkg/cid-source"
 	"ipfs-cid-hoarder/pkg/db"
-
 	"ipfs-cid-hoarder/pkg/p2p"
 
 	log "github.com/sirupsen/logrus"
@@ -30,7 +30,7 @@ type CidTracker struct {
 	host      *p2p.Host
 	DBCli     *db.DBClient
 	MsgNot    *p2p.Notifier
-	CidSource CidSource
+	CidSource src.CidSource
 	CidPinger *CidPinger
 
 	K              int
@@ -75,7 +75,7 @@ func NewCidTracker(
 	wg *sync.WaitGroup,
 	h *p2p.Host,
 	db *db.DBClient,
-	cidSource CidSource,
+	cidSource src.CidSource,
 	cidPinger *CidPinger,
 	k, cidNum, Workers int,
 	reqInterval, studyDuration time.Duration) (*CidTracker, error) {
@@ -102,7 +102,7 @@ func (tracker *CidTracker) run() {
 }
 
 //Generates cids randomly
-func (publisher *CidPublisher) generateCids(source CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
+func (publisher *CidPublisher) generateCids(source src.CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
 	defer wg.Done()
 	// generate the CIDs
 	for i := 0; i < cidNumber; i++ {
@@ -116,7 +116,7 @@ func (publisher *CidPublisher) generateCids(source CidSource, cidNumber int, wg 
 }
 
 //Reads cids from a file
-func (discoverer *CidDiscoverer) readCIDs(source CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan *GetNewCidReturnType) {
+func (discoverer *CidDiscoverer) readCIDs(source src.CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan *src.GetNewCidReturnType) {
 	defer wg.Done()
 	for {
 		GetNewCidReturnTypeInstance, err := source.GetNewCid()
@@ -124,7 +124,7 @@ func (discoverer *CidDiscoverer) readCIDs(source CidSource, wg *sync.WaitGroup, 
 			log.Errorf("unable to read %s content. %s", err.Error(), source.Type())
 			continue
 		}
-		if reflect.DeepEqual(GetNewCidReturnTypeInstance, Undef) {
+		if reflect.DeepEqual(GetNewCidReturnTypeInstance, src.Undef) {
 			break
 		}
 		GetNewCidReturnTypeChannel <- &GetNewCidReturnTypeInstance

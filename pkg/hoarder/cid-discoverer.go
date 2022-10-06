@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	src "ipfs-cid-hoarder/pkg/cid-source"
 	"ipfs-cid-hoarder/pkg/config"
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
@@ -24,7 +25,7 @@ func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 
 func (discoverer *CidDiscoverer) run() {
 
-	getNewCidReturnTypeChannel := make(chan *GetNewCidReturnType, discoverer.Workers)
+	getNewCidReturnTypeChannel := make(chan *src.GetNewCidReturnType, discoverer.Workers)
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
@@ -41,7 +42,7 @@ func (discoverer *CidDiscoverer) run() {
 }
 
 //This method essentially initiliazes the data for the pinger to be able to get information about the PR holders later.
-func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup, discovererID int, getNewCidReturnTypeChannel chan *GetNewCidReturnType) {
+func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup, discovererID int, getNewCidReturnTypeChannel chan *src.GetNewCidReturnType) {
 	defer discovererWG.Done()
 	logEntry := log.WithField("discoverer ID", discovererID)
 	ctx := discoverer.ctx
@@ -57,8 +58,8 @@ func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup,
 			)
 			//TODO what will the discoverer have instead of the request interval
 			//the starting values for the discoverer
-			cidInfo := models.NewCidInfo(getNewCidReturnTypeInstance.CID, discoverer.ReqInterval, config.TextFileSource, discoverer.CidSource.Type(), discoverer.host.ID())
-			fetchRes := models.NewCidFetchResults(getNewCidReturnTypeInstance.CID, 0) // First round = Publish PR
+			cidInfo := models.NewCidInfo(getNewCidReturnTypeInstance.CID, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), discoverer.host.ID())
+			fetchRes := models.NewCidFetchResults(getNewCidReturnTypeInstance.CID, 0)
 
 			discoverer.ProviderAndCID.Store(cidStr, fetchRes)
 			cidInfo.AddProvideTime(0)

@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	src "ipfs-cid-hoarder/pkg/cid-source"
 	"sync"
 	"time"
 
@@ -155,14 +156,14 @@ func (c *CidHoarder) Run() error {
 //	RandomContent  = "random"
 //  )
 //
-func findCidSource(conf *config.Config) (CidSource, error) {
+func findCidSource(conf *config.Config) (src.CidSource, error) {
 	switch conf.CidSource {
 	case config.TextFileSource:
 		return nil, errors.New("text file source not yet implemented")
 	case config.JsonFileSource:
-		return NewJsonFileCIDSource(conf.CidFile)
+		return src.OpenSimpleJSONFile(conf.CidFile)
 	case config.RandomSource:
-		return NewRandomCidGen(conf.CidContentSize), nil
+		return src.NewRandomCidGen(conf.CidContentSize), nil
 	case config.BitswapSource:
 		return nil, errors.New("bitswap source not yet implemented")
 
