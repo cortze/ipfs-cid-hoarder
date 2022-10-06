@@ -1,6 +1,4 @@
-package hoarder
-
-const filename = "providers.json"
+package cid_source
 
 //A container for the encapsulated struct.
 //
@@ -31,3 +29,5 @@ func NewEncapsulatedJSONCidProvider(id string, cid string, addresses []string) E
 		Addresses: addresses,
 	}
 }
+
+const filename = "providers.json"
