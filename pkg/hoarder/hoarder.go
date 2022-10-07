@@ -61,20 +61,20 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// generate new fresh key for pinger host
 	priv2, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
+		return nil, errors.Wrap(err, "unable to generate priv key for pinger's host")
 	}
 
 	// ----- Compose the Publisher or discoverer Libp2p host -----
 	pubordishost, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
+		return nil, errors.Wrap(err, "error generating publisher or discoverer libp2p host for the tool")
 	}
 
 	// ----- Compose Pinger Libp2p Host -----
 
 	pingerHost, err := p2p.NewHost(ctx, priv2, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
+		return nil, errors.Wrap(err, "error generating pinger libp2p host for the tool")
 	}
 
 	var studyWG sync.WaitGroup
@@ -119,6 +119,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 			ctx:        ctx,
 			wg:         &studyWG,
 			Host:       pubordishost,
+			PingerHost: pingerHost,
 			DBCli:      dbInstance,
 			CidTracker: cidDiscoverer,
 			CidPinger:  cidPinger,
