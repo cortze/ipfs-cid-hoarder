@@ -152,7 +152,7 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 				}
 
 			default:
-				log.Debugf("msg is not ADD_PROVIDER msg. It is of type %s", msgNot.Msg.Type.String())
+				//log.Debugf("msg is not ADD_PROVIDER msg. It is of type %s", msgNot.Msg.Type.String())
 			}
 
 		case <-publisher.ctx.Done():
