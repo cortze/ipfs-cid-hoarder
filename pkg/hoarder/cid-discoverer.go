@@ -30,7 +30,6 @@ func (discoverer *CidDiscoverer) run() {
 	var genWG sync.WaitGroup
 	genWG.Add(1)
 	go discoverer.readCIDs(discoverer.CidSource, &genWG, getNewCidReturnTypeChannel)
-
 	var discovererWG sync.WaitGroup
 
 	// CID PR Discoverers which are essentially the workers of tracker.
@@ -39,6 +38,8 @@ func (discoverer *CidDiscoverer) run() {
 		// start the discovery process
 		go discoverer.discovery_process(&discovererWG, discovererCounter, getNewCidReturnTypeChannel)
 	}
+	genWG.Wait()
+	discovererWG.Wait()
 }
 
 //This method essentially initiliazes the data for the pinger to be able to get information about the PR holders later.
@@ -98,6 +99,8 @@ func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup,
 		case <-ctx.Done():
 			logEntry.WithField("discovererID", discovererID).Debugf("shutdown detected, closing discoverer")
 			return
+		default:
+			//log.Debug("haven't received anything yet")
 		}
 	}
 }
