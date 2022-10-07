@@ -22,6 +22,7 @@ type CidHoarder struct {
 	wg  *sync.WaitGroup
 
 	Host       *p2p.Host
+	PingerHost *p2p.Host
 	DBCli      *db.DBClient
 	CidTracker Tracker
 	CidPinger  *CidPinger
@@ -57,8 +58,21 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		log.Debugf("Generated Priv Key for the host %s", p2p.PrivKeyToString(priv))
 	}
 
-	// ----- Compose the Libp2p host -----
-	h, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	// generate new fresh key for pinger host
+	priv2, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
+	}
+
+	// ----- Compose the Publisher or discoverer Libp2p host -----
+	pubordishost, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	if err != nil {
+		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
+	}
+
+	// ----- Compose Pinger Libp2p Host -----
+
+	pingerHost, err := p2p.NewHost(ctx, priv2, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating libp2p host for the tool")
 	}
@@ -82,9 +96,10 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	// ----- Generate the CidPinger -----
 	studyWG.Add(1)
-	cidPinger := NewCidPinger(ctx, &studyWG, h, dbInstance, reqInterval, rounds, conf.Workers)
+	cidPinger := NewCidPinger(ctx, &studyWG, pingerHost, dbInstance, reqInterval, rounds, conf.Workers)
 
-	// ----- Generate the CidTracker -----
+	//TODO this needs to be changed meaning the generation
+	// ----- Generate the CidTracker(either a discoverer or a publisher) -----
 	cidSource, err := findCidSource(conf)
 	if err != nil {
 		return nil, errors.Wrap(err, " error generating the CID Tracker")
@@ -92,23 +107,24 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	studyWG.Add(1)
 
 	if conf.AlreadyPublishedCIDs {
-		cidTracker, err := NewCidTracker(ctx, &studyWG, h, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
 		cidDiscoverer, err := NewCidDiscoverer(cidTracker)
+
 		log.Debug("CidHoarder Initialized with cid discoverer")
 
 		return &CidHoarder{
 			ctx:        ctx,
 			wg:         &studyWG,
-			Host:       h,
+			Host:       pubordishost,
 			DBCli:      dbInstance,
 			CidTracker: cidDiscoverer,
 			CidPinger:  cidPinger,
 		}, nil
 	} else {
-		cidTracker, err := NewCidTracker(ctx, &studyWG, h, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
@@ -117,7 +133,8 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		return &CidHoarder{
 			ctx:        ctx,
 			wg:         &studyWG,
-			Host:       h,
+			Host:       pubordishost,
+			PingerHost: pingerHost,
 			DBCli:      dbInstance,
 			CidTracker: cidPublisher,
 			CidPinger:  cidPinger,
@@ -129,8 +146,14 @@ func (c *CidHoarder) Run() error {
 	// Boostrap the kdht host
 	err := c.Host.Boostrap(c.ctx)
 	if err != nil {
-		return errors.Wrap(err, "unable to boostrap the host with the kdht routing table.")
+		return errors.Wrap(err, "unable to boostrap the publisher or discoverer host with the kdht routing table.")
 	}
+
+	err = c.PingerHost.Boostrap(c.ctx)
+	if err != nil {
+		return errors.Wrap(err, "unable to boostrap the pinger host with the kdht routing table.")
+	}
+
 	// Launch the Cid Tracker
 	go c.CidTracker.run()
 	go c.CidPinger.Run()
