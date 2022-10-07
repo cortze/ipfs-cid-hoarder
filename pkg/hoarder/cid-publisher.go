@@ -23,6 +23,7 @@ func NewCidPublisher(tracker *CidTracker) (*CidPublisher, error) {
 }
 
 func (publisher *CidPublisher) run() {
+	defer publisher.wg.Done()
 	// launch the PRholder reading routine
 	msgNotChannel := publisher.MsgNot.GetNotifierChan()
 
@@ -46,6 +47,14 @@ func (publisher *CidPublisher) run() {
 		publisherWG.Add(1)
 		// start the providing process
 		go publisher.publishing_process(&publisherWG, publisherCounter, cidChannel, &firstCidFetchRes)
+	}
+	genWG.Wait()
+	publisherWG.Wait()
+	//close the publisher host
+	err := publisher.host.Close()
+	if err != nil {
+		log.Errorf("failed to close host: %s", err)
+		return
 	}
 }
 
