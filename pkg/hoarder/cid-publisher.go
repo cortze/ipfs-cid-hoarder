@@ -84,7 +84,7 @@ func (publisher *CidPublisher) run() {
 //	cidInfo := models.NewCidInfo(*received_cid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 //	// generate the cidFetcher
 //	publisher.CidMap.Store(received_cidStr, cidInfo)
-func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel chan *p2p.MsgNotification) {
+func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel <-chan *p2p.MsgNotification) {
 	for {
 		select {
 		case msgNot := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
@@ -194,7 +194,7 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 //7.) Adds the cid info to the tracker's:
 //		CidPinger *CidPinger
 //to be later pinged by the pinger.
-func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, publisherID int, cidChannel chan *cid.Cid, cidFetchRes *sync.Map) {
+func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, publisherID int, cidChannel <-chan *cid.Cid, cidFetchRes *sync.Map) {
 	defer publisherWG.Done()
 	logEntry := log.WithField("publisherID", publisherID)
 	ctx := publisher.ctx
