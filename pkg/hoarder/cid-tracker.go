@@ -15,7 +15,6 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
-//TODO this is hacky and terrible
 type Tracker interface {
 	run()
 }
@@ -96,7 +95,6 @@ func NewCidTracker(
 	}, nil
 }
 
-//TODO this is hacky and terrible
 func (tracker *CidTracker) run() {
 
 }
@@ -127,6 +125,7 @@ func (discoverer *CidDiscoverer) readCIDs(source src.CidSource, wg *sync.WaitGro
 		if reflect.DeepEqual(GetNewCidReturnTypeInstance, src.Undef) {
 			break
 		}
+		log.Debugf("Get new cid read: cid %s", GetNewCidReturnTypeInstance.CID.String())
 		GetNewCidReturnTypeChannel <- &GetNewCidReturnTypeInstance
 	}
 }
