@@ -100,7 +100,7 @@ func (tracker *CidTracker) run() {
 }
 
 //Generates cids randomly
-func (publisher *CidPublisher) generateCids(source src.CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan *cid.Cid) {
+func (publisher *CidPublisher) generateCids(source src.CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan<- *cid.Cid) {
 	defer wg.Done()
 	// generate the CIDs
 	for i := 0; i < cidNumber; i++ {
@@ -114,7 +114,7 @@ func (publisher *CidPublisher) generateCids(source src.CidSource, cidNumber int,
 }
 
 //Reads cids from a file
-func (discoverer *CidDiscoverer) readCIDs(source src.CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan *src.GetNewCidReturnType) {
+func (discoverer *CidDiscoverer) readCIDs(source src.CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan<- *src.GetNewCidReturnType) {
 	defer wg.Done()
 	for {
 		GetNewCidReturnTypeInstance, err := source.GetNewCid()
@@ -123,6 +123,7 @@ func (discoverer *CidDiscoverer) readCIDs(source src.CidSource, wg *sync.WaitGro
 			continue
 		}
 		if reflect.DeepEqual(GetNewCidReturnTypeInstance, src.Undef) {
+			log.Debug("break from read cids")
 			break
 		}
 		log.Debugf("Get new cid read: cid %s", GetNewCidReturnTypeInstance.CID.String())
