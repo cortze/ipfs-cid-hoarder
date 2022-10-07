@@ -132,17 +132,19 @@ func OpenSimpleJSONFile(filename string) (*JsonFileCIDSource, error) {
 		return nil, errors.Wrap(err, "while trying to unmarshal json file contents")
 	}
 
-	return &JsonFileCIDSource{
+	newIn := &JsonFileCIDSource{
 		filename: filename,
 		records:  records,
-	}, nil
+	}
+	newIn.initializeIter()
+	return newIn, nil
 }
 
-func (fileCIDSource JsonFileCIDSource) initializeIter() {
+func (fileCIDSource *JsonFileCIDSource) initializeIter() {
 	fileCIDSource.iter = fileCIDSource.nextEncapsulatedJSONProviderRecord()
 }
 
-func (fileCIDSource JsonFileCIDSource) nextEncapsulatedJSONProviderRecord() func() EncapsulatedJSONProviderRecord {
+func (fileCIDSource *JsonFileCIDSource) nextEncapsulatedJSONProviderRecord() func() EncapsulatedJSONProviderRecord {
 	i := -1
 	return func() EncapsulatedJSONProviderRecord {
 		i++
