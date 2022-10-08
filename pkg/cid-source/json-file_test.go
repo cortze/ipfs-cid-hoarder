@@ -72,13 +72,14 @@ func TestGetNewCidSimpleJSON(t *testing.T) {
 	}
 	for true {
 		tp, err := file.GetNewCid()
+		if reflect.DeepEqual(tp, Undef) {
+			break
+		}
 		if err != nil {
 			t.Errorf("error %s while getting new cid", err)
 			return
 		}
-		if reflect.DeepEqual(tp, Undef) {
-			break
-		}
+
 	}
 }
 
