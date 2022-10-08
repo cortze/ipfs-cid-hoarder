@@ -84,5 +84,20 @@ func TestGetNewCidSimpleJSON(t *testing.T) {
 }
 
 func TestGetNewCidEncodedJSON(t *testing.T) {
+	file, err := OpenEncodedJSONFile("C:\\Users\\fotis\\GolandProjects\\ipfs-cid-hoarder\\examplejsonfiles\\providersen.json")
+	if err != nil {
+		t.Errorf("error %s while opening file", err)
+		return
+	}
+	for true {
+		tp, err := file.GetNewCid()
+		if reflect.DeepEqual(tp, Undef) {
+			break
+		}
+		if err != nil {
+			t.Errorf("error %s while getting new cid", err)
+			return
+		}
 
+	}
 }
