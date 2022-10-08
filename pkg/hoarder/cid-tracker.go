@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 	"sync"
 	"time"
@@ -9,14 +10,12 @@ import (
 	src "ipfs-cid-hoarder/pkg/cid-source"
 	"ipfs-cid-hoarder/pkg/db"
 	"ipfs-cid-hoarder/pkg/p2p"
-
-	log "github.com/sirupsen/logrus"
-
-	"github.com/ipfs/go-cid"
 )
 
 type Tracker interface {
 	run()
+	//this should be run as a go routine
+	generateCids(genWG *sync.WaitGroup, GetNewCidReturnTypeChannel chan<- *src.GetNewCidReturnType)
 }
 
 // CidTracker composes the basic object that generates and publishes the set of CIDs defined in the configuration
@@ -99,34 +98,18 @@ func (tracker *CidTracker) run() {
 
 }
 
-//Generates cids randomly
-func (publisher *CidPublisher) generateCids(source src.CidSource, cidNumber int, wg *sync.WaitGroup, cidChannel chan<- *cid.Cid) {
-	defer wg.Done()
-	// generate the CIDs
-	for i := 0; i < cidNumber; i++ {
-		GetNewCidReturnTypeInstance, err := source.GetNewCid()
-		if err != nil {
-			log.Errorf("unable to generate %s content. %s", err.Error(), source.Type())
-			continue
-		}
-		cidChannel <- &GetNewCidReturnTypeInstance.CID
-	}
-}
-
-//Reads cids from a file
-func (discoverer *CidDiscoverer) readCIDs(source src.CidSource, wg *sync.WaitGroup, GetNewCidReturnTypeChannel chan<- *src.GetNewCidReturnType) {
-	defer wg.Done()
-	for {
-		GetNewCidReturnTypeInstance, err := source.GetNewCid()
-		if err != nil {
-			log.Errorf("unable to read %s content. %s", err.Error(), source.Type())
-			continue
-		}
-		if reflect.DeepEqual(GetNewCidReturnTypeInstance, src.Undef) {
-			log.Debug("break from read cids")
+//Generates cids depending on the cid source
+func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, GetNewCidReturnTypeChannel chan<- *src.GetNewCidReturnType) {
+	defer genWG.Done()
+	for true {
+		cid, err := tracker.CidSource.GetNewCid()
+		if reflect.DeepEqual(cid, src.Undef) {
 			break
 		}
-		log.Debugf("Get new cid read: cid %s", GetNewCidReturnTypeInstance.CID.String())
-		GetNewCidReturnTypeChannel <- &GetNewCidReturnTypeInstance
+		if err != nil {
+			log.Errorf("error while getting new cid: %s", err)
+			return
+		}
+		GetNewCidReturnTypeChannel <- &cid
 	}
 }
