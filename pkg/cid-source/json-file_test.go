@@ -2,6 +2,7 @@ package cid_source
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -62,4 +63,25 @@ func TestOpenMultipleSimpleJSONFiles(t *testing.T) {
 	for _, rec := range file.records.EncapsulatedJSONProviderRecords {
 		fmt.Println(rec)
 	}
+}
+
+func TestGetNewCidSimpleJSON(t *testing.T) {
+	file, err := OpenSimpleJSONFile("C:\\Users\\fotis\\GolandProjects\\ipfs-cid-hoarder\\examplejsonfiles\\providers.json")
+	if err != nil {
+		return
+	}
+	for true {
+		tp, err := file.GetNewCid()
+		if err != nil {
+			t.Errorf("error %s while getting new cid", err)
+			return
+		}
+		if reflect.DeepEqual(tp, Undef) {
+			break
+		}
+	}
+}
+
+func TestGetNewCidEncodedJSON(t *testing.T) {
+
 }
