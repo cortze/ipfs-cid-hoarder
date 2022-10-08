@@ -167,13 +167,13 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		if reflect.DeepEqual(pr, EncapsulatedJSONProviderRecord{}) {
 			break
 		}
-		//log.Info(pr.CID)
+		log.Debug(pr.CID)
 		newCid, err := cid.Parse(pr.CID)
 		if err != nil {
 			log.Errorf("could not convert string to cid %s", err)
 			continue
 		}
-		log.Info(pr.ID)
+		log.Debug(pr.ID)
 		newPid, err := peer.IDFromString(pr.ID)
 		if err != nil {
 			log.Errorf("could not convert string to pid %s", err)
@@ -184,7 +184,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		for i := 0; i < len(pr.Addresses); i++ {
 			multiaddr, err := ma.NewMultiaddr(pr.Addresses[i])
 			if err != nil {
-				//log.Errorf("could not convert string to multiaddress %s", err)
+				log.Errorf("could not convert string to multiaddress %s", err)
 				continue
 			}
 			multiaddresses = append(multiaddresses, multiaddr)
