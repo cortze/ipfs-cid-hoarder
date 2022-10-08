@@ -43,6 +43,7 @@ func OpenMultipleSimpleJSONFiles(filenames []string) (*JsonFileCIDSource, error)
 		}
 		recordsIn.EncapsulatedJSONProviderRecords = append(recordsIn.EncapsulatedJSONProviderRecords, records.EncapsulatedJSONProviderRecords...)
 	}
+
 	newjsonsource := &JsonFileCIDSource{
 		records: recordsIn,
 	}
@@ -68,6 +69,7 @@ func OpenMultipleEncodedJSONFiles(filenames []string) (*JsonFileCIDSource, error
 			recordsIn.EncapsulatedJSONProviderRecords = append(recordsIn.EncapsulatedJSONProviderRecords, records.EncapsulatedJSONProviderRecords...)
 		}
 	}
+
 	newjsonsource := &JsonFileCIDSource{
 		records: recordsIn,
 	}
@@ -91,17 +93,20 @@ func OpenEncodedJSONFile(filename string) (*JsonFileCIDSource, error) {
 	var records ProviderRecords
 	decoder := json.NewDecoder(jsonFile)
 
+	var filteredRecords ProviderRecords
 	for decoder.More() {
+
 		err := decoder.Decode(&records)
 		if err != nil {
 			return nil, errors.Wrap(err, " while decoding encoded json")
 		}
+		filteredRecords.EncapsulatedJSONProviderRecords = append(filteredRecords.EncapsulatedJSONProviderRecords, records.EncapsulatedJSONProviderRecords...)
 
 	}
 
 	newIn := &JsonFileCIDSource{
 		filename: filename,
-		records:  records,
+		records:  filteredRecords,
 	}
 	newIn.initializeIter()
 	return newIn, nil
@@ -112,7 +117,7 @@ func OpenSimpleJSONFile(filename string) (*JsonFileCIDSource, error) {
 	defer func(jsonFile *os.File) {
 		err := jsonFile.Close()
 		if err != nil {
-			log.Errorf("failed to close file: %s")
+			log.Errorf("failed to close file: %s", err)
 		}
 	}(jsonFile)
 	if err != nil {
@@ -162,20 +167,25 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		if reflect.DeepEqual(pr, EncapsulatedJSONProviderRecord{}) {
 			break
 		}
+		//log.Info(pr.CID)
 		newCid, err := cid.Parse(pr.CID)
 		if err != nil {
-			return GetNewCidReturnType{}, err
+			log.Errorf("could not convert string to cid %s", err)
+			continue
 		}
-		newPid, err := peer.IDFromBytes([]byte(pr.ID))
+		log.Info(pr.ID)
+		newPid, err := peer.IDFromString(pr.ID)
 		if err != nil {
-			return Undef, errors.Wrap(err, " could not parse PID")
+			log.Errorf("could not convert string to pid %s", err)
+			continue
 		}
 
 		multiaddresses := make([]ma.Multiaddr, 0)
 		for i := 0; i < len(pr.Addresses); i++ {
 			multiaddr, err := ma.NewMultiaddr(pr.Addresses[i])
 			if err != nil {
-				log.Errorf("could not convert string to multiaddress %s", err)
+				//log.Errorf("could not convert string to multiaddress %s", err)
+				continue
 			}
 			multiaddresses = append(multiaddresses, multiaddr)
 		}
