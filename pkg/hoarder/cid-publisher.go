@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	src "ipfs-cid-hoarder/pkg/cid-source"
 	"sync"
 	"time"
 
@@ -30,7 +31,7 @@ func (publisher *CidPublisher) run() {
 	var firstCidFetchRes sync.Map
 
 	// generate a channel with the same size as the Workers one
-	cidChannel := make(chan *cid.Cid, publisher.Workers)
+	getNewCidReturnTypeChannel := make(chan *src.GetNewCidReturnType, publisher.Workers)
 
 	// IPFS DHT Message Notification Listener
 	done := make(chan struct{})
@@ -38,7 +39,7 @@ func (publisher *CidPublisher) run() {
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go publisher.generateCids(publisher.CidSource, publisher.CidNumber, &genWG, cidChannel)
+	go publisher.generateCids(&genWG, getNewCidReturnTypeChannel)
 
 	var publisherWG sync.WaitGroup
 
@@ -46,7 +47,7 @@ func (publisher *CidPublisher) run() {
 	for publisherCounter := 0; publisherCounter < publisher.Workers; publisherCounter++ {
 		publisherWG.Add(1)
 		// start the providing process
-		go publisher.publishing_process(&publisherWG, publisherCounter, cidChannel, &firstCidFetchRes)
+		go publisher.publishingProcess(&publisherWG, publisherCounter, getNewCidReturnTypeChannel, &firstCidFetchRes)
 	}
 	genWG.Wait()
 	publisherWG.Wait()
@@ -194,30 +195,31 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 //7.) Adds the cid info to the tracker's:
 //		CidPinger *CidPinger
 //to be later pinged by the pinger.
-func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, publisherID int, cidChannel <-chan *cid.Cid, cidFetchRes *sync.Map) {
+func (publisher *CidPublisher) publishingProcess(publisherWG *sync.WaitGroup, publisherID int, cidChannel <-chan *src.GetNewCidReturnType, cidFetchRes *sync.Map) {
 	defer publisherWG.Done()
 	logEntry := log.WithField("publisherID", publisherID)
 	ctx := publisher.ctx
 	logEntry.Debugf("publisher ready")
 	for {
 		select {
-		case received_cid := <-cidChannel: //this channel receives the CID from the CID generator go routine
-			if received_cid == nil {
+		case receivedType := <-cidChannel: //this channel receives the CID from the CID generator go routine
+			receivedCid := &receivedType.CID
+			if receivedCid == nil {
 				logEntry.Warn("received empty CID to track, closing publisher")
 				// not needed
 				return
 			}
-			logEntry.Debugf("new cid to publish %s", received_cid.Hash().B58String())
-			received_cidStr := received_cid.Hash().B58String()
+			logEntry.Debugf("new cid to publish %s", receivedCid.Hash().B58String())
+			received_cidStr := receivedCid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
 			//TODO the content type is not necessarily random content
-			cidInfo := models.NewCidInfo(*received_cid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
+			cidInfo := models.NewCidInfo(*receivedCid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 
 			// generate the cidFetcher
 			publisher.CidMap.Store(received_cidStr, cidInfo)
 
 			// generate a new CidFetchResults
-			fetchRes := models.NewCidFetchResults(*received_cid, 0) // First round = Publish PR
+			fetchRes := models.NewCidFetchResults(*receivedCid, 0) // First round = Publish PR
 			cidFetchRes.Store(received_cidStr, fetchRes)
 
 			// necessary stuff to get the different hop measurements
@@ -225,7 +227,7 @@ func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, p
 			// currently linking a ContextKey variable througth the context that we generate
 			ctx := context.WithValue(publisher.ctx, dht.ContextKey("hops"), &hops)
 
-			reqTime, err := provide(ctx, publisher, received_cid)
+			reqTime, err := provide(ctx, publisher, receivedCid)
 			if err != nil {
 				logEntry.Errorf("unable to Provide content. %s", err.Error())
 			}
@@ -256,7 +258,7 @@ func (publisher *CidPublisher) publishing_process(publisherWG *sync.WaitGroup, p
 				logEntry.Warnf("no ping results for the PR provide round of Cid %s", cidInfo.CID.Hash().B58String())
 			} else {
 				logEntry.Infof("Cid %s - %d total PRHolders | %d successfull PRHolders | %d failed PRHolders",
-					received_cid, tot, success, failed)
+					receivedCid, tot, success, failed)
 			}
 
 			// send the cid_info to the cid_pinger adn start pinging PR Holders

@@ -187,7 +187,7 @@ func findCidSource(conf *config.Config) (src.CidSource, error) {
 	case config.JsonFileSource:
 		return src.OpenSimpleJSONFile(conf.CidFile)
 	case config.RandomSource:
-		return src.NewRandomCidGen(conf.CidContentSize), nil
+		return src.NewRandomCidGen(conf.CidContentSize, conf.CidNumber), nil
 	case config.BitswapSource:
 		return nil, errors.New("bitswap source not yet implemented")
 

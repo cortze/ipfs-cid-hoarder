@@ -29,21 +29,25 @@ func (discoverer *CidDiscoverer) run() {
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go discoverer.readCIDs(discoverer.CidSource, &genWG, getNewCidReturnTypeChannel)
+	go discoverer.generateCids(&genWG, getNewCidReturnTypeChannel)
 	var discovererWG sync.WaitGroup
 
 	// CID PR Discoverers which are essentially the workers of tracker.
 	for discovererCounter := 0; discovererCounter < discoverer.Workers; discovererCounter++ {
 		discovererWG.Add(1)
 		// start the discovery process
-		go discoverer.discovery_process(&discovererWG, discovererCounter, getNewCidReturnTypeChannel)
+		go discoverer.discoveryProcess(&discovererWG, discovererCounter, getNewCidReturnTypeChannel)
 	}
 	genWG.Wait()
 	discovererWG.Wait()
+	err := discoverer.host.Close()
+	if err != nil {
+		return
+	}
 }
 
-//This method essentially initiliazes the data for the pinger to be able to get information about the PR holders later.
-func (discoverer *CidDiscoverer) discovery_process(discovererWG *sync.WaitGroup, discovererID int, getNewCidReturnTypeChannel chan *src.GetNewCidReturnType) {
+//This method essentially initializes the data for the pinger to be able to get information about the PR holders later.
+func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, discovererID int, getNewCidReturnTypeChannel <-chan *src.GetNewCidReturnType) {
 	defer discovererWG.Done()
 	logEntry := log.WithField("discoverer ID", discovererID)
 	ctx := discoverer.ctx
