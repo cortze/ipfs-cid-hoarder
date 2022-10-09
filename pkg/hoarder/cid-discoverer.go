@@ -89,19 +89,18 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 				p2p.NoConnError,
 			)
 			fetchRes.AddPRPingResults(pingRes)
-			//TODO will this work, because no add provider RPC has been completed
 			err := addPeerToProviderStore(ctx, discoverer.host, getNewCidReturnTypeInstance.ID, getNewCidReturnTypeInstance.CID, getNewCidReturnTypeInstance.Addresses)
 			if err != nil {
 				log.Errorf("error %s calling addpeertoproviderstore method", err)
 			}
 			useragent := discoverer.host.GetUserAgentOfPeer(getNewCidReturnTypeInstance.ID)
-			log.Infof(useragent)
+
 			prHolderInfo := models.NewPeerInfo(
 				getNewCidReturnTypeInstance.ID,
-				//TODO is it in the peerstore of the host
 				discoverer.host.Peerstore().Addrs(getNewCidReturnTypeInstance.ID),
 				useragent,
 			)
+
 			cidInfo.AddPRHolder(prHolderInfo)
 			discoverer.CidPinger.AddCidInfo(cidInfo)
 		case <-ctx.Done():
