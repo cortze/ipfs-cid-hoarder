@@ -1,6 +1,9 @@
 package hoarder
 
 import (
+	"context"
+	"github.com/ipfs/go-cid"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 
@@ -9,9 +12,7 @@ import (
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )
@@ -89,9 +90,12 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 			)
 			fetchRes.AddPRPingResults(pingRes)
 			//TODO will this work, because no add provider RPC has been completed
-			addAddrtoPeerstore(discoverer.host, getNewCidReturnTypeInstance.ID, getNewCidReturnTypeInstance.Addresses)
+			err := addPeerToProviderStore(ctx, discoverer.host, getNewCidReturnTypeInstance.ID, getNewCidReturnTypeInstance.CID, getNewCidReturnTypeInstance.Addresses)
+			if err != nil {
+				log.Errorf("error %s calling addpeertoproviderstore method", err)
+			}
 			useragent := discoverer.host.GetUserAgentOfPeer(getNewCidReturnTypeInstance.ID)
-
+			log.Infof(useragent)
 			prHolderInfo := models.NewPeerInfo(
 				getNewCidReturnTypeInstance.ID,
 				//TODO is it in the peerstore of the host
@@ -109,6 +113,18 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	}
 }
 
+/*
 func addAddrtoPeerstore(h host.Host, pid peer.ID, multiaddr []ma.Multiaddr) {
 	h.Peerstore().AddAddrs(pid, multiaddr, peerstore.PermanentAddrTTL)
+}
+*/
+
+//Instead of adding directly to peerstore the API is the following
+func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid cid.Cid, multiaddr []ma.Multiaddr) error {
+	keyMH := cid.Hash()
+	err := h.DHT.ProviderStore().AddProvider(ctx, keyMH, peer.AddrInfo{ID: pid, Addrs: multiaddr})
+	if err != nil {
+		return errors.Wrap(err, " while trying to add provider to peerstore")
+	}
+	return nil
 }
