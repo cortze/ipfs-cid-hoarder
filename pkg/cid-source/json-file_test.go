@@ -3,6 +3,7 @@ package cid_source
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -100,4 +101,26 @@ func TestGetNewCidEncodedJSON(t *testing.T) {
 		}
 
 	}
+}
+
+func TestJsonFileCIDSource_GetNewCidWithChannel(t *testing.T) {
+	GetNewCidReturnTypeChannel := make(chan *GetNewCidReturnType, 10)
+	var genWG sync.WaitGroup
+	go routineForReceivingFromChannel(GetNewCidReturnTypeChannel, &genWG)
+	file, err := OpenSimpleJSONFile("C:\\Users\\fotis\\GolandProjects\\ipfs-cid-hoarder\\examplejsonfiles\\providers.json")
+	if err != nil {
+		t.Errorf("error %s while opening json file", err)
+	}
+	for true {
+		cid, err := file.GetNewCid()
+		if reflect.DeepEqual(cid, Undef) {
+			break
+		}
+		if err != nil {
+			t.Errorf("error %s while generating random cid", err)
+		}
+		GetNewCidReturnTypeChannel <- &cid
+	}
+	close(GetNewCidReturnTypeChannel)
+	genWG.Wait()
 }
