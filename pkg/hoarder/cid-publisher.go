@@ -16,9 +16,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewCidPublisher(tracker *CidTracker) (*CidPublisher, error) {
+func NewCidPublisher(tracker *CidTracker, h *p2p.Host, cidNum int) (*CidPublisher, error) {
 	log.Debug("Creating a new CID publisher")
 	return &CidPublisher{
+		MsgNot:     h.GetMsgNotifier(),
+		CidNumber:  cidNum,
 		CidTracker: tracker,
 	}, nil
 }

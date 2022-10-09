@@ -27,12 +27,10 @@ type CidTracker struct {
 
 	host      *p2p.Host
 	DBCli     *db.DBClient
-	MsgNot    *p2p.Notifier
 	CidSource src.CidSource
 	CidPinger *CidPinger
 
 	K              int
-	CidNumber      int
 	Workers        int
 	ReqInterval    time.Duration
 	StudyDuration  time.Duration
@@ -41,6 +39,10 @@ type CidTracker struct {
 }
 
 type CidPublisher struct {
+	//receive message from listen for add provider message function
+	MsgNot *p2p.Notifier
+	//number of cids to publish
+	CidNumber int
 	*CidTracker
 }
 
@@ -75,7 +77,7 @@ func NewCidTracker(
 	db *db.DBClient,
 	cidSource src.CidSource,
 	cidPinger *CidPinger,
-	k, cidNum, Workers int,
+	k, Workers int,
 	reqInterval, studyDuration time.Duration) (*CidTracker, error) {
 
 	return &CidTracker{
@@ -83,11 +85,9 @@ func NewCidTracker(
 		host:          h,
 		wg:            wg,
 		DBCli:         db,
-		MsgNot:        h.GetMsgNotifier(),
 		CidSource:     cidSource,
 		CidPinger:     cidPinger,
 		K:             k,
-		CidNumber:     cidNum,
 		ReqInterval:   reqInterval,
 		StudyDuration: studyDuration,
 		Workers:       Workers,
