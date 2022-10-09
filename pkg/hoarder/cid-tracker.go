@@ -30,15 +30,15 @@ type CidTracker struct {
 	CidSource src.CidSource
 	CidPinger *CidPinger
 
-	K              int
-	Workers        int
-	ReqInterval    time.Duration
-	StudyDuration  time.Duration
-	CidMap         sync.Map
-	ProviderAndCID sync.Map
+	K             int
+	Workers       int
+	ReqInterval   time.Duration
+	StudyDuration time.Duration
 }
 
 type CidPublisher struct {
+	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
+	CidMap sync.Map
 	//receive message from listen for add provider message function
 	MsgNot *p2p.Notifier
 	//number of cids to publish
