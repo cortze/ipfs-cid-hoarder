@@ -176,6 +176,12 @@ func (c *Config) apply(ctx *cli.Context) {
 		} else {
 			c.CidSource = DefaultConfig.CidSource
 		}
+		// batch of CIDs for the entire study
+		if ctx.IsSet("workers") {
+			c.Workers = ctx.Int("workers")
+		} else {
+			c.Workers = DefaultConfig.Workers
+		}
 		switch c.CidSource {
 		case RandomSource:
 			// check the size of the random content to generate
@@ -191,12 +197,7 @@ func (c *Config) apply(ctx *cli.Context) {
 			} else {
 				c.CidNumber = DefaultConfig.CidNumber
 			}
-			// batch of CIDs for the entire study
-			if ctx.IsSet("workers") {
-				c.Workers = ctx.Int("workers")
-			} else {
-				c.Workers = DefaultConfig.Workers
-			}
+
 			//TODO support different types of cid files
 		case TextFileSource, JsonFileSource:
 			fmt.Println("text file source or json file source was found")
