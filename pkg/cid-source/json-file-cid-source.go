@@ -174,7 +174,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 			continue
 		}
 		log.Debug(pr.ID)
-		newPid, err := peer.IDFromString(pr.ID)
+		newPid, err := peer.Decode(pr.ID)
 		if err != nil {
 			log.Errorf("could not convert string to pid %s", err)
 			continue
@@ -184,7 +184,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		for i := 0; i < len(pr.Addresses); i++ {
 			multiaddr, err := ma.NewMultiaddr(pr.Addresses[i])
 			if err != nil {
-				log.Errorf("could not convert string to multiaddress %s", err)
+				//log.Errorf("could not convert string to multiaddress %s", err)
 				continue
 			}
 			multiaddresses = append(multiaddresses, multiaddr)

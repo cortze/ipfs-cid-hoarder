@@ -139,3 +139,4 @@ require (
 )
 
 replace github.com/libp2p/go-libp2p-kad-dht v0.15.0 => ./go-libp2p-kad-dht
+//replace github.com/libp2p/go-libp2p-core/peer v0.11.0 => github.com/libp2p/go-libp2p/core/peer v0.23.2
