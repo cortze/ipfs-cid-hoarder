@@ -107,7 +107,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	studyWG.Add(1)
 
 	if conf.AlreadyPublishedCIDs {
-		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.Workers, reqInterval, studyDuration)
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
@@ -125,11 +125,11 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 			CidPinger:  cidPinger,
 		}, nil
 	} else {
-		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.CidNumber, conf.Workers, reqInterval, studyDuration)
+		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.Workers, reqInterval, studyDuration)
 		if err != nil {
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
-		cidPublisher, err := NewCidPublisher(cidTracker)
+		cidPublisher, err := NewCidPublisher(cidTracker, pubordishost, conf.CidNumber)
 		log.Debug("CidHoarder Initialized with cid publisher")
 		return &CidHoarder{
 			ctx:        ctx,
