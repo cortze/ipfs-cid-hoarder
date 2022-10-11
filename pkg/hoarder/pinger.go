@@ -297,6 +297,7 @@ func createPinger(pinger *CidPinger, wg *sync.WaitGroup, pingerID int) {
 			}
 
 			cidStr := cidInfo.CID.Hash().B58String()
+
 			pingCounter := cidInfo.GetPingCounter()
 
 			logEntry.Infof("pinging CID %s for round %d", cidStr, pingCounter)

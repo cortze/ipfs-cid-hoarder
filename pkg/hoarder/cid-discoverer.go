@@ -62,12 +62,10 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 				cidStr, getNewCidReturnTypeInstance.ID.String(),
 				getNewCidReturnTypeInstance.Addresses,
 			)
-			//TODO what will the discoverer have instead of the request interval
 			//the starting values for the discoverer
 			cidInfo := models.NewCidInfo(getNewCidReturnTypeInstance.CID, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), discoverer.host.ID())
 			fetchRes := models.NewCidFetchResults(getNewCidReturnTypeInstance.CID, 0)
 
-			discoverer.ProviderAndCID.Store(cidStr, fetchRes)
 			cidInfo.AddProvideTime(0)
 			// generate a new CidFetchResults
 			//TODO starting data for the discoverer

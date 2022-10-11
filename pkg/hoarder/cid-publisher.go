@@ -114,7 +114,7 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 					log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", casted_cid.String(), msgNot.RemotePeer.String())
 				}
 
-				//if no error occured in p2p.MsgNotification the ping result will contain active = true and hasRecords = true,
+				//if no error occurred in p2p.MsgNotification the ping result will contain active = true and hasRecords = true,
 				//else it will have these fields as false.
 				pingRes := models.NewPRPingResults(
 					casted_cid,
@@ -212,17 +212,17 @@ func (publisher *CidPublisher) publishingProcess(publisherWG *sync.WaitGroup, pu
 				return
 			}
 			logEntry.Debugf("new cid to publish %s", receivedCid.Hash().B58String())
-			received_cidStr := receivedCid.Hash().B58String()
+			receivedCidStr := receivedCid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
 			//TODO the content type is not necessarily random content
 			cidInfo := models.NewCidInfo(*receivedCid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 
 			// generate the cidFetcher
-			publisher.CidMap.Store(received_cidStr, cidInfo)
+			publisher.CidMap.Store(receivedCidStr, cidInfo)
 
 			// generate a new CidFetchResults
 			fetchRes := models.NewCidFetchResults(*receivedCid, 0) // First round = Publish PR
-			cidFetchRes.Store(received_cidStr, fetchRes)
+			cidFetchRes.Store(receivedCidStr, fetchRes)
 
 			// necessary stuff to get the different hop measurements
 			var hops dht.Hops

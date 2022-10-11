@@ -53,7 +53,7 @@ func NewPRPingResults(
 	}
 }
 
-// CidFetchResults is the basic struct containing the summary of all the requests done for a ficen(?given) CID on a fetch round.
+// CidFetchResults is the basic struct containing the summary of all the requests done for a given CID on a fetch round.
 type CidFetchResults struct {
 	m   sync.Mutex
 	Cid cid.Cid
