@@ -2,15 +2,16 @@ package cid_source
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"ipfs-cid-hoarder/pkg/config"
+	"os"
+	"reflect"
+
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
-	"ipfs-cid-hoarder/pkg/config"
-	"os"
-	"reflect"
 )
 
 // JsonFileCIDSource reads CIDs and their content from a json file.
@@ -184,7 +185,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		for i := 0; i < len(pr.Addresses); i++ {
 			multiaddr, err := ma.NewMultiaddr(pr.Addresses[i])
 			if err != nil {
-				log.Errorf("could not convert string to multiaddress %s", err)
+				//log.Errorf("could not convert string to multiaddress %s", err)
 				continue
 			}
 			multiaddresses = append(multiaddresses, multiaddr)

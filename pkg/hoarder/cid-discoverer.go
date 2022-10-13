@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -71,8 +72,8 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, getN
 	for {
 		select {
 		case getNewCidReturnTypeInstance := <-getNewCidReturnTypeChannel:
-			if reflect.DeepEqual(getNewCidReturnTypeInstance, src.Undef) {
-				return
+			if reflect.DeepEqual(*getNewCidReturnTypeInstance, src.Undef) {
+				break
 			}
 			cidStr := getNewCidReturnTypeInstance.CID.Hash().B58String()
 			log.Debugf(
@@ -131,6 +132,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 		fetchRes.AddPRPingResults(pingRes)
 		useragent := discoverer.host.GetUserAgentOfPeer(val.ID)
 
+		fmt.Println(discoverer.host.Peerstore().Addrs(val.ID))
 		prHolderInfo := models.NewPeerInfo(
 			val.ID,
 			discoverer.host.Peerstore().Addrs(val.ID),
