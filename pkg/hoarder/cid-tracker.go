@@ -2,10 +2,11 @@ package hoarder
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 	"reflect"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	src "ipfs-cid-hoarder/pkg/cid-source"
 	"ipfs-cid-hoarder/pkg/db"
@@ -48,6 +49,8 @@ type CidPublisher struct {
 
 type CidDiscoverer struct {
 	*CidTracker
+	m      sync.Mutex
+	CidMap map[string][]*src.GetNewCidReturnType
 }
 
 //Creates a new:
@@ -104,6 +107,7 @@ func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, GetNewCidReturnTy
 	for true {
 		cid, err := tracker.CidSource.GetNewCid()
 		if reflect.DeepEqual(cid, src.Undef) {
+			GetNewCidReturnTypeChannel <- &cid
 			break
 		}
 		if err != nil {
