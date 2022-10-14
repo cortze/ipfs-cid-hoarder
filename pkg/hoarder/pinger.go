@@ -9,7 +9,6 @@ import (
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	log "github.com/sirupsen/logrus"
@@ -102,18 +101,8 @@ func (pinger *CidPinger) Run() {
 
 	pingOrchWG.Wait()
 	log.Infof("finished pinging the CIDs on %d rounds", pinger.rounds)
-
-	// after the orchester has pinged all the CIDs for the given number of rounds
-	// check if the tasks have been completed and close the pingers
-	for {
-		if len(pinger.pingTaskC) != 0 {
-			continue
-		} else {
-			close(pinger.pingTaskC)
-			break
-		}
-	}
-
+	pingerWG.Wait()
+	close(pinger.pingTaskC)
 	log.Debug("done from the CID Pinger")
 }
 
@@ -127,9 +116,9 @@ func (p *CidPinger) AddCidInfo(c *models.CidInfo) {
 }
 
 // PingPRHolder dials a given PR Holder to check whether it's active or not, and whether it has the PRs or not
-func (pinger *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo) *models.PRPingResults {
+func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.AddrInfo) *models.PRPingResults {
 	logEntry := log.WithFields(log.Fields{
-		"cid": c.Hash().B58String(),
+		"cid": c.CID.Hash().B58String(),
 	})
 
 	var active, hasRecords bool
@@ -146,22 +135,23 @@ func (pinger *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo)
 		// TODO: attempt at least to see if the connection refused
 		err := pinger.host.Connect(pingCtx, pAddr)
 		if err != nil {
-			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.Hash().B58String(), err.Error())
+			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.CID.Hash().B58String(), err.Error())
 			connError = p2p.ParseConError(err)
 			// If the error is not linked to an connection refused or reset by peer, just break the look
 			if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
 				break
 			}
 		} else {
-			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.Hash().B58String())
+			logEntry.Infof("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.CID.Hash().B58String())
 			active = true
 			connError = p2p.NoConnError
 
 			// if the connection was successfull, request whether it has the records or not
-			provs, _, _ := pinger.host.DHT.GetProvidersFromPeer(pinger.ctx, pAddr.ID, c.Hash())
-			if len(provs) > 0 {
-				hasRecords = true
-				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.Hash().B58String(), pAddr.ID.String(), provs)
+			provs, _, _ := pinger.host.DHT.GetProvidersFromPeer(pinger.ctx, pAddr.ID, c.CID.Hash())
+			if err != nil {
+				log.Warnf("unable to retrieve providers from peer %s - error: %s", pAddr.ID, err.Error())
+			} else {
+				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
 			}
 
 			// close connection and exit loop
@@ -176,7 +166,7 @@ func (pinger *CidPinger) PingPRHolder(c cid.Cid, round int, pAddr peer.AddrInfo)
 	fetchTime := time.Since(tstart)
 
 	return models.NewPRPingResults(
-		c,
+		c.CID,
 		pAddr.ID,
 		round,
 		tstart,
@@ -231,7 +221,7 @@ func generatePingOrchester(pinger *CidPinger, pingOrchWG *sync.WaitGroup) {
 				cidStr := cidInfo.CID.Hash().B58String()
 				// check if the time for next ping has arrived
 				//if the time has passed for the next ping
-
+				log.Debugf("CID INFO NEXT PING: %s", cidInfo.NextPing)
 				if time.Now().Sub(cidInfo.NextPing) < time.Duration(0) {
 					logEntry.Debugf("not in time to ping %s", cidStr)
 					//TODO isn't continue better here
@@ -290,12 +280,17 @@ func createPinger(pinger *CidPinger, wg *sync.WaitGroup, pingerID int) {
 	logEntry := log.WithField("pinger", pingerID)
 	logEntry.Debug("Initialized")
 	for {
+		// check if the ping orcherster has finished
+		if len(pinger.pingTaskC) == 0 {
+			logEntry.Info("no more pings to orchestrate, finishing worker")
+			return
+		}
 		select {
-		case cidInfo := <-pinger.pingTaskC:
-			// check if the models.CidInfo id not nil
-			if cidInfo == nil {
+		case cidInfo, ok := <-pinger.pingTaskC:
+
+			if !ok {
 				logEntry.Warn("empty CID received from channel, finishing worker")
-				continue
+				return
 			}
 
 			cidStr := cidInfo.CID.Hash().B58String()
@@ -351,11 +346,11 @@ func createPinger(pinger *CidPinger, wg *sync.WaitGroup, pingerID int) {
 			// Ping in parallel each of the PRHolders
 			for _, peerInfo := range cidInfo.PRHolders {
 				wg.Add(1)
-				go func(wg *sync.WaitGroup, c cid.Cid, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
+				go func(wg *sync.WaitGroup, c *models.CidInfo, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
 					defer wg.Done()
 					pingRes := pinger.PingPRHolder(c, pingCounter, peerInfo.GetAddrInfo())
 					fetchRes.AddPRPingResults(pingRes)
-				}(&wg, cidInfo.CID, peerInfo, cidFetchRes)
+				}(&wg, cidInfo, peerInfo, cidFetchRes)
 			}
 
 			wg.Wait()
