@@ -363,7 +363,6 @@ func createPinger(pinger *CidPinger, wg *sync.WaitGroup, pingerID int) {
 
 			// add the fetch results to the array and persist it in the DB
 			pinger.dbCli.AddFetchResult(cidFetchRes)
-			log.Debug("THREW ERROR HERE")
 
 		case <-pinger.ctx.Done():
 			logEntry.Info("shutdown detected, closing pinger")

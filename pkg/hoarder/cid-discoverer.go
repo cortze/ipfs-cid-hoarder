@@ -2,7 +2,6 @@ package hoarder
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -76,6 +75,7 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, getN
 				break
 			}
 			cidStr := getNewCidReturnTypeInstance.CID.Hash().B58String()
+
 			log.Debugf(
 				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v",
 				cidStr, getNewCidReturnTypeInstance.ID.String(),
@@ -104,6 +104,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	defer discovererWG.Done()
 	//the starting values for the discoverer
 	cidIn, err := cid.Parse(cidstr)
+
 	if err != nil {
 		log.Errorf("couldnt parse cid")
 	}
@@ -115,7 +116,6 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	//TODO starting data for the discoverer
 	fetchRes.TotalHops = 0
 	fetchRes.HopsToClosest = 0
-	cidInfo.AddPRFetchResults(fetchRes)
 	for _, val := range getNewCidReturnTypearr {
 		//TODO discoverer starting ping res
 		pingRes := models.NewPRPingResults(
@@ -132,7 +132,6 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 		fetchRes.AddPRPingResults(pingRes)
 		useragent := discoverer.host.GetUserAgentOfPeer(val.ID)
 
-		fmt.Println(discoverer.host.Peerstore().Addrs(val.ID))
 		prHolderInfo := models.NewPeerInfo(
 			val.ID,
 			discoverer.host.Peerstore().Addrs(val.ID),
@@ -141,6 +140,9 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 
 		cidInfo.AddPRHolder(prHolderInfo)
 	}
+
+	cidInfo.AddPRFetchResults(fetchRes)
+
 	discoverer.DBCli.AddCidInfo(cidInfo)
 	discoverer.DBCli.AddFetchResult(fetchRes)
 
