@@ -231,8 +231,10 @@ func generatePingOrchester(pinger *CidPinger, pingOrchWG *sync.WaitGroup) {
 				cidStr := cidInfo.CID.Hash().B58String()
 				// check if the time for next ping has arrived
 				//if the time has passed for the next ping
+
 				if time.Now().Sub(cidInfo.NextPing) < time.Duration(0) {
 					logEntry.Debugf("not in time to ping %s", cidStr)
+					//TODO isn't continue better here
 					break
 				}
 

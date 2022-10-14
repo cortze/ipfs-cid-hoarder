@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -143,19 +144,22 @@ func (c *Config) apply(ctx *cli.Context) {
 		if ctx.IsSet("database-endpoint") {
 			c.Database = ctx.String("database-endpoint")
 		}
+
 		if ctx.IsSet("hydra-filter") {
 			c.HydraFilter = ctx.Bool("hydra-filter")
 		} else {
 			c.HydraFilter = DefaultConfig.HydraFilter
 		}
+
 		// Time delay between the each of the PRHolder pings
 		if ctx.IsSet("req-interval") {
 			c.ReqInterval = ctx.String("req-interval")
 		} else {
 			c.ReqInterval = DefaultConfig.ReqInterval
 		}
+
 		if ctx.IsSet("already-published-cids") {
-			c.AlreadyPublishedCIDs = ctx.Bool("already-published-cids")
+			c.AlreadyPublishedCIDs, _ = strconv.ParseBool(ctx.String("already-published-cids"))
 		} else {
 			c.AlreadyPublishedCIDs = DefaultConfig.AlreadyPublishedCIDs
 		}

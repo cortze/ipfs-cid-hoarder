@@ -108,6 +108,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	if err != nil {
 		log.Errorf("couldnt parse cid")
 	}
+
 	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), discoverer.host.ID())
 	fetchRes := models.NewCidFetchResults(cidIn, 0)
 

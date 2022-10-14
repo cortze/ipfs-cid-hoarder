@@ -83,7 +83,7 @@ var RunCmd = &cli.Command{
 			EnvVars:     []string{"IPFS_CID_HOARDER_K"},
 			DefaultText: "K=20",
 		},
-		&cli.BoolFlag{
+		&cli.StringFlag{
 			Name:        "already-published-cids",
 			Usage:       "if the cids are already published in the network the tool has to only ping them and not publish them",
 			EnvVars:     []string{"IPFS_CID_HOARDER_PUBLISHED_CIDS"},
