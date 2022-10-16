@@ -16,7 +16,7 @@ import (
 
 const (
 	DialTimeout     = 20 * time.Second
-	minIterTime     = 500 * time.Millisecond
+	minIterTime     = 2 * time.Second
 	maxDialAttempts = 3 // Are three attempts enough?
 	dialGraceTime   = 10 * time.Second
 )
@@ -107,6 +107,12 @@ func (pinger *CidPinger) Run() {
 	pingerWG.Wait()
 	close(pinger.pingTaskC)
 	log.Debug("done from the CID Pinger")
+	//close the publisher host
+	err := pinger.host.Close()
+	if err != nil {
+		log.Errorf("failed to close host: %s", err)
+		return
+	}
 }
 
 // AddCidInfo adds a new CID to the pinging queue
@@ -296,6 +302,8 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 				return
 			}
 
+			log.Debug("RECEIVED PING TASK FROM CHANNEL")
+
 			cidStr := cidInfo.CID.Hash().B58String()
 
 			pingCounter := cidInfo.GetPingCounter()
@@ -325,6 +333,7 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 					isRetrievable = true
 				}
 				fetchRes.IsRetrievable = isRetrievable
+				log.Debug("FINISHED CALLING LOOKUP FOR PROVIDERS")
 			}(pinger, cidInfo, cidFetchRes)
 
 			wg.Add(1)
@@ -347,6 +356,7 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 				for _, peer := range closestPeers {
 					cidFetchRes.AddClosestPeer(peer)
 				}
+				log.Debug("FINISHED CALLING GET CLOSEST PEERS")
 			}(pinger, cidInfo, cidFetchRes)
 
 			// Ping in parallel each of the PRHolders
@@ -357,17 +367,19 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 					defer wg.Done()
 					pingRes := pinger.PingPRHolder(c, pingCounter, peerInfo.GetAddrInfo())
 					fetchRes.AddPRPingResults(pingRes)
+					log.Debug("FINISHED CALLING PING PR HOLDER")
 				}(&wg, cidInfo, peerInfo, cidFetchRes)
 			}
 
 			wg.Wait()
 
+			log.Debug("FINISHED GO ROUTINES")
 			// update the finish time for the total fetch round
 			cidFetchRes.FinishTime = time.Now()
 
 			// add the fetch results to the array and persist it in the DB
 			pinger.dbCli.AddFetchResult(cidFetchRes)
-
+			log.Debug("ADDED FETCH RESULTS TO THE DATABASE")
 		case <-pinger.ctx.Done():
 			logEntry.Info("shutdown detected, closing pinger")
 			return
