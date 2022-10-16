@@ -1,0 +1,186 @@
+{
+ "ProviderRecords": [
+  {
+   "PeerID": "QmTjz7SiyCJnLbSbEPu2EaR3trsfjV3JFoTRUHiCNes1om",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/2602:ff16:9:0:1:ba:0:1/tcp/4001",
+    "/ip6/64:ff9b::3ffa:36c1/udp/4001/quic",
+    "/ip6/2602:ff16:9:0:1:ba:0:1/udp/4001/quic",
+    "/ip4/63.250.54.193/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip4/63.250.54.193/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWL2AhRPxTp7QfHEDnyDDiQSCoPZAc2QARCFcNNjUmRMDj",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip4/66.94.106.94/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip4/66.94.106.94/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWF6nu8e5pgk8EaHQobDQzmz2Rdak4z4wjN28D5WLa9J68",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/203.159.94.39/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/203.159.94.39/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip6/64:ff9b::cb9f:5e27/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWGRAiJ7wssBrtR8AGfVtGPNkTVufpEKULeqLzHGgZHVDN",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/207.180.212.93/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip4/207.180.212.93/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWMpFQf3k4NLcHczf6sb675CJN6yr42kvEwQcosCM45xTf",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip6/::1/udp/4001/quic",
+    "/ip6/64:ff9b::68f8:ad47/udp/4001/quic",
+    "/ip4/104.248.173.71/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip4/104.248.173.71/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWPKPFxshwDaptMmXkVrWJPxK4GAkuK3VHUAqcNJXyN3gk",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/172.31.5.156/tcp/30002",
+    "/ip4/172.31.5.156/udp/30002/quic",
+    "/ip4/18.118.122.217/udp/30002/quic",
+    "/ip4/18.118.122.217/tcp/30002",
+    "/ip4/127.0.0.1/udp/30002/quic",
+    "/ip4/127.0.0.1/tcp/30002"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWHYGoPkzkQ2wdXqBgBvqktBoUZxpekwmYbxowTP8GJypR",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip6/2604:1380:45f1:3f00::d/tcp/4002/ws",
+    "/ip6/2604:1380:45f1:3f00::d/udp/4001/quic",
+    "/ip4/147.75.63.161/tcp/4001",
+    "/ip4/147.75.63.161/tcp/4002/ws",
+    "/ip4/147.75.63.161/udp/4001/quic",
+    "/ip6/2604:1380:45f1:3f00::d/tcp/4001"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWAHzTAsuuMSN59BnDPqPRUCXK5k4JWokjkYW82WLibgNL",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/18.222.184.4/tcp/30004",
+    "/ip4/127.0.0.1/tcp/30004",
+    "/ip4/127.0.0.1/udp/30004/quic",
+    "/ip4/172.31.1.22/tcp/30004",
+    "/ip4/18.222.184.4/udp/30004/quic",
+    "/ip4/172.31.1.22/udp/30004/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWPKyubmL4gDiey7rp2Yj5LxS6JN5qss3iXGGvhfzkd5ER",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/138.68.162.174/tcp/4001",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip4/138.68.162.174/udp/4001/quic",
+    "/ip6/2a03:b0c0:1:d0::c2e:1/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/2a03:b0c0:1:d0::c2e:1/udp/4001/quic",
+    "/ip6/::1/tcp/4001"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWHHX4hXvfUuWk7cLB4utqZSVsXicGvJxUq9MTDNkFNpvT",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/138.68.109.103/tcp/25203",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip4/172.18.0.42/tcp/4001",
+    "/ip4/138.68.109.103/udp/51282/quic",
+    "/ip4/138.68.109.103/udp/2551/quic",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip4/138.68.109.103/tcp/4001",
+    "/ip4/172.18.0.42/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWHo2MsUcFfXCdDF5FtCMp5S4AG5zuwKwc1ai2XL6zBwZJ",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/147.75.71.245/tcp/4001",
+    "/ip4/147.75.71.245/tcp/4002/ws",
+    "/ip4/147.75.71.245/udp/4001/quic",
+    "/ip6/2604:1380:45e1:4a00::11/udp/4001/quic",
+    "/ip6/2604:1380:45e1:4a00::11/tcp/4001",
+    "/ip6/2604:1380:45e1:4a00::11/tcp/4002/ws"
+   ]
+  },
+  {
+   "PeerID": "QmUNvEc13GDSc1RnE3inK3VN44BTEFxnVXxUqVtPd5Ef8W",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip6/2a02:c207:2029:2042:ac0f::1/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip6/2a02:c207:2029:2042:f05d::4/tcp/4001",
+    "/ip4/167.86.80.60/tcp/4001",
+    "/ip6/2a02:c207:2029:2042:b546::2/tcp/4001",
+    "/ip6/2a02:c207:2029:2042:b6cf::6/tcp/4001",
+    "/ip6/2a02:c207:2029:2042:4e06::2/udp/4001/quic",
+    "/ip6/2a02:c207:2029:2042:154c::1/tcp/4001",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/2a02:c207:2029:2042:60c8::1/tcp/4001",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/167.86.80.60/udp/4001/quic",
+    "/ip6/2a02:c207:2029:2042:4e06::2/tcp/4001"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWFmT8eNM5eZffWLsyDQfLjmt1BN4WVTmUvDtBEbKuqzsk",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/143.198.152.169/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip4/143.198.152.169/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWSef7pn3DVqnBkbWVwQvBQ36W1sdrBDbH7rSf5EXooefz",
+   "ContentID": "QmbifSV4R1Ui5JXKR32pcULhnqn47ciBPTr8VekKMppcyE",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/64:ff9b::951c:5091/udp/4001/quic",
+    "/ip6/::1/tcp/4001",
+    "/ip4/149.28.80.145/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/149.28.80.145/tcp/4001"
+   ]
+  }
+ ]
+}
