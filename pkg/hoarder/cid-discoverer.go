@@ -28,7 +28,7 @@ func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 }
 
 func (discoverer *CidDiscoverer) run() {
-
+	defer discoverer.wg.Done()
 	getNewCidReturnTypeChannel := make(chan *src.GetNewCidReturnType, discoverer.Workers)
 	// CID generator
 	var genWG sync.WaitGroup
