@@ -30,7 +30,8 @@ type CidTracker struct {
 	DBCli     *db.DBClient
 	CidSource src.CidSource
 	CidPinger *CidPinger
-
+	//receive message from listen for add provider message function
+	MsgNot        *p2p.Notifier
 	K             int
 	Workers       int
 	ReqInterval   time.Duration
@@ -40,8 +41,7 @@ type CidTracker struct {
 type CidPublisher struct {
 	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
 	CidMap sync.Map
-	//receive message from listen for add provider message function
-	MsgNot *p2p.Notifier
+
 	//number of cids to publish
 	CidNumber int
 	*CidTracker
@@ -88,6 +88,7 @@ func NewCidTracker(
 		host:          h,
 		wg:            wg,
 		DBCli:         db,
+		MsgNot:        h.GetMsgNotifier(),
 		CidSource:     cidSource,
 		CidPinger:     cidPinger,
 		K:             k,

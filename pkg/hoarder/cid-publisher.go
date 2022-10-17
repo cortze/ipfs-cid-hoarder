@@ -19,7 +19,6 @@ import (
 func NewCidPublisher(tracker *CidTracker, h *p2p.Host, cidNum int) (*CidPublisher, error) {
 	log.Debug("Creating a new CID publisher")
 	return &CidPublisher{
-		MsgNot:     h.GetMsgNotifier(),
 		CidNumber:  cidNum,
 		CidTracker: tracker,
 	}, nil
@@ -53,6 +52,8 @@ func (publisher *CidPublisher) run() {
 	}
 	genWG.Wait()
 	publisherWG.Wait()
+	// close Msg Notifier
+	close(msgNotChannel)
 	//close the publisher host
 	err := publisher.host.Close()
 	if err != nil {

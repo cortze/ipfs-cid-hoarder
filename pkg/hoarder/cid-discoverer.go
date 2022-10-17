@@ -44,12 +44,14 @@ func (discoverer *CidDiscoverer) run() {
 
 	for cidstr, getNewCidReturnTypeArray := range discoverer.CidMap {
 		discovererWG.Add(1)
-		discoverer.discoveryProcess(&discovererWG, cidstr, getNewCidReturnTypeArray)
+		go discoverer.discoveryProcess(&discovererWG, cidstr, getNewCidReturnTypeArray)
 	}
 
 	discovererWG.Wait()
+	//close(discoverer.MsgNot.GetNotifierChan())
 	err := discoverer.host.Close()
 	if err != nil {
+		log.Errorf("failed to close host: %s", err)
 		return
 	}
 }
@@ -57,7 +59,7 @@ func (discoverer *CidDiscoverer) run() {
 func (discoverer *CidDiscoverer) addToMap(getNewCidReturnTypeInstance *src.GetNewCidReturnType) {
 	cidStr := getNewCidReturnTypeInstance.CID.Hash().B58String()
 	if typeInstance, ok := discoverer.CidMap[cidStr]; ok {
-		typeInstance = append(typeInstance, getNewCidReturnTypeInstance)
+		discoverer.CidMap[cidStr] = append(typeInstance, getNewCidReturnTypeInstance)
 	} else {
 		arr := make([]*src.GetNewCidReturnType, 0)
 		arr = append(arr, getNewCidReturnTypeInstance)
@@ -83,12 +85,11 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, getN
 			)
 			discoverer.m.Lock()
 			discoverer.addToMap(getNewCidReturnTypeInstance)
-			discoverer.m.Unlock()
-
 			err := addPeerToProviderStore(ctx, discoverer.host, getNewCidReturnTypeInstance.ID, getNewCidReturnTypeInstance.CID, getNewCidReturnTypeInstance.Addresses)
 			if err != nil {
 				log.Errorf("error %s calling addpeertoproviderstore method", err)
 			}
+			discoverer.m.Unlock()
 
 		case <-ctx.Done():
 			log.Debugf("shutdown detected, closing discoverer through add provider")
@@ -143,6 +144,14 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	}
 
 	cidInfo.AddPRFetchResults(fetchRes)
+
+	tot, success, failed := cidInfo.GetFetchResultSummaryOfRound(0)
+	if tot < 0 {
+		log.Warnf("no ping results for the PR provide round of Cid %s", cidInfo.CID.Hash().B58String())
+	} else {
+		log.Infof("Cid %s - %d total PRHolders | %d successfull PRHolders | %d failed PRHolders",
+			cidIn, tot, success, failed)
+	}
 
 	discoverer.DBCli.AddCidInfo(cidInfo)
 	discoverer.DBCli.AddFetchResult(fetchRes)
