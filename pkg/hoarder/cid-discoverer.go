@@ -29,6 +29,9 @@ func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 
 func (discoverer *CidDiscoverer) run() {
 	defer discoverer.wg.Done()
+	// launch the PRholder reading routine
+	//msgNotChannel := discoverer.MsgNot.GetNotifierChan()
+
 	getNewCidReturnTypeChannel := make(chan *src.GetNewCidReturnType, discoverer.Workers)
 	// CID generator
 	var genWG sync.WaitGroup
@@ -48,7 +51,8 @@ func (discoverer *CidDiscoverer) run() {
 	}
 
 	discovererWG.Wait()
-	//close(discoverer.MsgNot.GetNotifierChan())
+	//close(msgNotChannel)
+	log.Debug("CLOSED NOT CHANNEL")
 	err := discoverer.host.Close()
 	if err != nil {
 		log.Errorf("failed to close host: %s", err)
@@ -72,7 +76,10 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, getN
 	ctx := discoverer.ctx
 	for {
 		select {
-		case getNewCidReturnTypeInstance := <-getNewCidReturnTypeChannel:
+		case getNewCidReturnTypeInstance, ok := <-getNewCidReturnTypeChannel:
+			if !ok {
+				break
+			}
 			if reflect.DeepEqual(*getNewCidReturnTypeInstance, src.Undef) {
 				break
 			}

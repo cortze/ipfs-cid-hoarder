@@ -40,8 +40,9 @@ type CidTracker struct {
 
 type CidPublisher struct {
 	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
-	CidMap sync.Map
-
+	CidMap      sync.Map
+	genDoneFlag bool
+	pubDoneFlag bool
 	//number of cids to publish
 	CidNumber int
 	*CidTracker
@@ -109,6 +110,7 @@ func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, GetNewCidReturnTy
 		cid, err := tracker.CidSource.GetNewCid()
 		if reflect.DeepEqual(cid, src.Undef) {
 			GetNewCidReturnTypeChannel <- &cid
+			close(GetNewCidReturnTypeChannel)
 			break
 		}
 		if err != nil {

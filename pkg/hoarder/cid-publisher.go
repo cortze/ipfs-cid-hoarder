@@ -3,6 +3,7 @@ package hoarder
 import (
 	"context"
 	src "ipfs-cid-hoarder/pkg/cid-source"
+	"reflect"
 	"sync"
 	"time"
 
@@ -52,8 +53,7 @@ func (publisher *CidPublisher) run() {
 	}
 	genWG.Wait()
 	publisherWG.Wait()
-	// close Msg Notifier
-	close(msgNotChannel)
+	done <- struct{}{}
 	//close the publisher host
 	err := publisher.host.Close()
 	if err != nil {
@@ -91,7 +91,12 @@ func (publisher *CidPublisher) run() {
 func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel <-chan *p2p.MsgNotification) {
 	for {
 		select {
-		case msgNot := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
+		case msgNot, ok := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
+
+			if !ok {
+				log.Warn("msg Not channel is closed, closing reader for PR holders")
+				return
+			}
 			if msgNot == nil {
 				log.Warn("empty msgNot Received, closing reader for PR Holders")
 				return
@@ -204,14 +209,21 @@ func (publisher *CidPublisher) publishingProcess(publisherWG *sync.WaitGroup, pu
 	ctx := publisher.ctx
 	logEntry.Debugf("publisher ready")
 	for {
+
 		select {
-		case receivedType := <-cidChannel: //this channel receives the CID from the CID generator go routine
-			receivedCid := &receivedType.CID
-			if receivedCid == nil {
-				logEntry.Warn("received empty CID to track, closing publisher")
-				// not needed
+		case receivedType, ok := <-cidChannel: //this channel receives the CID from the CID generator go routine
+
+			if !ok {
+				log.Warn("Cid channel has been closed")
 				return
 			}
+
+			if reflect.DeepEqual(*receivedType, src.Undef) {
+				log.Warn("Received undef type from cid channel")
+				return
+			}
+
+			receivedCid := &receivedType.CID
 			logEntry.Debugf("new cid to publish %s", receivedCid.Hash().B58String())
 			receivedCidStr := receivedCid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
