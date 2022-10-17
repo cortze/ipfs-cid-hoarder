@@ -40,9 +40,7 @@ type CidTracker struct {
 
 type CidPublisher struct {
 	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
-	CidMap      sync.Map
-	genDoneFlag bool
-	pubDoneFlag bool
+	CidMap sync.Map
 	//number of cids to publish
 	CidNumber int
 	*CidTracker
