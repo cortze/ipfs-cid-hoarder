@@ -163,6 +163,14 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
 			}
 
+			// iter through the providers to see if it matches with the host's peerID
+			for _, paddrs := range provs {
+				if paddrs.ID == c.Creator {
+					hasRecords = true
+					log.Info(time.Now(), "Peer", pAddr.ID.String(), "reporting on", c.CID.Hash().B58String(), " -> ", paddrs)
+				}
+			}
+
 			// close connection and exit loop
 			err = pinger.host.Network().ClosePeer(pAddr.ID)
 			if err != nil {
@@ -328,9 +336,11 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 				if err != nil {
 					logEntry.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
 				}
-				//TODO CHANGE WITH FOR LOOP AND IF HERE
-				if len(providers) > 0 { // is this assumption naive?
-					isRetrievable = true
+				// iter through the providers to see if it matches with the host's peerID
+				for _, paddrs := range providers {
+					if paddrs.ID == c.Creator {
+						isRetrievable = true
+					}
 				}
 				fetchRes.IsRetrievable = isRetrievable
 				log.Debug("FINISHED CALLING LOOKUP FOR PROVIDERS")

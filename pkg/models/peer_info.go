@@ -13,9 +13,9 @@ import (
 // PeerInfo has the basic info of a Peer elected as a PR Holder
 type PeerInfo struct {
 	//TODO why not embed  AddrInfo struct here?
-	//ID        peer.ID
-	//MultiAddr []ma.Multiaddr
-	peer.AddrInfo
+	ID        peer.ID
+	MultiAddr []ma.Multiaddr
+	// peer.AddrInfo
 	UserAgent string
 	Client    string
 	Version   string
@@ -33,13 +33,9 @@ type PeerInfo struct {
 func NewPeerInfo(peerId peer.ID, multiAddr []ma.Multiaddr, userAgent string) *PeerInfo {
 	client, version := FilterClientType(userAgent)
 
-	addressInfo := peer.AddrInfo{
-		ID:    peerId,
-		Addrs: multiAddr,
-	}
-
 	return &PeerInfo{
-		AddrInfo:  addressInfo,
+		ID:        peerId,
+		MultiAddr: multiAddr,
 		UserAgent: userAgent,
 		Client:    client,
 		Version:   version,
@@ -56,12 +52,12 @@ func NewPeerInfo(peerId peer.ID, multiAddr []ma.Multiaddr, userAgent string) *Pe
 }
 
 func (p *PeerInfo) GetAddrInfo() peer.AddrInfo {
-	/*addrinfo := peer.AddrInfo{
+	addrinfo := peer.AddrInfo{
 		ID:    p.ID,
 		Addrs: make([]ma.Multiaddr, len(p.MultiAddr)),
 	}
-	addrinfo.Addrs = p.MultiAddr*/
-	return p.AddrInfo
+	addrinfo.Addrs = p.MultiAddr
+	return addrinfo
 }
 
 // Aux funcs

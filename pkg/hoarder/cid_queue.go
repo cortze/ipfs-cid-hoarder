@@ -46,7 +46,6 @@ func (q *cidQueue) addCid(c *models.CidInfo) {
 	q.cidMap[c.CID.Hash().B58String()] = c
 	q.cidArray = append(q.cidArray, c)
 
-	return
 }
 
 func (q *cidQueue) removeCid(cStr string) {

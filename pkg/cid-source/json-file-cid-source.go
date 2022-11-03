@@ -2,6 +2,7 @@ package cid_source
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"ipfs-cid-hoarder/pkg/config"
 	"os"
@@ -168,6 +169,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		if reflect.DeepEqual(pr, EncapsulatedJSONProviderRecord{}) {
 			break
 		}
+		fmt.Println(pr)
 		log.Debug(pr.CID)
 		newCid, err := cid.Parse(pr.CID)
 		if err != nil {
@@ -178,6 +180,12 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		newPid, err := peer.Decode(pr.ID)
 		if err != nil {
 			log.Errorf("could not convert string to pid %s", err)
+			continue
+		}
+		log.Debug(pr.Creator)
+		newCreator, err := peer.Decode(pr.Creator)
+		if err != nil {
+			log.Errorf("could not convert string to creator pid %s", err)
 			continue
 		}
 
@@ -191,8 +199,8 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 			multiaddresses = append(multiaddresses, multiaddr)
 		}
 
-		log.Infof("Read a new provider ID %s. The multiaddresses are %v.The new CID is %s", string(newPid), multiaddresses, newCid)
-		ProviderAndCidInstance := NewGetNewCidReturnType(newPid, newCid, multiaddresses)
+		log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
+		ProviderAndCidInstance := NewGetNewCidReturnType(newPid, newCid, newCreator, multiaddresses)
 
 		return ProviderAndCidInstance, nil
 	}

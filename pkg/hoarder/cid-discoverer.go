@@ -117,7 +117,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 		log.Errorf("couldnt parse cid")
 	}
 
-	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), discoverer.host.ID())
+	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), "")
 	fetchRes := models.NewCidFetchResults(cidIn, 0)
 
 	cidInfo.AddProvideTime(0)
@@ -138,6 +138,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 			true,
 			p2p.NoConnError,
 		)
+		cidInfo.AddCreator(val.Creator)
 		fetchRes.AddPRPingResults(pingRes)
 		useragent := discoverer.host.GetUserAgentOfPeer(val.ID)
 

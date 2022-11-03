@@ -1,0 +1,153 @@
+{
+ "ProviderRecords": [
+  {
+   "PeerID": "12D3KooWGrrQ7Yw7tqu4La8hrzYHoGeFm2r1MpApoWyPCf2kZ8Jq",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip4/144.91.90.25/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip4/144.91.90.25/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWQxknTxHkkBSQuRRtthYAZfjnq7krKjELyhkXwsW6rNzi",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/75.119.159.54/udp/4001/quic",
+    "/ip4/75.119.159.54/tcp/4001",
+    "/ip4/75.119.159.54/tcp/49079",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWJjydJCxFXMZK7Extz37F8fkUsLmiZnTWsGHsXXMSrhG5",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/3.145.75.78/udp/30008/quic",
+    "/ip4/3.145.75.78/tcp/30008",
+    "/ip4/172.31.7.172/tcp/30008",
+    "/ip4/127.0.0.1/tcp/30008",
+    "/ip4/127.0.0.1/udp/30008/quic",
+    "/ip4/172.31.7.172/udp/30008/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWRCGBfLCrmnm6S3oc1316f75NJdDofZ1rk9xM4EJaJ8qm",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/udp/30012/quic",
+    "/ip4/172.31.9.30/tcp/30012",
+    "/ip4/18.188.128.101/udp/30012/quic",
+    "/ip4/18.188.128.101/tcp/30012",
+    "/ip4/127.0.0.1/tcp/30012",
+    "/ip4/172.31.9.30/udp/30012/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWRTQroqgJSJBeMcSMCXEnxhwRxcy7rfm4NNXbULchFN2A",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/95.216.194.223/udp/15058/quic",
+    "/ip4/95.216.194.223/tcp/2614",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip4/95.216.194.223/tcp/4001",
+    "/ip4/95.216.194.223/udp/25387/quic",
+    "/ip4/127.0.0.1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWPwm1ziCuhfxbkJJojf1bDyZ7jgssmfyruFPZnXEZ16cA",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/45.76.170.241/udp/15196/quic",
+    "/ip4/45.76.170.241/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip4/45.76.170.241/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWN7bvbYUrKsHmV2jS5kap1hSBrbPensgDnuh5x5TPQdjo",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip6/::1/tcp/4001",
+    "/ip4/209.145.59.173/udp/17818/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/209.145.59.173/tcp/4001",
+    "/ip4/209.145.59.173/tcp/1219",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip4/209.145.59.173/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "QmRNw9ZimjSwujzS3euqSYxDW9EHDU5LB3NbLQ5vJ13hwJ",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/127.0.0.1/tcp/4011/ws",
+    "/ip4/3.134.197.203/tcp/4011/ws",
+    "/ip4/10.0.1.136/tcp/4010",
+    "/ip4/127.0.0.1/tcp/4010",
+    "/ip4/10.0.1.136/tcp/4011/ws"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWBkN67EbML1yvgm2HTR52p7i2sRbrKYMUbje9584ZMjfW",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/18.118.20.164/tcp/30013",
+    "/ip4/127.0.0.1/udp/30013/quic",
+    "/ip4/172.31.15.250/tcp/30013",
+    "/ip4/127.0.0.1/tcp/30013",
+    "/ip4/18.118.20.164/udp/30013/quic",
+    "/ip4/172.31.15.250/udp/30013/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWDxYT9C8avMrEcjMcFEgHKHs5T6YjrVPrrdR5MNuwJDf5",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip4/137.184.120.207/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip6/64:ff9b::89b8:78cf/tcp/4001",
+    "/ip4/137.184.120.207/udp/4001/quic",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic"
+   ]
+  },
+  {
+   "PeerID": "12D3KooWEzZNETDmsFRH1nrETvDZd4FAuKWw1o8UHNZ2r3PFmAZL",
+   "ContentID": "QmWZxR2KZhphr2MDXQrztjf5j84V6nNk24v4oGbzKH6RXb",
+   "Creator": "QmPebpVQf27oDwJN886Zp8dbFnsCBdrVBHNPeHepgLJ2Tr",
+   "PeerMultiaddresses": [
+    "/ip6/64:ff9b::341:edcd/udp/4001/quic",
+    "/ip4/172.31.40.182/tcp/4001",
+    "/ip4/172.31.40.182/udp/4001/quic",
+    "/ip4/3.65.237.205/tcp/4001",
+    "/ip4/127.0.0.1/tcp/4001",
+    "/ip6/::1/tcp/4001",
+    "/ip4/127.0.0.1/udp/4001/quic",
+    "/ip6/::1/udp/4001/quic",
+    "/ip4/3.65.237.205/udp/4001/quic",
+    "/ip6/64:ff9b::341:edcd/tcp/4001"
+   ]
+  }
+ ]
+}

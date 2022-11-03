@@ -13,6 +13,7 @@ type ProviderRecords struct {
 type EncapsulatedJSONProviderRecord struct {
 	ID        string   `json:"PeerID"`
 	CID       string   `json:"ContentID"`
+	Creator   string   `json:"Creator"`
 	Addresses []string `json:"PeerMultiaddresses"`
 }
 
@@ -22,10 +23,11 @@ type EncapsulatedJSONProviderRecord struct {
 //		CID     string
 //		Address ma.Multiaddr
 //	}
-func NewEncapsulatedJSONCidProvider(id string, cid string, addresses []string) EncapsulatedJSONProviderRecord {
+func NewEncapsulatedJSONCidProvider(id string, cid string, creator string, addresses []string) EncapsulatedJSONProviderRecord {
 	return EncapsulatedJSONProviderRecord{
 		ID:        id,
 		CID:       cid,
+		Creator:   creator,
 		Addresses: addresses,
 	}
 }

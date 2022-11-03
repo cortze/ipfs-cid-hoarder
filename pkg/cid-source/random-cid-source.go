@@ -1,13 +1,14 @@
 package cid_source
 
 import (
+	"ipfs-cid-hoarder/pkg/config"
+	"math/rand"
+
 	"github.com/ipfs/go-cid"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"ipfs-cid-hoarder/pkg/config"
-	"math/rand"
 )
 
 type RandomCidGen struct {
@@ -57,6 +58,6 @@ func (g *RandomCidGen) GetNewCid() (GetNewCidReturnType, error) {
 	}
 
 	log.Infof("generated new CID %s", contID.Hash().B58String())
-	ProvidersAndCidInstance := NewGetNewCidReturnType("", contID, make([]ma.Multiaddr, 0))
+	ProvidersAndCidInstance := NewGetNewCidReturnType("", contID, "", make([]ma.Multiaddr, 0))
 	return ProvidersAndCidInstance, nil
 }

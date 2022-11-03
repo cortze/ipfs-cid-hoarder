@@ -17,16 +17,18 @@ type CidSource interface {
 type GetNewCidReturnType struct {
 	ID        peer.ID        `json:"PeerID"`
 	CID       cid.Cid        `json:"ContentID"`
+	Creator   peer.ID        `json:"Creator"`
 	Content   []byte         `json:"Content"`
 	Addresses []ma.Multiaddr `json:"PeerMultiaddresses"`
 }
 
 var Undef = GetNewCidReturnType{}
 
-func NewGetNewCidReturnType(ID peer.ID, CID cid.Cid, Addresses []ma.Multiaddr) GetNewCidReturnType {
+func NewGetNewCidReturnType(ID peer.ID, CID cid.Cid, creator peer.ID, Addresses []ma.Multiaddr) GetNewCidReturnType {
 	return GetNewCidReturnType{
 		ID:        ID,
 		CID:       CID,
+		Creator:   creator,
 		Content:   make([]byte, 0),
 		Addresses: Addresses,
 	}
