@@ -113,9 +113,16 @@ func RunHoarder(ctx *cli.Context) error {
 		return errors.Wrap(err, "unable to generate config from arguments")
 	}
 
+	file, err := config.ParseLogOutput("text-file")
+
+	if err != nil {
+		return err
+	}
+
 	// set the logs configurations
 	log.SetFormatter(config.ParseLogFormatter("text"))
-	log.SetOutput(config.ParseLogOutput("terminal"))
+	log.SetOutput(file)
+	// log.SetOutput(config.ParseLogOutput("terminal"))
 	log.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
 	jsonConf, err := conf.JsonConfig()

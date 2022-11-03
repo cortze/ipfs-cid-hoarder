@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,12 +35,18 @@ func ParseLogLevel(lvl string) logrus.Level {
 }
 
 // parse Formatter from string
-func ParseLogOutput(lvl string) io.Writer {
+func ParseLogOutput(lvl string) (io.Writer, error) {
 	switch lvl {
 	case "terminal":
-		return os.Stdout
+		return os.Stdout, nil
+	case "text-file":
+		file, err := os.OpenFile("logs.txt", os.O_WRONLY|os.O_CREATE, 0755)
+		if err != nil {
+			return nil, errors.Wrap(err, " while creating/opening text file")
+		}
+		return file, nil
 	default:
-		return DefaultLogOutput
+		return DefaultLogOutput, nil
 	}
 }
 
