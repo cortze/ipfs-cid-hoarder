@@ -103,8 +103,9 @@ func (pinger *CidPinger) Run() {
 
 	pingOrchWG.Wait()
 	log.Infof("finished pinging the CIDs on %d rounds", pinger.rounds)
-	pinger.pingOrcDoneFlag = true
 	close(pinger.pingTaskC)
+	pinger.pingOrcDoneFlag = true
+	log.Info("closed pingTask channel and set pingOrcDoneFlag to true")
 	pingerWG.Wait()
 	log.Debug("done from the CID Pinger")
 	//close the publisher host
@@ -168,6 +169,8 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 				if paddrs.ID == c.Creator {
 					hasRecords = true
 					log.Info(time.Now(), "Peer", pAddr.ID.String(), "reporting on", c.CID.Hash().B58String(), " -> ", paddrs)
+				} else {
+					log.Debugf("Did not find creator for cid %s", c.CID.Hash().B58String())
 				}
 			}
 
@@ -298,7 +301,7 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 	logEntry.Debug("Initialized")
 	for {
 		// check if the ping orcherster has finished
-		if pinger.pingOrcDoneFlag && len(pinger.pingTaskC) == 0 {
+		if pinger.pingOrcDoneFlag {
 			logEntry.Info("no more pings to orchestrate, finishing worker")
 			return
 		}
@@ -316,7 +319,7 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 			}
 
 			// check if the ping orcherster has finished
-			if pinger.pingOrcDoneFlag && len(pinger.pingTaskC) == 0 {
+			if pinger.pingOrcDoneFlag {
 				logEntry.Info("no more pings to orchestrate, finishing worker")
 				return
 			}
