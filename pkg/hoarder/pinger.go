@@ -296,7 +296,7 @@ func (pinger *CidPinger) generatePingOrchester(pingOrchWG *sync.WaitGroup) {
 //	PRPingResults to the CidFetchRes field []*PRPingResults
 func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 	defer wg.Done()
-
+	minTimeT := time.NewTicker(minIterTime)
 	logEntry := log.WithField("pinger", pingerID)
 	logEntry.Debug("Initialized")
 	for {
@@ -407,6 +407,14 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 		case <-pinger.ctx.Done():
 			logEntry.Info("shutdown detected, closing pinger")
 			return
+		default:
+			// check if ticker for next iteration was raised
+			// check if the ping orcherster has finished
+			if pinger.pingOrcDoneFlag {
+				logEntry.Info("no more pings to orchestrate, finishing worker")
+				return
+			}
+			<-minTimeT.C
 		}
 	}
 }
