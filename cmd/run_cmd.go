@@ -113,7 +113,7 @@ func RunHoarder(ctx *cli.Context) error {
 		return errors.Wrap(err, "unable to generate config from arguments")
 	}
 
-	file, err := config.ParseLogOutput("text-file")
+	file, err := config.ParseLogOutput("terminal")
 
 	if err != nil {
 		return err

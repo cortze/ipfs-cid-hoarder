@@ -104,8 +104,8 @@ func (pinger *CidPinger) Run() {
 	pingOrchWG.Wait()
 	log.Infof("finished pinging the CIDs on %d rounds", pinger.rounds)
 	pinger.pingOrcDoneFlag = true
-	pingerWG.Wait()
 	close(pinger.pingTaskC)
+	pingerWG.Wait()
 	log.Debug("done from the CID Pinger")
 	//close the publisher host
 	err := pinger.host.Close()
@@ -305,8 +305,19 @@ func (pinger *CidPinger) createPinger(wg *sync.WaitGroup, pingerID int) {
 		select {
 		case cidInfo, ok := <-pinger.pingTaskC:
 
+			if cidInfo == nil {
+				logEntry.Warn("empty CID received from channel, finishing worker")
+				return
+			}
+
 			if !ok {
 				logEntry.Warn("empty CID received from channel, finishing worker")
+				return
+			}
+
+			// check if the ping orcherster has finished
+			if pinger.pingOrcDoneFlag && len(pinger.pingTaskC) == 0 {
+				logEntry.Info("no more pings to orchestrate, finishing worker")
 				return
 			}
 
