@@ -25,11 +25,6 @@ var RunCmd = &cli.Command{
 			DefaultText: "info",
 		},
 		&cli.StringFlag{
-			Name:    "priv-key",
-			Usage:   "Private key to initialize the host (to avoid generating node churn in the network)",
-			EnvVars: []string{"IPFS_CID_HOARDER_PRIV_KEY"},
-		},
-		&cli.StringFlag{
 			Name:        "database-endpoint",
 			Usage:       "database endpoint",
 			EnvVars:     []string{"IPFS_CID_HOARDER_DATABASE_ENDPOINT"},

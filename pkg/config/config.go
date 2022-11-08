@@ -56,7 +56,6 @@ var DefaultConfig = Config{
 
 // Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
-	PrivKey              string `json:"priv-key"`
 	LogLevel             string `json:"log-level"`
 	Database             string `json:"database-endpoint"`
 	CidSource            string `json:"cid-source"`
@@ -130,11 +129,6 @@ func (c *Config) JsonConfig() ([]byte, error) {
 func (c *Config) apply(ctx *cli.Context) {
 	// Check if the flags have been set
 	if ctx.Command.Name == "run" {
-		if ctx.IsSet("priv-key") {
-			c.PrivKey = ctx.String("priv-key")
-		} else {
-			c.PrivKey = DefaultConfig.PrivKey
-		}
 		if ctx.IsSet("log-level") {
 			c.LogLevel = ctx.String("log-level")
 		} else {
