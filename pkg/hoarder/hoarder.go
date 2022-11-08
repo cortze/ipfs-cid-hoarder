@@ -38,41 +38,27 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		return nil, errors.Wrap(err, "initialise the DB")
 	}
 
-	// Read or Generate Priv key for the host
-	genKey := true
-	if conf.PrivKey != "" {
-		priv, err = p2p.ParsePrivateKey(conf.PrivKey)
-		if err != nil {
-			log.Error("unable to parse PrivKey %s", conf.PrivKey)
-		} else {
-			genKey = false
-			log.Debugf("Readed PrivKey %s", p2p.PrivKeyToString(priv))
-		}
+	// generate private key for the publisher Libp2p host
+	pubprivk, _, err = crypto.GenerateKeyPair(crypto.Secp256k1, 256)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
 	}
-	if genKey {
-		// generate private and public keys for the Libp2p host
-		priv, _, err = crypto.GenerateKeyPair(crypto.Secp256k1, 256)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to generate priv key for client's host")
-		}
-		log.Debugf("Generated Priv Key for the host %s", p2p.PrivKeyToString(priv))
-	}
+	log.Debugf("Generated Priv Key for the host %s", p2p.PrivKeyToString(pubprivk))
 
-	// generate new fresh key for pinger host
-	priv2, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
+	// generate new priv key for pinger host
+	pingprivk, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to generate priv key for pinger's host")
 	}
 
 	// ----- Compose the Publisher or discoverer Libp2p host -----
-	pubordishost, err := p2p.NewHost(ctx, priv, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	pubordishost, err := p2p.NewHost(ctx, pubprivk, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating publisher or discoverer libp2p host for the tool")
 	}
 
 	// ----- Compose Pinger Libp2p Host -----
-
-	pingerHost, err := p2p.NewHost(ctx, priv2, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	pingerHost, err := p2p.NewHost(ctx, pingprivk, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating pinger libp2p host for the tool")
 	}
