@@ -29,7 +29,6 @@ type CidHoarder struct {
 }
 
 func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error) {
-	var priv crypto.PrivKey
 	var err error
 
 	// ----- Compose the DB client -----
@@ -39,7 +38,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}
 
 	// generate private key for the publisher Libp2p host
-	pubprivk, _, err = crypto.GenerateKeyPair(crypto.Secp256k1, 256)
+	pubprivk, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
 	}
@@ -90,8 +89,8 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	if err != nil {
 		return nil, errors.Wrap(err, " error generating the CID Tracker")
 	}
-	studyWG.Add(1)
 
+	studyWG.Add(1)
 	if conf.AlreadyPublishedCIDs {
 		cidTracker, err := NewCidTracker(ctx, &studyWG, pubordishost, dbInstance, cidSource, cidPinger, conf.K, conf.Workers, reqInterval, studyDuration)
 		if err != nil {

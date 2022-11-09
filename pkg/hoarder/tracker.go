@@ -2,7 +2,6 @@ package hoarder
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 type Tracker interface {
 	run()
 	//this should be run as a go routine
-	generateCids(genWG *sync.WaitGroup, GetNewCidReturnTypeChannel chan<- *src.GetNewCidReturnType)
+	generateCids(genWG *sync.WaitGroup, trackableCidC chan<- *src.TrackableCid)
 }
 
 // CidTracker composes the basic object that generates and publishes the set of CIDs defined in the configuration
@@ -36,20 +35,6 @@ type CidTracker struct {
 	Workers       int
 	ReqInterval   time.Duration
 	StudyDuration time.Duration
-}
-
-type CidPublisher struct {
-	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
-	CidMap sync.Map
-	//number of cids to publish
-	CidNumber int
-	*CidTracker
-}
-
-type CidDiscoverer struct {
-	*CidTracker
-	m      sync.Mutex
-	CidMap map[string][]*src.GetNewCidReturnType
 }
 
 //Creates a new:
@@ -97,24 +82,20 @@ func NewCidTracker(
 	}, nil
 }
 
-func (tracker *CidTracker) run() {
-
-}
-
 //Generates cids depending on the cid source
-func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, GetNewCidReturnTypeChannel chan<- *src.GetNewCidReturnType) {
+func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, trackableCidC chan<- *src.TrackableCid) {
 	defer genWG.Done()
 	for true {
 		cid, err := tracker.CidSource.GetNewCid()
-		if reflect.DeepEqual(cid, src.Undef) {
-			GetNewCidReturnTypeChannel <- &cid
-			close(GetNewCidReturnTypeChannel)
+		if cid.IsEmpty() {
+			trackableCidC <- &cid
+			close(trackableCidC)
 			break
 		}
 		if err != nil {
 			log.Errorf("error while getting new cid: %s", err)
 			return
 		}
-		GetNewCidReturnTypeChannel <- &cid
+		trackableCidC <- &cid
 	}
 }

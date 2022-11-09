@@ -2,7 +2,6 @@ package hoarder
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"time"
 
@@ -19,11 +18,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type CidDiscoverer struct {
+	*CidTracker
+	m      sync.Mutex
+	CidMap map[string][]*src.TrackableCid
+}
+
 func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 	log.Info("Creating a new CID discoverer")
 	return &CidDiscoverer{
 		CidTracker: tracker,
-		CidMap:     make(map[string][]*src.GetNewCidReturnType),
+		CidMap:     make(map[string][]*src.TrackableCid),
 	}, nil
 }
 
@@ -32,14 +37,14 @@ func (discoverer *CidDiscoverer) run() {
 	// launch the PRholder reading routine
 	//msgNotChannel := discoverer.MsgNot.GetNotifierChan()
 
-	getNewCidReturnTypeChannel := make(chan *src.GetNewCidReturnType, discoverer.Workers)
+	trackableCidC := make(chan *src.TrackableCid, discoverer.Workers)
 	// CID generator
 	var genWG sync.WaitGroup
 	genWG.Add(1)
-	go discoverer.generateCids(&genWG, getNewCidReturnTypeChannel)
+	go discoverer.generateCids(&genWG, trackableCidC)
 
 	var addProviderWG sync.WaitGroup
-	go discoverer.addProvider(&addProviderWG, getNewCidReturnTypeChannel)
+	go discoverer.addProvider(&addProviderWG, trackableCidC)
 	genWG.Wait()
 	addProviderWG.Wait()
 
@@ -60,39 +65,39 @@ func (discoverer *CidDiscoverer) run() {
 	}
 }
 
-func (discoverer *CidDiscoverer) addToMap(getNewCidReturnTypeInstance *src.GetNewCidReturnType) {
-	cidStr := getNewCidReturnTypeInstance.CID.Hash().B58String()
+func (discoverer *CidDiscoverer) addToMap(trackableCid *src.TrackableCid) {
+	cidStr := trackableCid.CID.Hash().B58String()
 	if typeInstance, ok := discoverer.CidMap[cidStr]; ok {
-		discoverer.CidMap[cidStr] = append(typeInstance, getNewCidReturnTypeInstance)
+		discoverer.CidMap[cidStr] = append(typeInstance, trackableCid)
 	} else {
-		arr := make([]*src.GetNewCidReturnType, 0)
-		arr = append(arr, getNewCidReturnTypeInstance)
+		arr := make([]*src.TrackableCid, 0)
+		arr = append(arr, trackableCid)
 		discoverer.CidMap[cidStr] = arr
 	}
 }
 
-func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, getNewCidReturnTypeChannel <-chan *src.GetNewCidReturnType) {
+func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trackableCidC <-chan *src.TrackableCid) {
 	defer addProviderWG.Done()
 	ctx := discoverer.ctx
 	for {
 		select {
-		case getNewCidReturnTypeInstance, ok := <-getNewCidReturnTypeChannel:
+		case trackableCid, ok := <-trackableCidC:
 			if !ok {
 				break
 			}
-			if reflect.DeepEqual(*getNewCidReturnTypeInstance, src.Undef) {
+			if trackableCid.IsEmpty() {
 				break
 			}
-			cidStr := getNewCidReturnTypeInstance.CID.Hash().B58String()
+			cidStr := trackableCid.CID.Hash().B58String()
 
 			log.Debugf(
 				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v",
-				cidStr, getNewCidReturnTypeInstance.ID.String(),
-				getNewCidReturnTypeInstance.Addresses,
+				cidStr, trackableCid.ID.String(),
+				trackableCid.Addresses,
 			)
 			discoverer.m.Lock()
-			discoverer.addToMap(getNewCidReturnTypeInstance)
-			err := addPeerToProviderStore(ctx, discoverer.host, getNewCidReturnTypeInstance.ID, getNewCidReturnTypeInstance.CID, getNewCidReturnTypeInstance.Addresses)
+			discoverer.addToMap(trackableCid)
+			err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 			if err != nil {
 				log.Errorf("error %s calling addpeertoproviderstore method", err)
 			}
@@ -108,7 +113,7 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, getN
 }
 
 //This method essentially initializes the data for the pinger to be able to get information about the PR holders later.
-func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, cidstr string, getNewCidReturnTypearr []*src.GetNewCidReturnType) {
+func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, cidstr string, trackableCidArr []*src.TrackableCid) {
 	defer discovererWG.Done()
 	//the starting values for the discoverer
 	cidIn, err := cid.Parse(cidstr)
@@ -125,7 +130,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	//TODO starting data for the discoverer
 	fetchRes.TotalHops = 0
 	fetchRes.HopsToClosest = 0
-	for _, val := range getNewCidReturnTypearr {
+	for _, val := range trackableCidArr {
 		//TODO discoverer starting ping res
 		pingRes := models.NewPRPingResults(
 			cidIn,

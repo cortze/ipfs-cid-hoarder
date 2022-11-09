@@ -3,7 +3,6 @@ package hoarder
 import (
 	"context"
 	src "ipfs-cid-hoarder/pkg/cid-source"
-	"reflect"
 	"sync"
 	"time"
 
@@ -16,6 +15,14 @@ import (
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	log "github.com/sirupsen/logrus"
 )
+
+type CidPublisher struct {
+	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
+	CidMap sync.Map
+	//number of cids to publish
+	CidNumber int
+	*CidTracker
+}
 
 func NewCidPublisher(tracker *CidTracker, h *p2p.Host, cidNum int) (*CidPublisher, error) {
 	log.Debug("Creating a new CID publisher")
@@ -30,34 +37,51 @@ func (publisher *CidPublisher) run() {
 	// launch the PRholder reading routine
 	msgNotChannel := publisher.MsgNot.GetNotifierChan()
 
+	// control variables
 	var firstCidFetchRes sync.Map
 
+	var genWG sync.WaitGroup
+	var publisherWG sync.WaitGroup
+	var msgNotWG sync.WaitGroup
+	var generationDone bool = false
+	var publicationDone bool = false
+
 	// generate a channel with the same size as the Workers one
-	getNewCidReturnTypeChannel := make(chan *src.GetNewCidReturnType, publisher.Workers)
+	trackableCidC := make(chan *src.TrackableCid, publisher.Workers)
 
 	// IPFS DHT Message Notification Listener
-	done := make(chan struct{})
-	go publisher.addProviderMsgListener(&firstCidFetchRes, done, msgNotChannel)
-	// CID generator
-	var genWG sync.WaitGroup
-	genWG.Add(1)
-	go publisher.generateCids(&genWG, getNewCidReturnTypeChannel)
+	msgNotWG.Add(1)
+	go publisher.addProviderMsgListener(&msgNotWG, &publicationDone, &firstCidFetchRes, msgNotChannel)
 
-	var publisherWG sync.WaitGroup
+	// CID generator
+	genWG.Add(1)
+	go publisher.generateCids(&genWG, trackableCidC)
 
 	// CID PR Publishers which are essentially the workers of tracker.
 	for publisherCounter := 0; publisherCounter < publisher.Workers; publisherCounter++ {
 		publisherWG.Add(1)
 		// start the providing process
-		go publisher.publishingProcess(&publisherWG, publisherCounter, getNewCidReturnTypeChannel, &firstCidFetchRes)
+		go publisher.publishingProcess(&publisherWG, &generationDone, publisherCounter, trackableCidC, &firstCidFetchRes)
 	}
+
+	// wait until the generation of the CIDs is done
 	genWG.Wait()
+	generationDone = true
+	log.Info("generation process finished successfully")
+
+	// wait until the publication of the CIDs is done
 	publisherWG.Wait()
-	done <- struct{}{}
+	publicationDone = true
+	log.Info("publication process finished successfully")
+
+	// wait until the msg not reader has ended
+	msgNotWG.Wait()
+	log.Info("msg notification channel finished successfully")
+
 	//close the publisher host
 	err := publisher.host.Close()
 	if err != nil {
-		log.Errorf("failed to close host: %s", err)
+		log.Errorf("failed to close publisher host: %s", err)
 		return
 	}
 }
@@ -88,19 +112,21 @@ func (publisher *CidPublisher) run() {
 //	cidInfo := models.NewCidInfo(*received_cid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 //	// generate the cidFetcher
 //	publisher.CidMap.Store(received_cidStr, cidInfo)
-func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map, done chan struct{}, msgNotChannel <-chan *p2p.MsgNotification) {
+func (publisher *CidPublisher) addProviderMsgListener(msgNotWg *sync.WaitGroup, publicationDone *bool, firstCidFetchRes *sync.Map, msgNotChannel <-chan *p2p.MsgNotification) {
+	defer func() {
+		// notify that the msg listener has been closed
+		msgNotWg.Done()
+	}()
 	for {
-		select {
-		case msgNot, ok := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
+		// check if we are done with the publication (with priority)
+		if *publicationDone && (len(msgNotChannel) == 0) {
+			log.Info("publication done and not missing sent msgs to check, closing msgNotChannel")
+			return
+		}
 
-			if !ok {
-				log.Warn("msg Not channel is closed, closing reader for PR holders")
-				return
-			}
-			if msgNot == nil {
-				log.Warn("empty msgNot Received, closing reader for PR Holders")
-				return
-			}
+		select {
+		case msgNot := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
+			// check the msg type
 			casted_cid, err := cid.Cast(msgNot.Msg.GetKey())
 			if err != nil {
 				log.Errorf("unable to cast msg key into cid. %s", err.Error())
@@ -161,16 +187,14 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 				}
 
 			default:
-				//log.Debugf("msg is not ADD_PROVIDER msg. It is of type %s", msgNot.Msg.Type.String())
+				// the message that we tracked is not ADD_PROVIDER, skipping
 			}
 
 		case <-publisher.ctx.Done():
 			log.Info("context has been closed, finishing Cid Tracker")
 			return
-
-		case <-done:
-			log.Info("all the CIDs have been generated")
-			return
+		default:
+			// if there is no msg to check and ctx is still active, check if we have finished
 		}
 	}
 }
@@ -203,26 +227,25 @@ func (publisher *CidPublisher) addProviderMsgListener(firstCidFetchRes *sync.Map
 //7.) Adds the cid info to the tracker's:
 //		CidPinger *CidPinger
 //to be later pinged by the pinger.
-func (publisher *CidPublisher) publishingProcess(publisherWG *sync.WaitGroup, publisherID int, cidChannel <-chan *src.GetNewCidReturnType, cidFetchRes *sync.Map) {
-	defer publisherWG.Done()
+func (publisher *CidPublisher) publishingProcess(
+	publisherWG *sync.WaitGroup,
+	generationDone *bool,
+	publisherID int,
+	cidChannel <-chan *src.TrackableCid,
+	cidFetchRes *sync.Map) {
+	defer func() {
+		publisherWG.Done()
+	}()
 	logEntry := log.WithField("publisherID", publisherID)
-	ctx := publisher.ctx
 	logEntry.Debugf("publisher ready")
 	for {
-
+		// check if the generation is done to finish the publisher (with priority)
+		if *generationDone && len(cidChannel) == 0 {
+			log.Info("generation process has finished and no cid is waiting to be published, closing publishingProcess")
+			return
+		}
 		select {
-		case receivedType, ok := <-cidChannel: //this channel receives the CID from the CID generator go routine
-
-			if !ok {
-				log.Warn("Cid channel has been closed")
-				return
-			}
-
-			if reflect.DeepEqual(*receivedType, src.Undef) {
-				log.Warn("Received undef type from cid channel")
-				return
-			}
-
+		case receivedType := <-cidChannel: //this channel receives the CID from the CID generator go routine
 			receivedCid := &receivedType.CID
 			logEntry.Debugf("new cid to publish %s", receivedCid.Hash().B58String())
 			receivedCidStr := receivedCid.Hash().B58String()
@@ -282,6 +305,8 @@ func (publisher *CidPublisher) publishingProcess(publisherWG *sync.WaitGroup, pu
 		case <-ctx.Done():
 			logEntry.WithField("publisherID", publisherID).Debugf("shutdown detected, closing publisher")
 			return
+		default:
+			// keep checking if the generation has ended to close the routine
 		}
 	}
 }
