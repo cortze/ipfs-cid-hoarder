@@ -73,7 +73,7 @@ func TestGetNewCidSimpleJSON(t *testing.T) {
 	}
 	for true {
 		tp, err := file.GetNewCid()
-		if reflect.DeepEqual(tp, Undef) {
+		if reflect.DeepEqual(tp, TrackableCid{}) {
 			break
 		}
 		if err != nil {
@@ -92,7 +92,7 @@ func TestGetNewCidEncodedJSON(t *testing.T) {
 	}
 	for true {
 		tp, err := file.GetNewCid()
-		if reflect.DeepEqual(tp, Undef) {
+		if reflect.DeepEqual(tp, TrackableCid{}) {
 			break
 		}
 		if err != nil {
@@ -104,23 +104,23 @@ func TestGetNewCidEncodedJSON(t *testing.T) {
 }
 
 func TestJsonFileCIDSource_GetNewCidWithChannel(t *testing.T) {
-	GetNewCidReturnTypeChannel := make(chan *GetNewCidReturnType, 10)
+	TrackableCidChannel := make(chan *TrackableCid, 10)
 	var genWG sync.WaitGroup
-	go routineForReceivingFromChannel(GetNewCidReturnTypeChannel, &genWG)
+	go routineForReceivingFromChannel(TrackableCidChannel, &genWG)
 	file, err := OpenSimpleJSONFile("C:\\Users\\fotis\\GolandProjects\\ipfs-cid-hoarder\\examplejsonfiles\\providers.json")
 	if err != nil {
 		t.Errorf("error %s while opening json file", err)
 	}
 	for true {
 		cid, err := file.GetNewCid()
-		if reflect.DeepEqual(cid, Undef) {
+		if reflect.DeepEqual(cid, TrackableCid{}) {
 			break
 		}
 		if err != nil {
 			t.Errorf("error %s while generating random cid", err)
 		}
-		GetNewCidReturnTypeChannel <- &cid
+		TrackableCidChannel <- &cid
 	}
-	close(GetNewCidReturnTypeChannel)
+	close(TrackableCidChannel)
 	genWG.Wait()
 }

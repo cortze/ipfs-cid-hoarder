@@ -85,9 +85,9 @@ var RunCmd = &cli.Command{
 			DefaultText: "false",
 		},
 		&cli.StringFlag{
-			Name:        "name-of-config-json-file",
+			Name:        "config-file",
 			Usage:       "reads a config struct from the specified json file",
-			EnvVars:     []string{"IPFS_CID_HOARDER_NAME_CONFIG_JSON_FILE"},
+			EnvVars:     []string{"IPFS_CID_HOARDER_CONFIG_FILE"},
 			DefaultText: "config.json",
 		},
 		&cli.BoolFlag{

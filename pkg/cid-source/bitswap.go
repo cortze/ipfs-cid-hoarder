@@ -15,7 +15,7 @@ func (bitswap_cid_source *BitswapCIDSource) Type() string {
 	return config.BitswapSource
 }
 
-func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (GetNewCidReturnType, error) {
+func (bitswap_cid_source *BitswapCIDSource) GetNewCid() (TrackableCid, error) {
 	//TODO function that reads bitswap content
-	return Undef, nil
+	return TrackableCid{}, nil
 }

@@ -22,7 +22,7 @@ type RandomCidGen struct {
 func NewRandomCidGen(contentSize int, limit int) *RandomCidGen {
 	return &RandomCidGen{
 		contentSize:   contentSize,
-		cidsGenerated: 1,
+		cidsGenerated: 0,
 		limit:         limit,
 	}
 }
@@ -33,9 +33,9 @@ func (g *RandomCidGen) Type() string {
 
 // TODO: is it worth keeping the content?
 // getRandomContent returns generates an array of random bytes with the given size and the composed CID of the content
-func (g *RandomCidGen) GetNewCid() (GetNewCidReturnType, error) {
+func (g *RandomCidGen) GetNewCid() (TrackableCid, error) {
 	if g.cidsGenerated >= g.limit {
-		return Undef, errors.New("done generating cids")
+		return TrackableCid{}, errors.New("done generating cids")
 	}
 	g.cidsGenerated++
 	// generate random bytes
@@ -54,10 +54,10 @@ func (g *RandomCidGen) GetNewCid() (GetNewCidReturnType, error) {
 	// get the CID of the content we just generated
 	contID, err := pref.Sum(content)
 	if err != nil {
-		return Undef, errors.Wrap(err, "composing CID")
+		return TrackableCid{}, errors.Wrap(err, "composing CID")
 	}
 
 	log.Infof("generated new CID %s", contID.Hash().B58String())
-	ProvidersAndCidInstance := NewGetNewCidReturnType("", contID, "", make([]ma.Multiaddr, 0))
+	ProvidersAndCidInstance := NewTrackableCid("", contID, "", make([]ma.Multiaddr, 0))
 	return ProvidersAndCidInstance, nil
 }

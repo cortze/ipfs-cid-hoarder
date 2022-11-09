@@ -10,9 +10,9 @@ import (
 func TestRandomCidGen_GetNewCid(t *testing.T) {
 	randomgen := NewRandomCidGen(6, 8)
 	i := 0
-	for true {
+	for {
 		cid, err := randomgen.GetNewCid()
-		if reflect.DeepEqual(cid, Undef) {
+		if reflect.DeepEqual(cid, TrackableCid{}) {
 			break
 		}
 		if err != nil {
@@ -25,32 +25,32 @@ func TestRandomCidGen_GetNewCid(t *testing.T) {
 }
 
 func TestRandomCidGen_GetNewCidWithChannel(t *testing.T) {
-	GetNewCidReturnTypeChannel := make(chan *GetNewCidReturnType, 10)
+	TrackableCidChannel := make(chan *TrackableCid, 10)
 	var genWG sync.WaitGroup
-	go routineForReceivingFromChannel(GetNewCidReturnTypeChannel, &genWG)
+	go routineForReceivingFromChannel(TrackableCidChannel, &genWG)
 	randomgen := NewRandomCidGen(6, 8)
 	i := 0
-	for true {
+	for {
 		cid, err := randomgen.GetNewCid()
-		if reflect.DeepEqual(cid, Undef) {
+		if reflect.DeepEqual(cid, TrackableCid{}) {
 			break
 		}
 		if err != nil {
 			t.Errorf("error %s while generating random cid", err)
 		}
-		GetNewCidReturnTypeChannel <- &cid
+		TrackableCidChannel <- &cid
 	}
-	close(GetNewCidReturnTypeChannel)
+	close(TrackableCidChannel)
 	genWG.Wait()
 	if i > randomgen.limit {
 		t.Errorf("i bigger than limit")
 	}
 }
 
-func routineForReceivingFromChannel(GetNewCidReturnTypeChannel <-chan *GetNewCidReturnType, genWG *sync.WaitGroup) {
+func routineForReceivingFromChannel(TrackableCidChannel <-chan *TrackableCid, genWG *sync.WaitGroup) {
 	genWG.Add(1)
 	defer genWG.Done()
-	for elem := range GetNewCidReturnTypeChannel {
+	for elem := range TrackableCidChannel {
 		fmt.Print("received new element: ")
 		fmt.Println(elem)
 	}

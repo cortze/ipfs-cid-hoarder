@@ -163,7 +163,7 @@ func (fileCIDSource *JsonFileCIDSource) nextEncapsulatedJSONProviderRecord() fun
 }
 
 //Returns the json records read from the file when creating the file_cid_source instance.
-func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error) {
+func (fileCIDSource *JsonFileCIDSource) GetNewCid() (TrackableCid, error) {
 	for true {
 		pr := fileCIDSource.iter()
 		if reflect.DeepEqual(pr, EncapsulatedJSONProviderRecord{}) {
@@ -200,11 +200,11 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (GetNewCidReturnType, error)
 		}
 
 		log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
-		ProviderAndCidInstance := NewGetNewCidReturnType(newPid, newCid, newCreator, multiaddresses)
+		ProviderAndCidInstance := NewTrackableCid(newPid, newCid, newCreator, multiaddresses)
 
 		return ProviderAndCidInstance, nil
 	}
-	return Undef, errors.New("end of provider records")
+	return TrackableCid{}, errors.New("end of provider records")
 }
 
 //TODO type returning a string is not a good idea
