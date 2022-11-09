@@ -302,7 +302,7 @@ func (publisher *CidPublisher) publishingProcess(
 			// send the cid_info to the cid_pinger adn start pinging PR Holders
 			publisher.CidPinger.AddCidInfo(cidInfo)
 
-		case <-ctx.Done():
+		case <-publisher.ctx.Done():
 			logEntry.WithField("publisherID", publisherID).Debugf("shutdown detected, closing publisher")
 			return
 		default:
