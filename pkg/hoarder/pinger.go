@@ -111,17 +111,11 @@ func (pinger *CidPinger) Run() {
 	pingerWG.Wait()
 	log.Debug("done from the CID Pinger")
 
-	//close the pinger host
-	err := pinger.host.Close()
-	if err != nil {
-		log.Errorf("failed to close host: %s", err)
-		return
-	}
 	// close all the pending channels
 	close(pinger.pingTaskC)
 
 	//close the publisher host
-	err = pinger.host.Close()
+	err := pinger.host.Close()
 	if err != nil {
 		log.Errorf("failed to close pinger host: %s", err)
 		return

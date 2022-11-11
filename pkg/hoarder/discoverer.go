@@ -48,6 +48,7 @@ func (discoverer *CidDiscoverer) run() {
 	genWG.Wait()
 	addProviderWG.Wait()
 
+	log.Debugf("Number of cids read from the file was: %d", len(discoverer.CidMap))
 	var discovererWG sync.WaitGroup
 
 	for cidstr, getNewCidReturnTypeArray := range discoverer.CidMap {
@@ -57,12 +58,13 @@ func (discoverer *CidDiscoverer) run() {
 
 	discovererWG.Wait()
 	//close(msgNotChannel)
-	log.Debug("CLOSED NOT CHANNEL")
+	//log.Debug("CLOSED NOT CHANNEL")
 	err := discoverer.host.Close()
 	if err != nil {
 		log.Errorf("failed to close host: %s", err)
 		return
 	}
+	log.Debug("Closed the discoverer host")
 }
 
 func (discoverer *CidDiscoverer) addToMap(trackableCid *src.TrackableCid) {
@@ -88,6 +90,7 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 			if trackableCid.IsEmpty() {
 				break
 			}
+
 			cidStr := trackableCid.CID.Hash().B58String()
 
 			log.Debugf(
