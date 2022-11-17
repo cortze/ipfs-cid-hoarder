@@ -148,12 +148,11 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 		)
 		cidInfo.AddCreator(val.Creator)
 		fetchRes.AddPRPingResults(pingRes)
-		useragent := discoverer.host.GetUserAgentOfPeer(val.ID)
 
 		prHolderInfo := models.NewPeerInfo(
 			val.ID,
 			discoverer.host.Peerstore().Addrs(val.ID),
-			useragent,
+			val.UserAgent,
 		)
 
 		cidInfo.AddPRHolder(prHolderInfo)
