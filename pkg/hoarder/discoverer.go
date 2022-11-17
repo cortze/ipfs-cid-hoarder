@@ -100,10 +100,22 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 			)
 			discoverer.m.Lock()
 			discoverer.addToMap(trackableCid)
+
 			err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 			if err != nil {
 				log.Errorf("error %s calling addpeertoproviderstore method", err)
+			} else {
+				log.Debug("Added providers to provider store")
 			}
+
+			err = addAgentVersionToProvideStore(discoverer.host, trackableCid.ID, trackableCid.UserAgent)
+
+			if err != nil {
+				log.Errorf("error %s calling addAgentVersionToProvideStore", err)
+			} else {
+				log.Debug("Added agent version to provider store")
+			}
+
 			discoverer.m.Unlock()
 
 		case <-ctx.Done():
@@ -149,10 +161,12 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 		cidInfo.AddCreator(val.Creator)
 		fetchRes.AddPRPingResults(pingRes)
 
+		log.Debugf("User agent received from provider store: %s", discoverer.host.GetUserAgentOfPeer(val.ID))
+
 		prHolderInfo := models.NewPeerInfo(
 			val.ID,
 			discoverer.host.Peerstore().Addrs(val.ID),
-			val.UserAgent,
+			discoverer.host.GetUserAgentOfPeer(val.ID),
 		)
 
 		cidInfo.AddPRHolder(prHolderInfo)
@@ -188,4 +202,8 @@ func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid c
 		return errors.Wrap(err, " while trying to add provider to peerstore")
 	}
 	return nil
+}
+
+func addAgentVersionToProvideStore(h *p2p.Host, pid peer.ID, useragent string) error {
+	return h.Peerstore().Put(pid, "AgentVersion", useragent)
 }
