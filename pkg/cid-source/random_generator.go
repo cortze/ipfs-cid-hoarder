@@ -58,6 +58,6 @@ func (g *RandomCidGen) GetNewCid() (TrackableCid, error) {
 	}
 
 	log.Infof("generated new CID %s", contID.Hash().B58String())
-	ProvidersAndCidInstance := NewTrackableCid("", contID, "", make([]ma.Multiaddr, 0))
+	ProvidersAndCidInstance := NewTrackableCid("", contID, "", make([]ma.Multiaddr, 0), 0, "")
 	return ProvidersAndCidInstance, nil
 }

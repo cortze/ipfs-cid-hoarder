@@ -169,6 +169,7 @@ func (publisher *CidPublisher) addProviderMsgListener(msgNotWg *sync.WaitGroup, 
 				}
 
 				useragent := publisher.host.GetUserAgentOfPeer(msgNot.RemotePeer)
+				log.Debugf("User agent is: %s", useragent)
 
 				// Generate the new PeerInfo struct for the new PRHolder
 				prHolderInfo := models.NewPeerInfo(

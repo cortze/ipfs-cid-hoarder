@@ -94,9 +94,9 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 			cidStr := trackableCid.CID.Hash().B58String()
 
 			log.Debugf(
-				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v",
+				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v,ProvideTime:%s,UserAgent:%s",
 				cidStr, trackableCid.ID.String(),
-				trackableCid.Addresses,
+				trackableCid.Addresses, trackableCid.ProvideTime, trackableCid.UserAgent,
 			)
 			discoverer.m.Lock()
 			discoverer.addToMap(trackableCid)
@@ -128,12 +128,12 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), "")
 	fetchRes := models.NewCidFetchResults(cidIn, 0)
 
-	cidInfo.AddProvideTime(0)
 	// generate a new CidFetchResults
 	//TODO starting data for the discoverer
 	fetchRes.TotalHops = 0
 	fetchRes.HopsToClosest = 0
 	for _, val := range trackableCidArr {
+		cidInfo.AddProvideTime(val.ProvideTime)
 		//TODO discoverer starting ping res
 		pingRes := models.NewPRPingResults(
 			cidIn,

@@ -2,11 +2,11 @@ package cid_source
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"ipfs-cid-hoarder/pkg/config"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -169,25 +169,39 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (TrackableCid, error) {
 		if reflect.DeepEqual(pr, EncapsulatedJSONProviderRecord{}) {
 			break
 		}
-		fmt.Println(pr)
-		log.Debug(pr.CID)
+
+		log.Debug("Read a new PR:")
+
+		log.Debugf("It's cid is: %s", pr.CID)
 		newCid, err := cid.Parse(pr.CID)
 		if err != nil {
 			log.Errorf("could not convert string to cid %s", err)
 			continue
 		}
-		log.Debug(pr.ID)
+
+		log.Debugf("It's peer id is: %s", pr.ID)
 		newPid, err := peer.Decode(pr.ID)
 		if err != nil {
 			log.Errorf("could not convert string to pid %s", err)
 			continue
 		}
-		log.Debug(pr.Creator)
+
+		log.Debugf("It's creator is: %s", pr.Creator)
 		newCreator, err := peer.Decode(pr.Creator)
 		if err != nil {
 			log.Errorf("could not convert string to creator pid %s", err)
 			continue
 		}
+
+		log.Debugf("It's provide time is: %s", pr.ProvideTime)
+		newProvideTime, err := time.ParseDuration(pr.ProvideTime)
+
+		if err != nil {
+			log.Errorf("Error while parsing time: %s", err)
+			continue
+		}
+
+		log.Debugf("It's user agent is: %s", pr.UserAgent)
 
 		multiaddresses := make([]ma.Multiaddr, 0)
 		for i := 0; i < len(pr.Addresses); i++ {
@@ -199,8 +213,10 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (TrackableCid, error) {
 			multiaddresses = append(multiaddresses, multiaddr)
 		}
 
+		log.Infof("generated new CID %s", newCid.Hash().B58String())
+
 		log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
-		ProviderAndCidInstance := NewTrackableCid(newPid, newCid, newCreator, multiaddresses)
+		ProviderAndCidInstance := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newProvideTime, pr.UserAgent)
 
 		return ProviderAndCidInstance, nil
 	}
