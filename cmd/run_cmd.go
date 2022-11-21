@@ -33,7 +33,7 @@ var RunCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:        "cid-source",
-			Usage:       "defines the mode where we want to run the tool [random-content-gen, text-file, bitswap]",
+			Usage:       "defines the mode where we want to run the tool [random-content-gen, text-file, json-file,bitswap]",
 			DefaultText: "text",
 		},
 		&cli.StringFlag{
@@ -86,7 +86,7 @@ var RunCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:        "config-file",
-			Usage:       "reads a config struct from the specified json file",
+			Usage:       "reads a config struct from the specified json file(not yet tested might not work)",
 			EnvVars:     []string{"IPFS_CID_HOARDER_CONFIG_FILE"},
 			DefaultText: "config.json",
 		},
