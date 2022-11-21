@@ -196,6 +196,12 @@ The script is divided in three main stages:
 2. Analyzing the reply of those peers sharing the PRs during the DHT lookup over the study
 3. Analyzing the final result of the DHT lookup over the study
 
+## Contribution of the tool in studies
+
+- [Rfm 17](https://github.com/protocol/network-measurements/pull/16)
+
+- [Rfm 17.1](https://github.com/protocol/network-measurements/pull/22)
+
 # Install
 
 ## Requirements
