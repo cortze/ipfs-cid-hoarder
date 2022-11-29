@@ -30,7 +30,6 @@ var PprofPort = "9020"
 
 // Hardcoded variables for the cli host
 var CliIp string = "0.0.0.0"
-var CliPort string = "9010"
 var UserAgent string = "BSC-Cid-Hoarder"
 
 // Blacklisting UserAgents
@@ -38,6 +37,7 @@ var DefaultBlacklistUserAgent = "hydra-booster"
 
 // default configuration
 var DefaultConfig = Config{
+	Port: "9010",
 	LogLevel:             "info",
 	Database:             "./data/ipfs-hoarder-db.db",
 	ConfigJsonFile:       "config.json",
@@ -56,6 +56,7 @@ var DefaultConfig = Config{
 
 // Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
+	Port string `json:"port"`
 	LogLevel             string `json:"log-level"`
 	Database             string `json:"database-endpoint"`
 	CidSource            string `json:"cid-source"`
@@ -129,6 +130,11 @@ func (c *Config) JsonConfig() ([]byte, error) {
 func (c *Config) apply(ctx *cli.Context) {
 	// Check if the flags have been set
 	if ctx.Command.Name == "run" {
+		if ctx.IsSet("port") {
+			c.Port = ctx.String("port")
+		} else {
+			c.Port = DefaultConfig.Port
+		}
 		if ctx.IsSet("log-level") {
 			c.LogLevel = ctx.String("log-level")
 		} else {

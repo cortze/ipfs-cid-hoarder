@@ -51,13 +51,13 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}
 
 	// ----- Compose the Publisher or discoverer Libp2p host -----
-	pubordishost, err := p2p.NewHost(ctx, pubprivk, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	pubordishost, err := p2p.NewHost(ctx, pubprivk, config.CliIp, conf.Port, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating publisher or discoverer libp2p host for the tool")
 	}
 
 	// ----- Compose Pinger Libp2p Host -----
-	pingerHost, err := p2p.NewHost(ctx, pingprivk, config.CliIp, config.CliPort, conf.K, conf.HydraFilter)
+	pingerHost, err := p2p.NewHost(ctx, pingprivk, config.CliIp, conf.Port, conf.K, conf.HydraFilter)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating pinger libp2p host for the tool")
 	}

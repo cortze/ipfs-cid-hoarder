@@ -82,7 +82,7 @@ func RunLightCrawler(ctx context.Context, balcklistingUA string) (CrawlResults, 
 	}
 
 	// Initialize the CidHoarder
-	c, err := New(ctx, priv, config.CliIp, config.CliPort, balcklistingUA)
+	c, err := New(ctx, priv, config.CliIp, config.DefaultConfig.Port, balcklistingUA)
 	if err != nil {
 		return CrawlResults{}, err
 	}
