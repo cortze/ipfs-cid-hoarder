@@ -22,8 +22,9 @@ type PeerInfo struct {
 	// TODO: Is there anything else to add?
 }
 
-//Creates a new:
-// 	type PeerInfo struct {
+// Creates a new:
+//
+//	type PeerInfo struct {
 //		ID        peer.ID
 //		MultiAddr []ma.Multiaddr
 //		UserAgent string
@@ -67,6 +68,8 @@ func FilterClientType(userAgent string) (string, string) {
 	fields := strings.Split(userAgentLower, "/")
 	if strings.Contains(userAgentLower, "rust-libp2p") {
 		return "rust-client", cleanVersion(getVersionIfAny(fields, 1))
+	} else if strings.Contains(userAgentLower, "kubo") {
+		return "kubo", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "go-ipfs") {
 		return "go-ipfs", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "hydra") {
