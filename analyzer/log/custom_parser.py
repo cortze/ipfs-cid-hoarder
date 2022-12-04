@@ -175,7 +175,7 @@ class LogFile():
 
     def analyze_logs(self):
 
-        with open(self.file_name, encoding="utf-8") as f:
+        with open(self.file_name) as f:
             lines = f.readlines()
 
         for i, line in enumerate(lines):
@@ -187,10 +187,10 @@ class LogFile():
 
                 if log_type == cid_generation:
                     cid, gen_time = log_line.parse_gen_log()
-
-                    # Generate new CID obj
-                    cid_obj = CID(cid, gen_time)
-                    self.cid_map[cid] = cid_obj
+                    if cid not in self.cid_map:
+                        # Generate new CID obj
+                        cid_obj = CID(cid, gen_time)
+                        self.cid_map[cid] = cid_obj
                     continue
 
                 elif log_type == finish:
@@ -400,20 +400,20 @@ def test_log_parser():
     log9 = LogLine(
         "2022-11-30 04:46:16.503568489 +0000 UTC m=+1819.831759219 Providers for QmR6Mt62hM2BLvCuw83Xrhh1s1tALYqbQ4m8svbm2Dvzvp -> []")
     cid, time, status = log9.parse_lookup()
-    print("\n empty providers")
+    print("\n empty providers ")
     print(log9.raw_line)
     print(cid, time, status)
 
 
 def main():
-    """ log_file = "/home/cortze/devel/cortze/ipfs-cid-hoarder/parsed_logs.txt" """
+    log_file = "../logs.txt"
 
-    """ lfile = LogFile(log_file)
-    lfile.analyze_logs() """
-    test_log_parser()
+    lfile = LogFile(log_file)
+    lfile.analyze_logs()
+    """ test_log_parser() """
 
-    """ print(
-        lfile.cid_map["QmTJNoEqpg7A7hz4g2bWqTB16iLaeLfW7b76bov73x6DqC"].ping_rounds[9].summary()) """
+    print(
+        lfile.cid_map["QmTJNoEqpg7A7hz4g2bWqTB16iLaeLfW7b76bov73x6DqC"].ping_rounds[9].summary())
 
 
 if __name__ == "__main__":
