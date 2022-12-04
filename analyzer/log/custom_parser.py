@@ -175,7 +175,7 @@ class LogFile():
 
     def analyze_logs(self):
 
-        with open(self.file_name) as f:
+        with open(self.file_name, encoding="utf-8") as f:
             lines = f.readlines()
 
         for i, line in enumerate(lines):
