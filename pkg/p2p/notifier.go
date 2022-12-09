@@ -3,8 +3,8 @@ package p2p
 import (
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 //This is the struct type received and send by the notifier's channel.
