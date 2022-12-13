@@ -10,8 +10,8 @@ import (
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/peer"
 	log "github.com/sirupsen/logrus"
 )
 

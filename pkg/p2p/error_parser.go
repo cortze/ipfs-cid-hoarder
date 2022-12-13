@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
-	swarm "github.com/libp2p/go-libp2p-swarm"
+	swarm "github.com/libp2p/go-libp2p/p2p/net/swarm"
 )
 
 const (
@@ -38,7 +38,7 @@ const (
 )
 
 var KnownErrors = map[string]string{
-	DialBlacklistedPeer:                                  net.ErrBlacklistedPeer.Error(),
+	DialBlacklistedPeer:                                 net.ErrBlacklistedPeer.Error(),
 	DialErrorIoTimeout:                                  "i/o timeout",
 	DialErrorConnectionRefused:                          "connection refused",
 	DialErrorProtocolNotSupported:                       "protocol not supported",

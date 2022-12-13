@@ -13,7 +13,7 @@ import (
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )

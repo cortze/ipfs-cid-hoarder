@@ -5,7 +5,7 @@ import (
 	"time"
 
 	cid "github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // CidInfo contains the basic information of the CID to track.

@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/protocol"
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // MessageSender handles sending wire protocol messages to a given peer
