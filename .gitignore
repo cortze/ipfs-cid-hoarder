@@ -5,9 +5,11 @@ build/
 data/*
 
 # Dismiss python cached stuff and venv
+__pycache__/
 .ipynb_checkpoints/
 analyzer/.ipynb_checkpoints/
 analyzer/venv/
+logs/
 
 # Igonore the .vscode configuration
 .vscode
