@@ -18,6 +18,7 @@ const (
 const (
 	// list errors
 	NoConnError                                         = "none"
+	DialBackoff                                         = "backoff"
 	DialBlacklistedPeer                                 = "hydra_booster_peer"
 	DialErrorIoTimeout                                  = "io_timeout"
 	DialErrorConnectionRefused                          = "connection_refused"
@@ -38,6 +39,7 @@ const (
 )
 
 var KnownErrors = map[string]string{
+	DialBackoff:                                         "backoff",
 	DialBlacklistedPeer:                                 net.ErrBlacklistedPeer.Error(),
 	DialErrorIoTimeout:                                  "i/o timeout",
 	DialErrorConnectionRefused:                          "connection refused",

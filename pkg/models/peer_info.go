@@ -69,6 +69,8 @@ func FilterClientType(userAgent string) (string, string) {
 		return "rust-client", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "go-ipfs") {
 		return "go-ipfs", cleanVersion(getVersionIfAny(fields, 1))
+	} else if strings.Contains(userAgentLower, "kubo") {
+		return "kubo", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "hydra") {
 		return "hydra-booster", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "ioi") {

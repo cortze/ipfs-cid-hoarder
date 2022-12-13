@@ -16,11 +16,10 @@ import (
 )
 
 const (
-	LookupTimeout   = 10 * time.Second
-	DialTimeout     = 20 * time.Second
+	LookupTimeout   = time.Minute
 	minIterTime     = 500 * time.Millisecond
 	maxDialAttempts = 3 // Are three attempts enough?
-	dialGraceTime   = 10 * time.Second
+	dialGraceTime   = time.Minute
 )
 
 // CidPinger is the main object to schedule and monitor all the CID related metrics
@@ -140,10 +139,7 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 	var active, hasRecords bool
 	var connError string
 
-	// connect the peer
-	pingCtx, cancel := context.WithTimeout(pinger.ctx, DialTimeout)
-	defer cancel()
-
+	// track time of the process
 	tstart := time.Now()
 
 	// fulfill the control fields from a successful connection
@@ -184,7 +180,7 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 		// loop over max tries if the connection is connection refused/ connection reset by peer
 		for att := 0; att < maxDialAttempts; att++ {
 			// attempt to connect the peer
-			err := pinger.host.Connect(pingCtx, pAddr)
+			err := pinger.host.Connect(pinger.ctx, pAddr)
 			if err != nil {
 				logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.CID.Hash().B58String(), err.Error())
 				connError = p2p.ParseConError(err)

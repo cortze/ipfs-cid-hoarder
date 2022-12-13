@@ -3,7 +3,6 @@ package p2p
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,14 +17,18 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 
-	//quic "github.com/libp2p/go-libp2p-quic-transport"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
+)
+
+const (
+	DialTimeout = time.Minute
 )
 
 type Host struct {
@@ -41,8 +44,22 @@ type Host struct {
 func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int, hydraFilter bool) (*Host, error) {
 	log.Debug("Creating host")
 
-	// set the max limit of connections to 30000
-	os.Setenv("LIBP2P_SWARM_FD_LIMIT", "30000")
+	// Configure the main ctx of the tool to have:
+	// - no resource limits
+	// - prevention against dial backoffs
+	// - dial timeouts
+
+	ctx = network.WithDialPeerTimeout(ctx, DialTimeout)
+
+	// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
+	ctx = network.WithForceDirectDial(ctx, "prevent backoff")
+
+	// Configure the resource manager to not limit anything
+	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
+	rm, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		return nil, errors.Wrap(err, "new resource manager")
+	}
 
 	// compose the multiaddress
 	mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", ip, port))
@@ -51,10 +68,10 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 	}
 
 	var dht *kaddht.IpfsDHT
+
 	// check if hydra filter has been tuned
 	var blacklistedUA string
 	var blacklistPeers map[peer.ID]struct{}
-
 	if hydraFilter {
 		log.Info("hydra-filter: ON -> crawling network to identify hydra-boosters (might take 5-7mins)")
 		blacklistedUA = config.DefaultBlacklistUserAgent
@@ -65,6 +82,8 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 		}
 		blacklistPeers = crawlResutls.GetBlacklistedPeers()
 	}
+
+	// generate a new custom message sender
 	msgSender := NewCustomMessageSender(blacklistedUA)
 
 	// generate the libp2p host
@@ -72,8 +91,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 		libp2p.ListenAddrs(mAddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(config.UserAgent),
-		libp2p.Transport(tcp.NewTCPTransport),
-		//libp2p.Transport(quic.NewTransport), // not supported in 1.18 yet
+		libp2p.ResourceManager(rm),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dht, err = kaddht.New(ctx, h,
