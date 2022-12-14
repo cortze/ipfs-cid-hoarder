@@ -22,6 +22,7 @@ const (
 	DialBlacklistedPeer                                 = "hydra_booster_peer"
 	DialErrorIoTimeout                                  = "io_timeout"
 	DialErrorConnectionRefused                          = "connection_refused"
+	DialErrorBackOff                                    = "backoff"
 	DialErrorProtocolNotSupported                       = "protocol_not_supported"
 	DialErrorPeerIDMismatch                             = "peer_id_mismatch"
 	DialErrorNoRouteToHost                              = "no_route_to_host"
@@ -39,10 +40,10 @@ const (
 )
 
 var KnownErrors = map[string]string{
-	DialBackoff:                                         "backoff",
 	DialBlacklistedPeer:                                 net.ErrBlacklistedPeer.Error(),
 	DialErrorIoTimeout:                                  "i/o timeout",
 	DialErrorConnectionRefused:                          "connection refused",
+	DialErrorBackOff:                                    "backoff",
 	DialErrorProtocolNotSupported:                       "protocol not supported",
 	DialErrorPeerIDMismatch:                             "peer id mismatch",
 	DialErrorNoRouteToHost:                              "no route to host",
