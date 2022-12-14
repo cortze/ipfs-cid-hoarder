@@ -17,7 +17,6 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
@@ -28,7 +27,7 @@ import (
 )
 
 const (
-	DialTimeout = time.Minute
+	DialTimeout = 10 * time.Second
 )
 
 type Host struct {
@@ -43,16 +42,6 @@ type Host struct {
 
 func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int, hydraFilter bool) (*Host, error) {
 	log.Debug("Creating host")
-
-	// Configure the main ctx of the tool to have:
-	// - no resource limits
-	// - prevention against dial backoffs
-	// - dial timeouts
-
-	ctx = network.WithDialPeerTimeout(ctx, DialTimeout)
-
-	// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
-	ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 
 	// Configure the resource manager to not limit anything
 	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
@@ -88,6 +77,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 
 	// generate the libp2p host
 	h, err := libp2p.New(
+		libp2p.WithDialTimeout(DialTimeout),
 		libp2p.ListenAddrs(mAddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(config.UserAgent),
@@ -112,6 +102,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 	if dht == nil {
 		return nil, errors.New("error - no IpfsDHT server has been initialized")
 	}
+
 	hw := &Host{
 		ctx:         ctx,
 		Host:        h,
