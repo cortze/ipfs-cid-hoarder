@@ -34,6 +34,7 @@ CID Hoarder Flags:
 - Database Endpoint
 - CID content size
 - Already published cids
+- The port that the ipfs-cid-hoarder will user for the hosts
 - Hydra filter for peers that correspond to hydras, to avoid connections to them
 - A cid source that specifies from where shall the cids be generated/published
 - A cid file that contains cids
@@ -236,6 +237,7 @@ OPTIONS:
    --log-level value              verbosity of the logs that will be displayed [debug,warn,info,error] (default: info) [$IPFS_CID_HOARDER_LOGLEVEL]
    --priv-key value               REMOVED: Private key to initialize the host (to avoid generating node churn in the network) [$IPFS_CID_HOARDER_PRIV_KEY]
    --database-endpoint value      database enpoint (e.g. /Path/to/sqlite3.db) (default: ./data/ipfs-hoarder-db.db) [$IPFS_CID_HOARDER_DATABASE_ENDPOINT]
+   --port value                   the port that the hosts will user in the hoarder(default: 9010) [$IPFS_CID_HOARDER_PORT]
    --cid-source value             defines the mode where we want to run the tool [random-content-gen, json-file ,text-file, bitswap] (default: text)
    --cid-file value               link to the file containing the files to track (txt/json files) (default: cids/test.txt) [$IPFS_CID_HOARDER_CID_FILE]
    --cid-content-size value       PROBABLY NOT NEEDED: size in KB of the random block generated (default: 1MB) [$IPFS_CID_HOARDER_CID_CONTENT_SIZE]
@@ -244,7 +246,7 @@ OPTIONS:
    --req-interval value           delay in minutes in between PRHolders pings for each CID (example '30m' - '1h' - '60s') (default: 30m) [$IPFS_CID_HOARDER_REQ_INTERVAL]
    --study-duration value         max time for the study to run (example '24h', '35h', '48h') (default: 48h) [$IPFS_CID_HOARDER_STUDY_DURATION]
    --already-published-cids       value already published cids on the network (example true,false). Right now can only be tracked by a json file.  []
-   -k value                       number of peers that we want to forward the Provider Records (default: K=20) [$IPFS_CID_HOARDER_K]
+   --k value                      number of peers that we want to forward the Provider Records (default: K=20) [$IPFS_CID_HOARDER_K]
    --hydra-filter value           boolean representation to activate or not the filter to avoid connections to hydras (default: false) [$IPFS_CID_HOARDER_HYDRA_FILTER]
    --config-file value            NOT YET TESTED: reads a config struct from the specified json file (default: config.json) [$IPFS_CID_HOARDER_CONFIG_FILE]
    --help, -h                     show help (default: false)
