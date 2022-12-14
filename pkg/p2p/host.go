@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	DialTimeout = 10 * time.Second
+	DialTimeout = 1 * time.Minute
 )
 
 type Host struct {

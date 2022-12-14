@@ -15,6 +15,7 @@ import (
 	"ipfs-cid-hoarder/pkg/p2p"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
 )
 
 type CidHoarder struct {
@@ -49,6 +50,9 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to generate priv key for pinger's host")
 	}
+
+	// prevent dial backoffs
+	ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 
 	// ----- Compose the Publisher or discoverer Libp2p host -----
 	pubordishost, err := p2p.NewHost(ctx, pubprivk, config.CliIp, conf.Port, conf.K, conf.HydraFilter)

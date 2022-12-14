@@ -18,7 +18,6 @@ const (
 const (
 	// list errors
 	NoConnError                                         = "none"
-	DialBackoff                                         = "backoff"
 	DialBlacklistedPeer                                 = "hydra_booster_peer"
 	DialErrorIoTimeout                                  = "io_timeout"
 	DialErrorConnectionRefused                          = "connection_refused"
