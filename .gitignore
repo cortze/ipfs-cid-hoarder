@@ -11,9 +11,10 @@ analyzer/.ipynb_checkpoints/
 analyzer/venv/
 logs/
 
-# Igonore the .vscode configuration
+# Ignore the .vscode configuration
 .vscode
-
+#Ignore .idea 
+.idea
 
 # TODO: update to make file and build folder
 dbs
