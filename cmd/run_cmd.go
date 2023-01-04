@@ -19,8 +19,8 @@ var RunCmd = &cli.Command{
 	Action: RunHoarder,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name: "port",
-			Usage: "port number where the hoarder will be spawned",
+			Name:    "port",
+			Usage:   "port number where the hoarder will be spawned",
 			EnvVars: []string{"IPFS_CID_HOARDER_PORT"},
 		},
 		&cli.StringFlag{
