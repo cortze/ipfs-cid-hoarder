@@ -17,11 +17,12 @@ var log = logrus.WithField(
 )
 
 const (
-	RandomSource   = "random-content-gen"
-	TextFileSource = "text-file"
-	JsonFileSource = "json-file"
-	BitswapSource  = "bitswap"
-	RandomContent  = "random-content-gen"
+	RandomSource     = "random-content-gen"
+	TextFileSource   = "text-file"
+	JsonFileSource   = "json-file"
+	HttpServerSource = "http-server"
+	BitswapSource    = "bitswap"
+	RandomContent    = "random-content-gen"
 )
 
 // Harcoded variables for the tool's profiling
@@ -37,7 +38,7 @@ var DefaultBlacklistUserAgent = "hydra-booster"
 
 // default configuration
 var DefaultConfig = Config{
-	Port: "9010",
+	Port:                 "9010",
 	LogLevel:             "info",
 	Database:             "./data/ipfs-hoarder-db.db",
 	ConfigJsonFile:       "config.json",
@@ -56,7 +57,7 @@ var DefaultConfig = Config{
 
 // Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
-	Port string `json:"port"`
+	Port                 string `json:"port"`
 	LogLevel             string `json:"log-level"`
 	Database             string `json:"database-endpoint"`
 	CidSource            string `json:"cid-source"`
