@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	src "ipfs-cid-hoarder/pkg/cid-source"
+	"ipfs-cid-hoarder/pkg/config"
 	"ipfs-cid-hoarder/pkg/db"
 	"ipfs-cid-hoarder/pkg/p2p"
 )
@@ -85,17 +86,33 @@ func NewCidTracker(
 //Generates cids depending on the cid source
 func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, trackableCidC chan<- *src.TrackableCid) {
 	defer genWG.Done()
+	// generate a timer to determine
+	minTimeT := time.NewTicker(5 * time.Second)
 	for true {
 		cid, err := tracker.CidSource.GetNewCid()
 		if cid.IsEmpty() {
+			log.Debugf("Received empty cid: %s with peer id: %s", cid.CID.String(), cid.ID.String())
 			trackableCidC <- &cid
 			close(trackableCidC)
 			break
 		}
-		if err != nil {
-			log.Errorf("error while getting new cid: %s", err)
-			return
+		if tracker.CidSource.Type() == config.HttpServerSource {
+			log.Debugf("Source is: %s and config source is: ", tracker.CidSource.Type(), config.HttpServerSource)
+			if err != nil {
+				log.Errorf("error while getting new cid: %s", err)
+				// check if ticker for next iteration was raised
+				<-minTimeT.C
+				continue
+			}
+			// check if ticker for next iteration was raised
+			<-minTimeT.C
+		} else {
+			if err != nil {
+				log.Errorf("error while getting new cid: %s", err)
+				return
+			}
 		}
+
 		trackableCidC <- &cid
 	}
 }

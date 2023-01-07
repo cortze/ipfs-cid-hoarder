@@ -45,7 +45,9 @@ func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 }
 
 func (httpCidSource *HttpCidSource) StartServer() {
+	log.Info("Starting http server")
 	http.HandleFunc("/ProviderRecord", func(w http.ResponseWriter, r *http.Request) {
+		log.Info("Set handler for requests")
 		if r.Method == http.MethodPost {
 			// create a new TrackableCid instance
 			var encapsulatedJSONProviderRecord EncapsulatedJSONProviderRecord

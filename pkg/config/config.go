@@ -81,6 +81,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if ctx.IsSet("name-of-config-json-file") {
 		c.ImportConfigFromJsonFile()
 	} else {
+		fmt.Println("applying arguments")
 		c.apply(ctx)
 	}
 
@@ -211,6 +212,8 @@ func (c *Config) apply(ctx *cli.Context) {
 			} else {
 				c.CidFile = DefaultConfig.CidFile
 			}
+		case HttpServerSource:
+			fmt.Println("will start http server")
 		case BitswapSource:
 			fmt.Println("bitswap content discovery not supported yet.")
 			os.Exit(0)
