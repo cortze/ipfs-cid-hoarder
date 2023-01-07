@@ -166,6 +166,7 @@ func (c *CidHoarder) Run() error {
 //	TextFileSource = "text-file"
 //	JsonFileSource = "json-file"
 //	BitswapSource  = "bitswap"
+//  HttpSource     = "HttpServerSource"
 //	RandomContent  = "random"
 //  )
 //
@@ -173,8 +174,12 @@ func findCidSource(conf *config.Config) (src.CidSource, error) {
 	switch conf.CidSource {
 	case config.TextFileSource:
 		return nil, errors.New("text file source not yet implemented")
+	case config.HttpServerSource:
+		server := src.NewHttpCidSource(8080, "localhost")
+		go server.StartServer()
+		return server, nil
 	case config.JsonFileSource:
-		return src.OpenSimpleJSONFile(conf.CidFile)
+		return src.OpenEncodedJSONFile(conf.CidFile)
 	case config.RandomSource:
 		return src.NewRandomCidGen(conf.CidContentSize, conf.CidNumber), nil
 	case config.BitswapSource:
