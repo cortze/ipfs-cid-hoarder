@@ -32,11 +32,24 @@ func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 	}, nil
 }
 
+func (discoverer *CidDiscoverer) httpRun() {
+	trackableCidC := make(chan *src.TrackableCid, discoverer.Workers)
+	// CID generator
+	var genWG sync.WaitGroup
+	genWG.Add(1)
+	go discoverer.generateCids(&genWG, trackableCidC)
+	genWG.Wait()
+}
+
 func (discoverer *CidDiscoverer) run() {
 	defer discoverer.wg.Done()
 	// launch the PRholder reading routine
 	//msgNotChannel := discoverer.MsgNot.GetNotifierChan()
 
+	if discoverer.CidSource.Type() == config.HttpServerSource {
+		discoverer.httpRun()
+		return
+	}
 	trackableCidC := make(chan *src.TrackableCid, discoverer.Workers)
 	// CID generator
 	var genWG sync.WaitGroup
@@ -48,7 +61,7 @@ func (discoverer *CidDiscoverer) run() {
 	genWG.Wait()
 	addProviderWG.Wait()
 
-	log.Debugf("Number of cids read from the file was: %d", len(discoverer.CidMap))
+	log.Debugf("Number of cids read was: %d", len(discoverer.CidMap))
 	var discovererWG sync.WaitGroup
 
 	for cidstr, getNewCidReturnTypeArray := range discoverer.CidMap {
@@ -116,6 +129,100 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 				log.Debug("Added agent version to provider store")
 			}
 
+			discoverer.m.Unlock()
+
+		case <-ctx.Done():
+			log.Debugf("shutdown detected, closing discoverer through add provider")
+			return
+		default:
+			//log.Debug("haven't received anything yet")
+		}
+	}
+}
+
+func (discoverer *CidDiscoverer) addProviderHttp(addProviderWG *sync.WaitGroup, trackableCidC <-chan *src.TrackableCid) {
+	defer addProviderWG.Done()
+	ctx := discoverer.ctx
+	for {
+		select {
+		case trackableCid, ok := <-trackableCidC:
+			if !ok {
+				break
+			}
+			if trackableCid.IsEmpty() {
+				break
+			}
+
+			cidStr := trackableCid.CID.Hash().B58String()
+
+			log.Debugf(
+				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v,ProvideTime:%s,UserAgent:%s",
+				cidStr, trackableCid.ID.String(),
+				trackableCid.Addresses, trackableCid.ProvideTime, trackableCid.UserAgent,
+			)
+			discoverer.m.Lock()
+			err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
+			if err != nil {
+				log.Errorf("error %s calling addpeertoproviderstore method", err)
+			} else {
+				log.Debug("Added providers to provider store")
+			}
+
+			err = addAgentVersionToProvideStore(discoverer.host, trackableCid.ID, trackableCid.UserAgent)
+
+			if err != nil {
+				log.Errorf("error %s calling addAgentVersionToProvideStore", err)
+			} else {
+				log.Debug("Added agent version to provider store")
+			}
+
+			//the starting values for the discoverer
+			cidIn, err := cid.Parse(cidStr)
+
+			if err != nil {
+				log.Errorf("couldnt parse cid")
+			}
+
+			cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), "")
+			fetchRes := models.NewCidFetchResults(cidIn, 0)
+
+			// generate a new CidFetchResults
+			//TODO starting data for the discoverer
+			fetchRes.TotalHops = 0
+			fetchRes.HopsToClosest = 0
+
+			cidInfo.AddProvideTime(trackableCid.ProvideTime)
+			//TODO discoverer starting ping res
+			pingRes := models.NewPRPingResults(
+				cidIn,
+				trackableCid.ID,
+				//the below are starting data for the discoverer
+				0,
+				time.Time{},
+				0,
+				true,
+				true,
+				p2p.NoConnError,
+			)
+			cidInfo.AddCreator(trackableCid.Creator)
+			fetchRes.AddPRPingResults(pingRes)
+
+			log.Debugf("User agent received from provider store: %s", discoverer.host.GetUserAgentOfPeer(trackableCid.ID))
+
+			prHolderInfo := models.NewPeerInfo(
+				trackableCid.ID,
+				discoverer.host.Peerstore().Addrs(trackableCid.ID),
+				discoverer.host.GetUserAgentOfPeer(trackableCid.ID),
+			)
+
+			cidInfo.AddPRHolder(prHolderInfo)
+
+			cidInfo.AddPRFetchResults(fetchRes)
+
+			discoverer.DBCli.AddCidInfo(cidInfo)
+			discoverer.DBCli.AddFetchResult(fetchRes)
+
+			discoverer.CidPinger.AddCidInfo(cidInfo)
 			discoverer.m.Unlock()
 
 		case <-ctx.Done():
