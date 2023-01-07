@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"ipfs-cid-hoarder/pkg/config"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -52,7 +53,7 @@ func (httpCidSource *HttpCidSource) StartServer() {
 			// decode the request body into the TrackableCid struct
 			err := json.NewDecoder(r.Body).Decode(&encapsulatedJSONProviderRecord)
 			if err == nil {
-				log.Info("Decoded new trackable cid received from post")
+				log.Info("Decoded new encapsulated json received from post")
 				log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(encapsulatedJSONProviderRecord.ID),
 					encapsulatedJSONProviderRecord.Addresses, encapsulatedJSONProviderRecord.Creator, encapsulatedJSONProviderRecord.CID)
 
@@ -71,12 +72,12 @@ func (httpCidSource *HttpCidSource) StartServer() {
 			if len(httpCidSource.encapsulatedJSONProviderRecords) != 0 {
 				// return the last unretrieved trackableCid
 				encapsulatedJSONProviderRecord := httpCidSource.pop()
-				log.Info("Sending new trackable cid to user with get method")
+				log.Info("Sending new encapsulated json cid to user with get method")
 				// send the trackableCid back to the client as a response
 				json.NewEncoder(w).Encode(encapsulatedJSONProviderRecord)
 			} else {
 
-				http.Error(w, "No more trackableCids available", http.StatusNoContent)
+				http.Error(w, "No record available currently", http.StatusNoContent)
 			}
 
 		} else {
@@ -92,22 +93,26 @@ func (httpCidSource *HttpCidSource) GetNewCid() (TrackableCid, error) {
 	url := fmt.Sprintf("http://%s:%d/ProviderRecord", httpCidSource.hostname, httpCidSource.port)
 	resp, err := http.Get(url)
 	if err != nil {
-		return TrackableCid{}, err
+		return TrackableCid{ID: "dummy"}, err
 	}
 	defer resp.Body.Close()
 
 	// check the status code
 	if resp.StatusCode == http.StatusNoContent {
-		return TrackableCid{}, errors.New(fmt.Sprintf("Error while retrieving new cid from stack: %s", resp.Status))
+		return TrackableCid{ID: "dummy"}, errors.New(fmt.Sprintf("Error while retrieving new cid from stack: %s", resp.Status))
 	} else if resp.StatusCode != http.StatusOK {
-		return TrackableCid{}, errors.New(fmt.Sprintf("Error retrieving trackableCid: %s", resp.Status))
+		return TrackableCid{ID: "dummy"}, errors.New(fmt.Sprintf("Error retrieving trackableCid: %s", resp.Status))
 	}
 
 	// decode the response into a EncapsulatedJSONProviderRecord struct
 	var pr EncapsulatedJSONProviderRecord
 	err = json.NewDecoder(resp.Body).Decode(&pr)
 	if err != nil {
-		return TrackableCid{}, errors.Wrap(err, " while decoding trackable cid")
+		return TrackableCid{ID: "dummy"}, errors.Wrap(err, " while decoding trackable cid")
+	}
+
+	if reflect.DeepEqual(pr, EncapsulatedJSONProviderRecord{}) {
+		return TrackableCid{}, nil
 	}
 
 	log.Debug("Read a new PR from the web server:")
