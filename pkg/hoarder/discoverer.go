@@ -38,7 +38,16 @@ func (discoverer *CidDiscoverer) httpRun() {
 	var genWG sync.WaitGroup
 	genWG.Add(1)
 	go discoverer.generateCids(&genWG, trackableCidC)
+	var addProviderWG sync.WaitGroup
+	go discoverer.addProviderHttp(&addProviderWG, trackableCidC)
 	genWG.Wait()
+	addProviderWG.Wait()
+	err := discoverer.host.Close()
+	if err != nil {
+		log.Errorf("failed to close host: %s", err)
+		return
+	}
+	log.Debug("Closed the discoverer host")
 }
 
 func (discoverer *CidDiscoverer) run() {

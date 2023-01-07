@@ -87,7 +87,7 @@ func NewCidTracker(
 func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, trackableCidC chan<- *src.TrackableCid) {
 	defer genWG.Done()
 	// generate a timer to determine
-	minTimeT := time.NewTicker(5 * time.Second)
+	minTimeT := time.NewTicker(10 * time.Second)
 	for true {
 		cid, err := tracker.CidSource.GetNewCid()
 		if cid.IsEmpty() {
