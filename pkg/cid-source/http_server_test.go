@@ -98,6 +98,21 @@ func PostRequestProviders() {
 		log.Errorf("Error sending POST request: %s", err)
 	}
 
+	// create a POST request
+	data, err = json.Marshal(ProviderRecords{})
+	if err != nil {
+		log.Errorf("Error marshalling provider records for cid: %s", err)
+	}
+	req, err = http.NewRequest("POST", "http://localhost:8080/ProviderRecord", bytes.NewReader(data))
+	if err != nil {
+		log.Errorf("Error creating POST request: %s", err)
+	}
+	// send the post request
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		log.Errorf("Error sending POST request: %s", err)
+	}
+
 }
 
 func GetRequest(httpSource *HttpCidSource) error {
