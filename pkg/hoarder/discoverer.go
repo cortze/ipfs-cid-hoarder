@@ -187,10 +187,8 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			//TODO starting data for the discoverer
 			fetchRes.TotalHops = 0
 			fetchRes.HopsToClosest = 0
-
 			for _, trackableCid := range trackableCids {
 
-				discoverer.m.Lock()
 				err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 				if err != nil {
 					log.Errorf("error %s calling addpeertoproviderstore method", err)
@@ -239,7 +237,6 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			discoverer.DBCli.AddFetchResult(fetchRes)
 
 			discoverer.CidPinger.AddCidInfo(cidInfo)
-			discoverer.m.Unlock()
 
 		case <-ctx.Done():
 			log.Debugf("shutdown detected, closing discoverer through add provider")
