@@ -93,12 +93,6 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 
 	for true {
 		trackableCids, err := src.GetNewHttpCid(tracker.CidSource)
-		if err != nil {
-			log.Errorf("error while getting new cid: %s", err)
-			// check if ticker for next iteration was raised
-			<-minTimeT.C
-			continue
-		}
 
 		if trackableCids == nil {
 			log.Debug("Received empty provider records")
@@ -106,6 +100,14 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 			close(trackableCidArrayC)
 			break
 		}
+
+		if err != nil {
+			log.Errorf("error while getting new cid: %s", err)
+			// check if ticker for next iteration was raised
+			<-minTimeT.C
+			continue
+		}
+
 		trackableCidArrayC <- trackableCids
 		// check if ticker for next iteration was raised
 		<-minTimeT.C
