@@ -117,6 +117,12 @@ func PostRequestProviders() {
 
 func GetRequest(httpSource *HttpCidSource) error {
 	trackableCids, err := GetNewHttpCid(httpSource)
+
+	if trackableCids == nil {
+
+		return nil
+	}
+
 	if err != nil {
 		fmt.Errorf("Error %s while getting new cid", err)
 		return err
