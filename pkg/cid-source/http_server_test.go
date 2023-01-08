@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"ipfs-cid-hoarder/pkg/config"
+	"ipfs-cid-hoarder/pkg/models"
+	"ipfs-cid-hoarder/pkg/p2p"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/ipfs/go-cid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -95,16 +100,83 @@ func PostRequestProviders() {
 
 }
 
+func GetRequest(httpSource *HttpCidSource) error {
+	trackableCids, err := GetNewHttpCid(httpSource)
+	if err != nil {
+		fmt.Errorf("Error %s while getting new cid", err)
+		return err
+	}
+	tr := trackableCids[0]
+	cidStr := tr.CID.Hash().B58String()
+
+	log.Debugf(
+		"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v,ProvideTime:%s,UserAgent:%s",
+		cidStr, tr.ID.String(),
+		tr.Addresses, tr.ProvideTime, tr.UserAgent,
+	)
+
+	//the starting values for the discoverer
+	cidIn, err := cid.Parse(cidStr)
+
+	if err != nil {
+		log.Errorf("couldnt parse cid")
+	}
+
+	cidInfo := models.NewCidInfo(cidIn, 0, config.JsonFileSource,
+		config.HttpServerSource, tr.Creator)
+	fetchRes := models.NewCidFetchResults(cidIn, 0)
+
+	// generate a new CidFetchResults
+	//TODO starting data for the discoverer
+	fetchRes.TotalHops = 0
+	fetchRes.HopsToClosest = 0
+	for _, trackableCid := range trackableCids {
+
+		cidInfo.AddProvideTime(trackableCid.ProvideTime)
+
+		//TODO discoverer starting ping res
+		pingRes := models.NewPRPingResults(
+			cidIn,
+			trackableCid.ID,
+			//the below are starting data for the discoverer
+			0,
+			time.Time{},
+			0,
+			true,
+			true,
+			p2p.NoConnError,
+		)
+		cidInfo.AddCreator(trackableCid.Creator)
+		fetchRes.AddPRPingResults(pingRes)
+
+		prHolderInfo := models.NewPeerInfo(
+			trackableCid.ID,
+			trackableCid.Addresses,
+			trackableCid.UserAgent,
+		)
+
+		cidInfo.AddPRHolder(prHolderInfo)
+	}
+	cidInfo.AddPRFetchResults(fetchRes)
+	return nil
+}
+
 func TestGetRequest(t *testing.T) {
 
 	httpSource := NewHttpCidSource(8080, "localhost")
 	go httpSource.StartServer()
 
 	PostRequestProviders()
-	trackableCid, err := GetNewHttpCid(httpSource)
+	err := GetRequest(httpSource)
 	if err != nil {
-		t.Errorf("Error %s while getting new http cid", err)
+		t.Errorf("%s", err)
 	}
-
-	fmt.Println(trackableCid)
+	err = GetRequest(httpSource)
+	if err != nil {
+		t.Errorf("%s", err)
+	}
+	err = GetRequest(httpSource)
+	if err != nil {
+		t.Errorf("%s", err)
+	}
 }
