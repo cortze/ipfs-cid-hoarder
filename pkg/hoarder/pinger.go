@@ -273,7 +273,7 @@ func (pinger *CidPinger) runPingOrchester(pingOrchWG *sync.WaitGroup) {
 				cidStr := cidInfo.CID.Hash().B58String()
 				// check if the time for next ping has arrived
 				if time.Since(cidInfo.NextPing) < time.Duration(0) {
-					logEntry.Debugf("not in time to ping %s", cidStr)
+					/* logEntry.Debugf("not in time to ping %s", cidStr) */
 					//TODO isn't continue better here
 					break
 				}
