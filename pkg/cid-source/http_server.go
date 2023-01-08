@@ -22,18 +22,17 @@ type HttpCidSource struct {
 	done            EncapsulatedJSONProviderRecord
 }
 
-func (httpCidSource *HttpCidSource) pop() ProviderRecords {
+func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
 	if len(httpCidSource.providerRecords) == 0 {
-		log.Debug("Stack is empty")
+		log.Debug("Queue is empty")
 		return ProviderRecords{}
 	}
-	length := len(httpCidSource.providerRecords)
-	elem := httpCidSource.providerRecords[length-1]
-	httpCidSource.providerRecords = httpCidSource.providerRecords[:length-1]
+	elem := httpCidSource.providerRecords[0]
+	httpCidSource.providerRecords = httpCidSource.providerRecords[1:]
 	return elem
 }
 
-func (httpCidSource *HttpCidSource) push(providerRecords ProviderRecords) {
+func (httpCidSource *HttpCidSource) Enqueue(providerRecords ProviderRecords) {
 	httpCidSource.providerRecords = append(httpCidSource.providerRecords, providerRecords)
 }
 
@@ -59,7 +58,7 @@ func (httpCidSource *HttpCidSource) StartServer() {
 				log.Info("Decoded new encapsulated json received from post")
 
 				// add the trackableCid to the list
-				httpCidSource.push(providerRecords)
+				httpCidSource.Enqueue(providerRecords)
 			} else {
 
 				http.Error(w, "Error decoding request body", http.StatusBadRequest)
@@ -69,7 +68,7 @@ func (httpCidSource *HttpCidSource) StartServer() {
 			// check if there are any trackableCids to return
 			if len(httpCidSource.providerRecords) != 0 {
 				// return the last unretrieved trackableCid
-				providerRecords := httpCidSource.pop()
+				providerRecords := httpCidSource.Dequeue()
 				log.Info("Sending new encapsulated json cid to user with get method")
 				// send the trackableCid back to the client as a response
 				json.NewEncoder(w).Encode(providerRecords)
@@ -84,6 +83,11 @@ func (httpCidSource *HttpCidSource) StartServer() {
 		}
 	})
 	http.ListenAndServe(":8080", nil)
+}
+
+func (HttpCidSource *HttpCidSource) shutdown() {
+	http.HandleFunc("/ProviderRecord", nil)
+	http.ListenAndServe("", nil)
 }
 
 func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
@@ -116,7 +120,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 	}
 
 	if reflect.DeepEqual(providerRecords, ProviderRecords{}) {
-		return nil, nil
+		return nil, errors.New("ended providing")
 	}
 
 	var trackableCidPrs []TrackableCid
