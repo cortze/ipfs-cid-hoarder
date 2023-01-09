@@ -143,7 +143,7 @@ func GetRequest(httpSource *HttpCidSource) error {
 		log.Errorf("couldnt parse cid")
 	}
 
-	cidInfo := models.NewCidInfo(cidIn, 0, config.JsonFileSource,
+	cidInfo := models.NewCidInfo(cidIn, 0, 0, config.JsonFileSource,
 		config.HttpServerSource, tr.Creator)
 	fetchRes := models.NewCidFetchResults(cidIn, 0)
 
