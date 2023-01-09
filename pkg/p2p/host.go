@@ -17,9 +17,9 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
-	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 
@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	DialTimeout = 1 * time.Minute
+	DialTimeout = 60 * time.Second
 )
 
 type Host struct {
@@ -42,13 +42,6 @@ type Host struct {
 
 func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int, hydraFilter bool) (*Host, error) {
 	log.Debug("Creating host")
-
-	// Configure the resource manager to not limit anything
-	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
-	rm, err := rcmgr.NewResourceManager(limiter)
-	if err != nil {
-		return nil, errors.Wrap(err, "new resource manager")
-	}
 
 	// compose the multiaddress
 	mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", ip, port))
@@ -81,7 +74,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 		libp2p.ListenAddrs(mAddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(config.UserAgent),
-		libp2p.ResourceManager(rm),
+		libp2p.ResourceManager(&network.NullResourceManager{}),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dht, err = kaddht.New(ctx, h,

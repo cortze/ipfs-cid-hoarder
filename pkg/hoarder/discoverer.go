@@ -247,7 +247,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 	}
 }
 
-//This method essentially initializes the data for the pinger to be able to get information about the PR holders later.
+// This method essentially initializes the data for the pinger to be able to get information about the PR holders later.
 func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, cidstr string, trackableCidArr []*src.TrackableCid) {
 	defer discovererWG.Done()
 	//the starting values for the discoverer
@@ -257,7 +257,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 		log.Errorf("couldnt parse cid")
 	}
 
-	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource, discoverer.CidSource.Type(), "")
+	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, discoverer.StudyDuration, config.JsonFileSource, discoverer.CidSource.Type(), "")
 	fetchRes := models.NewCidFetchResults(cidIn, 0)
 
 	// generate a new CidFetchResults
@@ -314,7 +314,7 @@ func addAddrtoPeerstore(h host.Host, pid peer.ID, multiaddr []ma.Multiaddr) {
 }
 */
 
-//Instead of adding directly to peerstore the API is the following
+// Instead of adding directly to peerstore the API is the following
 func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid cid.Cid, multiaddr []ma.Multiaddr) error {
 	keyMH := cid.Hash()
 	err := h.DHT.ProviderStore().AddProvider(ctx, keyMH, peer.AddrInfo{ID: pid, Addrs: multiaddr})
