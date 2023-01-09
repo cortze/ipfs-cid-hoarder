@@ -203,7 +203,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 				} else {
 					log.Debug("Added agent version to provider store")
 				}
-
+				cidInfo.AddPublicationTime(trackableCid.PublicationTime)
 				cidInfo.AddProvideTime(trackableCid.ProvideTime)
 
 				//TODO discoverer starting ping res
@@ -265,6 +265,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	fetchRes.TotalHops = 0
 	fetchRes.HopsToClosest = 0
 	for _, val := range trackableCidArr {
+		cidInfo.AddPublicationTime(val.PublicationTime)
 		cidInfo.AddProvideTime(val.ProvideTime)
 		//TODO discoverer starting ping res
 		pingRes := models.NewPRPingResults(

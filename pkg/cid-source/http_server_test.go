@@ -33,6 +33,7 @@ func PostRequestProviders() {
 				"/ip4/127.0.0.1/tcp/4001", "/ip4/89.233.108.3/tcp/4001"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
 			"0s",
+			"0s",
 			"go-ipfs/0.7.0/",
 		),
 		NewEncapsulatedJSONCidProvider(
@@ -42,6 +43,7 @@ func PostRequestProviders() {
 				"/ip6/2a01:4f9:c010:d4d4::1/udp/4001/quic", "/ip6/::1/udp/4001/quic", "/ip4/65.21.63.62/udp/4001/quic",
 				"/ip4/65.21.63.62/tcp/4001", "/ip4/127.0.0.1/tcp/4001", "/ip6/::1/tcp/4001", "/ip4/127.0.0.1/udp/4001/quic"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
+			"0s",
 			"0s",
 			"go-ipfs/0.8.0/",
 		),
@@ -55,6 +57,7 @@ func PostRequestProviders() {
 				"/ip4/45.63.7.28/udp/4001/quic", "/ip6/::1/udp/4001/quic", "/ip6/::1/tcp/4001", "/ip4/127.0.0.1/tcp/4001"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
 			"0s",
+			"0s",
 			"kubo/0.14.0/e0fabd6",
 		),
 		NewEncapsulatedJSONCidProvider(
@@ -63,6 +66,7 @@ func PostRequestProviders() {
 			[]string{"/ip4/127.0.0.1/udp/4001/quic", "/ip4/165.227.164.94/tcp/4001",
 				"/ip6/64:ff9b::a5e3:a45e/udp/4001/quic", "/ip6/::1/udp/4001/quic", "/ip4/127.0.0.1/tcp/4001", "/ip6/::1/tcp/4001", "/ip4/165.227.164.94/udp/4001/quic"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
+			"0s",
 			"0s",
 			"go-ipfs/0.7.0/",
 		),

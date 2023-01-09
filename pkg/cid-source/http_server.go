@@ -1,11 +1,13 @@
 package cid_source
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"ipfs-cid-hoarder/pkg/config"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -18,8 +20,10 @@ import (
 type HttpCidSource struct {
 	port            int
 	hostname        string
+	server          *http.Server
 	providerRecords []ProviderRecords
-	done            EncapsulatedJSONProviderRecord
+	isStarted       bool
+	mtx             *sync.Mutex
 }
 
 func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
@@ -29,24 +33,78 @@ func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
 	}
 	elem := httpCidSource.providerRecords[0]
 	httpCidSource.providerRecords = httpCidSource.providerRecords[1:]
+	log.Debugf("Removed element from queue, lenth is now: %d", len(httpCidSource.providerRecords))
 	return elem
 }
 
 func (httpCidSource *HttpCidSource) Enqueue(providerRecords ProviderRecords) {
 	httpCidSource.providerRecords = append(httpCidSource.providerRecords, providerRecords)
+	log.Debugf("Added new element to queue, length is now: %d", len(httpCidSource.providerRecords))
 }
 
 func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 	return &HttpCidSource{
 		port:            port,
 		hostname:        hostname,
+		server:          nil,
 		providerRecords: []ProviderRecords{},
 	}
 }
 
-func (httpCidSource *HttpCidSource) StartServer() {
+func (httpCidSource *HttpCidSource) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Received request in server HTTP")
+	if r.Method == http.MethodPost {
+		log.Debug("The request was a post method")
+		// create a new TrackableCid instance
+		var providerRecords ProviderRecords
+
+		// decode the request body into the TrackableCid struct
+		err := json.NewDecoder(r.Body).Decode(&providerRecords)
+		if err == nil {
+			log.Info("Decoded new encapsulated json received from post")
+
+			// add the trackableCid to the list
+			httpCidSource.Enqueue(providerRecords)
+		} else {
+
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+		}
+
+	} else if r.Method == http.MethodGet {
+		log.Debug("The request was a get request")
+		// check if there are any trackableCids to return
+		if len(httpCidSource.providerRecords) != 0 {
+			// return the last unretrieved trackableCid
+			providerRecords := httpCidSource.Dequeue()
+			log.Info("Sending new encapsulated json cid to user with get method")
+			// send the trackableCid back to the client as a response
+			json.NewEncoder(w).Encode(providerRecords)
+		} else {
+
+			http.Error(w, "No record available currently", http.StatusNoContent)
+		}
+
+	} else {
+		// return "Method Not Allowed" error
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (httpCidSource *HttpCidSource) StartServer() error {
 	log.Info("Starting http server")
-	http.HandleFunc("/ProviderRecord", func(w http.ResponseWriter, r *http.Request) {
+	if httpCidSource.isStarted {
+		return errors.New("Http server is already started")
+	}
+	httpCidSource.isStarted = true
+	// prepare address
+	addr := fmt.Sprintf(":%v", httpCidSource.port)
+
+	httpCidSource.server = &http.Server{
+		Addr:    addr,
+		Handler: httpCidSource,
+	}
+
+	/* http.HandleFunc("/ProviderRecord", func(w http.ResponseWriter, r *http.Request) {
 		log.Info("Set handler for requests")
 		if r.Method == http.MethodPost {
 			// create a new TrackableCid instance
@@ -81,13 +139,43 @@ func (httpCidSource *HttpCidSource) StartServer() {
 			// return "Method Not Allowed" error
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
-	})
-	http.ListenAndServe(":8080", nil)
+	}) */
+	if err := httpCidSource.server.ListenAndServe(); err != nil {
+		if err == http.ErrServerClosed {
+			log.Infof("Server closed under request: %v", err)
+		} else {
+			log.Fatalf("Server closed unexpect: %v", err)
+		}
+		httpCidSource.isStarted = false
+	}
+	return nil
 }
 
-func (HttpCidSource *HttpCidSource) shutdown() {
-	http.HandleFunc("/ProviderRecord", nil)
-	http.ListenAndServe("", nil)
+func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
+	httpCidSource.mtx.Lock()
+	defer httpCidSource.mtx.Unlock()
+
+	if !httpCidSource.isStarted || httpCidSource.server == nil {
+		return errors.New("Server is not started")
+	}
+
+	stop := make(chan bool)
+	go func() {
+		// We can use .Shutdown to gracefully shuts down the server without
+		// interrupting any active connection
+		httpCidSource.server.Shutdown(ctx)
+		stop <- true
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Errorf("Timeout: %v", ctx.Err())
+		break
+	case <-stop:
+		log.Infof("Finished and shutting down http server")
+	}
+
+	return nil
 }
 
 func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
@@ -148,6 +236,13 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 
 		log.Debugf("It's provide time is: %s", providerRecord.ProvideTime)
 		newProvideTime, err := time.ParseDuration(providerRecord.ProvideTime)
+
+		if err != nil {
+			log.Errorf("Error while parsing time: %s", err)
+		}
+
+		log.Debugf("It's publication time is: %s", providerRecord.PublicationTime)
+		newProvideTime, err := time.Parse(providerRecord.PublicationTime)
 
 		if err != nil {
 			log.Errorf("Error while parsing time: %s", err)

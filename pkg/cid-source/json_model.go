@@ -197,7 +197,15 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (TrackableCid, error) {
 		newProvideTime, err := time.ParseDuration(pr.ProvideTime)
 
 		if err != nil {
-			log.Errorf("Error while parsing time: %s", err)
+			log.Errorf("Error while parsing provide time: %s", err)
+			continue
+		}
+
+		log.Debugf("It's publication time is: %s", pr.PublicationTime)
+		newPublicationTime, err := time.ParseInLocation(pr.PublicationTime)
+
+		if err != nil {
+			log.Errorf("Error while parsing publication time: %s", err)
 			continue
 		}
 
@@ -216,7 +224,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (TrackableCid, error) {
 		log.Infof("generated new CID %s", newCid.Hash().B58String())
 
 		log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
-		ProviderAndCidInstance := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newProvideTime, pr.UserAgent)
+		ProviderAndCidInstance := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newPublicationTime, newProvideTime, pr.UserAgent)
 
 		return ProviderAndCidInstance, nil
 	}
