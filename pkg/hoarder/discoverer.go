@@ -179,8 +179,8 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 				log.Errorf("couldnt parse cid")
 			}
 
-			cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, config.JsonFileSource,
-				discoverer.CidSource.Type(), tr.Creator)
+			cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, discoverer.StudyDuration, config.JsonFileSource,
+				discoverer.CidSource.Type(), "")
 			fetchRes := models.NewCidFetchResults(cidIn, 0)
 
 			// generate a new CidFetchResults
