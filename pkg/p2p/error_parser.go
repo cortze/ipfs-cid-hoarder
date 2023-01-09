@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"fmt"
 	"strings"
 
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
@@ -18,6 +19,11 @@ const (
 const (
 	// list errors
 	NoConnError                                         = "none"
+	ResourceLimitError                                  = "resource_limit"
+	DialErrorRoutingNotFound                            = "routing_not_found"
+	DialErrorNoRecentNetworkActivity                    = "no_recent_network_activity"
+	DialErrorStreamErrorCode0                           = "canceled_stream_err_code_0"
+	DialErrorMsgSenderInvalidated                       = "msg_sender_invalidated"
 	DialBlacklistedPeer                                 = "hydra_booster_peer"
 	DialErrorIoTimeout                                  = "io_timeout"
 	DialErrorConnectionRefused                          = "connection_refused"
@@ -27,11 +33,12 @@ const (
 	DialErrorNoRouteToHost                              = "no_route_to_host"
 	DialErrorNetworkUnreachable                         = "network_unreachable"
 	DialErrorNoGoodAddresses                            = "no_good_addresses"
+	DialErrorNoAddress                                  = "no_addresses"
+	DialErrorMaddrReset                                 = "maddr_reset"
 	DialErrorContextDeadlineExceeded                    = "context_deadline_exceeded"
 	DialErrorNoPublicIP                                 = "no_public_ip"
 	DialErrorMaxDialAttemptsExceeded                    = "max_dial_attempts_exceeded"
 	DialErrorUnknown                                    = "unknown"
-	DialErrorMaddrReset                                 = "maddr_reset"
 	DialErrorStreamReset                                = "stream_reset"
 	DialErrorHostIsDown                                 = "host_is_down"
 	DialErrorTooManyOpenFiles                           = "too_many_open_files"
@@ -40,6 +47,11 @@ const (
 
 var KnownErrors = map[string]string{
 	DialBlacklistedPeer:                                 net.ErrBlacklistedPeer.Error(),
+	ResourceLimitError:                                  "resource limit exceeded",
+	DialErrorRoutingNotFound:                            "routing: not found",
+	DialErrorNoRecentNetworkActivity:                    "no recent network activity",
+	DialErrorStreamErrorCode0:                           "canceled with error code 0",
+	DialErrorMsgSenderInvalidated:                       "message sender has been invalidated",
 	DialErrorIoTimeout:                                  "i/o timeout",
 	DialErrorConnectionRefused:                          "connection refused",
 	DialErrorBackOff:                                    "backoff",
@@ -48,6 +60,7 @@ var KnownErrors = map[string]string{
 	DialErrorNoRouteToHost:                              "no route to host",
 	DialErrorNetworkUnreachable:                         "network is unreachable",
 	DialErrorNoGoodAddresses:                            "no good addresses",
+	DialErrorNoAddress:                                  "no addresses",
 	DialErrorContextDeadlineExceeded:                    "context deadline exceeded",
 	DialErrorNoPublicIP:                                 "no public IP address",
 	DialErrorMaxDialAttemptsExceeded:                    "max dial attempts exceeded",
@@ -73,5 +86,6 @@ func ParseConError(err error) string {
 		}
 	}
 
+	fmt.Println(err)
 	return DialErrorUnknown
 }
