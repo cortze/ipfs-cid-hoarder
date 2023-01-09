@@ -20,8 +20,9 @@ type PRPingResults struct {
 	ConError      string
 }
 
-//Creates a new:
-// 	PRPingResults struct {
+// Creates a new:
+//
+//	PRPingResults struct {
 //		Cid           cid.Cid
 //		PeerID        peer.ID
 //		Round         int
@@ -72,7 +73,8 @@ type CidFetchResults struct {
 }
 
 // Creates a new:
-// 	CidFetchResults struct {
+//
+//	CidFetchResults struct {
 //		m   sync.Mutex
 //		Cid cid.Cid
 //
@@ -101,10 +103,12 @@ func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
 }
 
 // AddPRPingResults inserts a new ping result of type:
+//
 //	type PRPingResults struct{...},
 //	into the:
 //	type CidFetchResult struct{...} which contains []*PRPingResults,
-//updating at the same time the final duration of the PR Holder ping process.
+//
+// updating at the same time the final duration of the PR Holder ping process.
 func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -131,9 +135,9 @@ func (c *CidFetchResults) GetSummary() (tot, success, failed int) {
 }
 
 // AddClosestPeer inserts into the CidFetchResults a peer that is inside the K closest peers in the IPFS DHT in that fetch round.
-//Adds to the:
+// Adds to the:
 //
-// 	CidFetchResults struct{...} for the field ClosestPeers []peer.ID
+//	CidFetchResults struct{...} for the field ClosestPeers []peer.ID
 func (c *CidFetchResults) AddClosestPeer(pInfo peer.ID) {
 	c.m.Lock()
 	defer c.m.Unlock()
