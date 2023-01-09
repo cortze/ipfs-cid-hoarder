@@ -158,18 +158,25 @@ func (c *CidHoarder) Run() error {
 	return nil
 }
 
-//Generates the cid source given a specific config struct. E.g. a randomly generated cid source uses the Random_Cid_Gen struct, this function must return that.
-//The options for the cid source are defined in this enum like const value.
+// Generates the cid source given a specific config struct. E.g. a randomly generated cid source uses the Random_Cid_Gen struct, this function must return that.
+// The options for the cid source are defined in this enum like const value.
 //
-//  const (
-//	RandomSource   = "random-content-gen"
-//	TextFileSource = "text-file"
-//	JsonFileSource = "json-file"
-//	BitswapSource  = "bitswap"
-//  HttpSource     = "HttpServerSource"
-//	RandomContent  = "random"
-//  )
+//	 const (
+//		RandomSource   = "random-content-gen"
+//		TextFileSource = "text-file"
+//		JsonFileSource = "json-file"
+//		BitswapSource  = "bitswap"
+//	 HttpSource     = "HttpServerSource"
+//		RandomContent  = "random"
+//	 )
 //
+//		 const (
+//			RandomSource   = "random-content-gen"
+//			TextFileSource = "text-file"
+//			JsonFileSource = "json-file"
+//			BitswapSource  = "bitswap"
+//			RandomContent  = "random"
+//		 )
 func findCidSource(conf *config.Config) (src.CidSource, error) {
 	switch conf.CidSource {
 	case config.TextFileSource:

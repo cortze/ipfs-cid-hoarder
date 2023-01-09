@@ -10,23 +10,21 @@ import (
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/peer"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	LookupTimeout   = time.Minute
+	LookupTimeout   = 60 * time.Second
 	minIterTime     = 500 * time.Millisecond
-	maxDialAttempts = 3 // Are three attempts enough?
-	dialGraceTime   = time.Minute
+	maxDialAttempts = 1 // Are two attempts enough?
+	dialGraceTime   = 15 * time.Second
 )
 
 // CidPinger is the main object to schedule and monitor all the CID related metrics
 type CidPinger struct {
 	ctx context.Context
-	sync.Mutex
-	wg *sync.WaitGroup
+	wg  *sync.WaitGroup
 
 	host         *p2p.Host
 	dbCli        *db.DBClient
@@ -270,12 +268,12 @@ func (pinger *CidPinger) runPingOrchester(pingOrchWG *sync.WaitGroup) {
 					log.Info("shutdown was detected, closing Cid Ping Orchester")
 					return
 				}
+
 				cidStr := cidInfo.CID.Hash().B58String()
 				// check if the time for next ping has arrived
-				if time.Since(cidInfo.NextPing) < time.Duration(0) {
-					/* logEntry.Debugf("not in time to ping %s", cidStr) */
-					//TODO isn't continue better here
-					break
+				if !cidInfo.IsReadyForNextPing() {
+					logEntry.Debugf("not in time to ping %s", cidStr)
+					break // we assume that the Array is sorted with the lower NextPingTime at the begining, therefore, we break the loop
 				}
 
 				// increment Ping Counter
@@ -284,9 +282,9 @@ func (pinger *CidPinger) runPingOrchester(pingOrchWG *sync.WaitGroup) {
 				// Add the CID to the pingTaskC
 				pinger.pingTaskC <- cidInfo
 
-				// check if they have reached the max-round counter
+				// check if they have finished the duration of the study
 				// if yes, remove them from the cidQ.cidArray
-				if cidInfo.GetPingCounter() >= pinger.rounds {
+				if cidInfo.IsFinished() {
 					// delete the CID from the list
 					pinger.cidQ.removeCid(cidStr)
 					logEntry.Infof("finished pinging CID %s - max pings reached %d", cidStr, pinger.rounds)
@@ -375,6 +373,14 @@ func (pinger *CidPinger) runPinger(wg *sync.WaitGroup, pingerID int) {
 						isRetrievable = true
 					}
 				}
+				// Removable - Just double checking
+				if len(providers) == 0 && isRetrievable {
+					log.Errorf("missmatch - content retrievable but no providers (%d)", len(providers))
+				}
+				if len(providers) > 0 && !isRetrievable {
+					log.Error("missmatch - content not retrievable but found providers (%d)", len(providers))
+				}
+
 				fetchRes.IsRetrievable = isRetrievable
 				fmt.Println(time.Now(), "Providers for", c.CID.Hash().B58String(), "->", providers)
 			}(pinger, cidInfo, cidFetchRes)
@@ -385,12 +391,12 @@ func (pinger *CidPinger) runPinger(wg *sync.WaitGroup, pingerID int) {
 				defer wg.Done()
 				t := time.Now()
 
-				var hops dht.Hops
-
-				closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, string(c.CID.Hash()), &hops)
+				ctxT, cancel := context.WithTimeout(p.ctx, LookupTimeout)
+				defer cancel()
+				closestPeers, lookupMetrics, err := p.host.DHT.GetClosestPeers(ctxT, string(c.CID.Hash()))
 				pingTime := time.Since(t)
-				fetchRes.TotalHops = hops.Total
-				fetchRes.HopsToClosest = hops.ToClosest
+				fetchRes.TotalHops = lookupMetrics.GetHops()
+				fetchRes.HopsToClosest = lookupMetrics.GetHopsForPeerSet(closestPeers)
 				fetchRes.GetClosePeersDuration = pingTime
 				if err != nil {
 					logEntry.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())

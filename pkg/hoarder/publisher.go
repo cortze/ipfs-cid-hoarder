@@ -86,29 +86,45 @@ func (publisher *CidPublisher) run() {
 	}
 }
 
-//addProviderMsgListener listens to a:
+// addProviderMsgListener listens to a:
+//
 //	msgNotchannel chan *p2p.MsgNotification
-//for a:
+//
+// for a:
+//
 //	MsgNotification.Msg.Type of Message_ADD_PROVIDER
-//when this message is received it adds the provider onto the database for later pings:
 //
-//1.)Creates a new:
+// when this message is received it adds the provider onto the database for later pings:
+//
+// 1.)Creates a new:
+//
 //	PRPingResults struct{...}
-//the result of a ping of an individual PR_HOLDER
 //
-//2.) Adds the PRPingResults struct{...} into the:
+// the result of a ping of an individual PR_HOLDER
+//
+// 2.) Adds the PRPingResults struct{...} into the:
+//
 //	var cidFetRes *CidFetchResults
-//using:
+//
+// using:
+//
 //	citFetRes.AddPRPingResults(pingRes)
-//which is set inside the providing_process routine:
+//
+// which is set inside the providing_process routine:
+//
 //	fetchRes := models.NewCidFetchResults(*received_cid, 0) // First round = Publish PR
 //	cidFetchRes.Store(received_cidStr, fetchRes)
 //
-//3.)Creates a new:
+// 3.)Creates a new:
+//
 //	PeerInfo struct{...}
-//which is stored inside a cidInfo struct{...}:
+//
+// which is stored inside a cidInfo struct{...}:
+//
 //	cidInfo.AddPRHolder(prHolderInfo)
-//this is taken by the providing_process routine:
+//
+// this is taken by the providing_process routine:
+//
 //	cidInfo := models.NewCidInfo(*received_cid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 //	// generate the cidFetcher
 //	publisher.CidMap.Store(received_cidStr, cidInfo)
@@ -200,34 +216,45 @@ func (publisher *CidPublisher) addProviderMsgListener(msgNotWg *sync.WaitGroup, 
 	}
 }
 
-//The providing process doesn't only publish the CIDs to the network but it's important for setting up the pinging process used later
-//by the tool.
-//Things that it does:
+// The providing process doesn't only publish the CIDs to the network but it's important for setting up the pinging process used later
+// by the tool.
+// Things that it does:
 //
-//1.)Receives the cids from the generateCids(...) method
+// 1.)Receives the cids from the generateCids(...) method
 //
-//2.)After receiving a cid it creates a:
+// 2.)After receiving a cid it creates a:
+//
 //	CIdInfo struct {...} instance
-//which documents basic info about a specific CID
 //
-//3.) Create a:
+// which documents basic info about a specific CID
+//
+// 3.) Create a:
+//
 //	CidFetchResults struct {...}
-//which contains basic info about the fetching process (pinging)
 //
-//4.) Calls the:
+// which contains basic info about the fetching process (pinging)
+//
+// 4.) Calls the:
+//
 //	func provide(...) inside this package cid-tracker.go
-//providing the CID to the network
 //
-//5.) adds the metrics received from func provide(...) and the fetch result struct to the newly created:
+// providing the CID to the network
+//
+// 5.) adds the metrics received from func provide(...) and the fetch result struct to the newly created:
+//
 //	var cidInfo *CidInfo
 //
-//6.) Access the tracker's field:
-//		DBCli     *db.DBClient
+// 6.) Access the tracker's field:
+//
+//	DBCli     *db.DBClient
+//
 // and adds the cidInfo and the fetchRes
 //
-//7.) Adds the cid info to the tracker's:
-//		CidPinger *CidPinger
-//to be later pinged by the pinger.
+// 7.) Adds the cid info to the tracker's:
+//
+//	CidPinger *CidPinger
+//
+// to be later pinged by the pinger.
 func (publisher *CidPublisher) publishingProcess(
 	publisherWG *sync.WaitGroup,
 	generationDone *bool,
@@ -252,7 +279,7 @@ func (publisher *CidPublisher) publishingProcess(
 			receivedCidStr := receivedCid.Hash().B58String()
 			// generate the new CidInfo cause a new CID was just received
 			//TODO the content type is not necessarily random content
-			cidInfo := models.NewCidInfo(*receivedCid, publisher.ReqInterval, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
+			cidInfo := models.NewCidInfo(*receivedCid, publisher.ReqInterval, publisher.StudyDuration, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
 
 			// generate the cidFetcher
 			publisher.CidMap.Store(receivedCidStr, cidInfo)
@@ -262,23 +289,25 @@ func (publisher *CidPublisher) publishingProcess(
 			cidFetchRes.Store(receivedCidStr, fetchRes)
 
 			// necessary stuff to get the different hop measurements
-			var hops dht.Hops
+			lookupMetrics := dht.NewLookupMetrics()
 			// currently linking a ContextKey variable througth the context that we generate
-			ctx := context.WithValue(publisher.ctx, dht.ContextKey("hops"), &hops)
+			ctx := context.WithValue(publisher.ctx, dht.ContextKey("lookupMetrics"), lookupMetrics)
 
+			pubTime := time.Now()
 			reqTime, err := provide(ctx, publisher, receivedCid)
 			if err != nil {
 				logEntry.Errorf("unable to Provide content. %s", err.Error())
 			}
 			// add the number of hops to the fetch results
-			fetchRes.TotalHops = hops.Total
-			fetchRes.HopsToClosest = hops.ToClosest
+			fetchRes.TotalHops = lookupMetrics.GetHops()
+			fetchRes.HopsToClosest = lookupMetrics.GetHopsForPeerSet(lookupMetrics.GetClosestPeers())
 
 			// TODO: fix this little wait to comput last PR Holder status
 			// little not inside the CID to notify when k peers where recorded?
 			time.Sleep(500 * time.Millisecond)
 
 			// add the request time to the CidInfo
+			cidInfo.AddPublicationTime(pubTime)
 			cidInfo.AddProvideTime(reqTime)
 			cidInfo.AddPRFetchResults(fetchRes)
 
@@ -312,8 +341,10 @@ func (publisher *CidPublisher) publishingProcess(
 	}
 }
 
-//provide calls:
+// provide calls:
+//
 //	DHT.Provide(...) method to provide the cid to the network
+//
 // and documents the time it took to publish a CID
 func provide(ctx context.Context, publisher *CidPublisher, receivedCid *cid.Cid) (time.Duration, error) {
 	log.Debug("calling provide method")
