@@ -26,10 +26,11 @@ type CidTracker struct {
 
 	m sync.Mutex
 
-	host      *p2p.Host
-	DBCli     *db.DBClient
-	CidSource src.CidSource
-	CidPinger *CidPinger
+	host       *p2p.Host
+	DBCli      *db.DBClient
+	CidSource  src.CidSource
+	httpSource *src.HttpCidSource // leave this nil
+	CidPinger  *CidPinger
 	//receive message from listen for add provider message function
 	MsgNot        *p2p.Notifier
 	K             int
@@ -98,6 +99,8 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 			log.Debug("Received empty provider records")
 			trackableCidArrayC <- nil
 			close(trackableCidArrayC)
+			//gracefully shutdown server
+			go tracker.httpSource.Shutdown(tracker.ctx)
 			break
 		}
 

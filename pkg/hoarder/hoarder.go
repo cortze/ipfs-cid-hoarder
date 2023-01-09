@@ -101,7 +101,19 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 			return nil, errors.Wrap(err, "error generating the CidTracker")
 		}
 		cidDiscoverer, err := NewCidDiscoverer(cidTracker)
-
+		// if the type is http source you need to assign the type to the tracker
+		if cidSource.Type() == config.HttpServerSource {
+			httpCidSource, ok := cidSource.(*src.HttpCidSource)
+			if !ok {
+				return nil, errors.New("Couldn't deduce type")
+			}
+			go httpCidSource.StartServer()
+			if err != nil {
+				return nil, errors.New("Couldn't start server")
+			}
+			//assign to user later for graceful shutdown
+			cidTracker.httpSource = httpCidSource
+		}
 		log.Debug("CidHoarder Initialized with cid discoverer")
 
 		return &CidHoarder{
@@ -183,7 +195,6 @@ func findCidSource(conf *config.Config) (src.CidSource, error) {
 		return nil, errors.New("text file source not yet implemented")
 	case config.HttpServerSource:
 		server := src.NewHttpCidSource(8080, "localhost")
-		go server.StartServer()
 		return server, nil
 	case config.JsonFileSource:
 		return src.OpenEncodedJSONFile(conf.CidFile)
