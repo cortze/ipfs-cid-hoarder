@@ -20,10 +20,10 @@ import (
 type HttpCidSource struct {
 	port            int
 	hostname        string
+	lock            sync.Mutex
 	server          *http.Server
 	providerRecords []ProviderRecords
 	isStarted       bool
-	mtx             *sync.Mutex
 }
 
 func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
@@ -47,6 +47,7 @@ func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 		port:            port,
 		hostname:        hostname,
 		server:          nil,
+		isStarted:       false,
 		providerRecords: []ProviderRecords{},
 	}
 }
@@ -152,8 +153,8 @@ func (httpCidSource *HttpCidSource) StartServer() error {
 }
 
 func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
-	httpCidSource.mtx.Lock()
-	defer httpCidSource.mtx.Unlock()
+	httpCidSource.lock.Lock()
+	defer httpCidSource.lock.Unlock()
 
 	if !httpCidSource.isStarted || httpCidSource.server == nil {
 		return errors.New("Server is not started")
