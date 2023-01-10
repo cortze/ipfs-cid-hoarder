@@ -242,7 +242,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 		}
 
 		log.Debugf("It's publication time is: %s", providerRecord.PublicationTime)
-		newPublicationTime, err := time.Parse(layoutPublicationTime, providerRecord.PublicationTime)
+		newPublicationTime, err := time.Parse(time.RFC3339, providerRecord.PublicationTime)
 
 		if err != nil {
 			log.Errorf("Error while parsing publication time: %s", err)

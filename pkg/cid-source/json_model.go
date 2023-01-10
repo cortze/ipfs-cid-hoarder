@@ -202,7 +202,7 @@ func (fileCIDSource *JsonFileCIDSource) GetNewCid() (TrackableCid, error) {
 		}
 
 		log.Debugf("It's publication time is: %s", pr.PublicationTime)
-		newPublicationTime, err := time.Parse(layoutPublicationTime, pr.PublicationTime)
+		newPublicationTime, err := time.Parse(time.RFC3339, pr.PublicationTime)
 
 		if err != nil {
 			log.Errorf("Error while parsing publication time: %s", err)
