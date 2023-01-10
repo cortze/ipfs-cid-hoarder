@@ -15,6 +15,8 @@ type CidSource interface {
 	Type() string
 }
 
+const layoutPublicationTime = "Jan 2, 2006 at 3:04pm (MST)"
+
 //Encapsulates the return type of the GetNewCid()
 type TrackableCid struct {
 	ID              peer.ID        `json:"PeerID"`

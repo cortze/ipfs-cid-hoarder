@@ -238,14 +238,14 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 		newProvideTime, err := time.ParseDuration(providerRecord.ProvideTime)
 
 		if err != nil {
-			log.Errorf("Error while parsing time: %s", err)
+			log.Errorf("Error while parsing provide time: %s", err)
 		}
 
 		log.Debugf("It's publication time is: %s", providerRecord.PublicationTime)
-		newProvideTime, err := time.Parse(providerRecord.PublicationTime)
+		newPublicationTime, err := time.Parse(layoutPublicationTime, providerRecord.PublicationTime)
 
 		if err != nil {
-			log.Errorf("Error while parsing time: %s", err)
+			log.Errorf("Error while parsing publication time: %s", err)
 		}
 
 		log.Debugf("It's user agent is: %s", providerRecord.UserAgent)
@@ -263,7 +263,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 		log.Infof("generated new CID %s", newCid.Hash().B58String())
 
 		log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
-		trackableCid := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newProvideTime, providerRecord.UserAgent)
+		trackableCid := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newPublicationTime, newProvideTime, providerRecord.UserAgent)
 		trackableCidPrs = append(trackableCidPrs, trackableCid)
 	}
 
