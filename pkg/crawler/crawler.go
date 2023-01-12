@@ -11,12 +11,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	kdht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/crawler"
-	tcp "github.com/libp2p/go-tcp-transport"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
 	ma "github.com/multiformats/go-multiaddr"
 
@@ -82,7 +82,7 @@ func RunLightCrawler(ctx context.Context, balcklistingUA string) (CrawlResults, 
 	}
 
 	// Initialize the CidHoarder
-	c, err := New(ctx, priv, config.CliIp, config.CliPort, balcklistingUA)
+	c, err := New(ctx, priv, config.CliIp, config.DefaultConfig.Port, balcklistingUA)
 	if err != nil {
 		return CrawlResults{}, err
 	}

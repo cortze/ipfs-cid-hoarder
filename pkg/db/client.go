@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
+
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"

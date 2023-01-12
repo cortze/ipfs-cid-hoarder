@@ -6,6 +6,7 @@ import (
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/crawler"
+
 	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
@@ -43,9 +44,11 @@ func RunCrawler(ctx *cli.Context) error {
 		return errors.Wrap(err, "unable to generate config from arguments")
 	}
 
+	term, _ := config.ParseLogOutput("terminal")
+
 	// set the logs configurations
 	log.SetFormatter(config.ParseLogFormatter("text"))
-	log.SetOutput(config.ParseLogOutput("terminal"))
+	log.SetOutput(term)
 	log.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
 	// expose the pprof and prometheus metrics

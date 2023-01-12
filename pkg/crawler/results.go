@@ -4,45 +4,43 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	log "github.com/sirupsen/logrus"
-	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
-	disc = iota 	// peer that got discovered but not connected
-	active 			// peer that got successfully connected
-	blacklist		// peer that got connected but belongs to the blacklistable UserAgent List
+	disc      = iota // peer that got discovered but not connected
+	active           // peer that got successfully connected
+	blacklist        // peer that got connected but belongs to the blacklistable UserAgent List
 	failed
 )
 
 type CrawlResults struct {
-	m sync.RWMutex
-	discPeers map[peer.ID]int
-	initTime time.Time
+	m          sync.RWMutex
+	discPeers  map[peer.ID]int
+	initTime   time.Time
 	finishTime time.Time
 }
 
-
-func NewCrawlerResults() *CrawlResults{
-	return &CrawlResults {
+func NewCrawlerResults() *CrawlResults {
+	return &CrawlResults{
 		discPeers: make(map[peer.ID]int),
 	}
 }
-
 
 func (r *CrawlResults) addPeer(p peer.ID, status int) {
 	r.m.Lock()
 	defer r.m.Unlock()
 
 	log.WithFields(log.Fields{
-		"peer": p.String(),
+		"peer":   p.String(),
 		"status": status,
 	}).Debug("new peer discovered")
-	
+
 	// add the peer to the discovered list with the received status
 
 	// if the peer wasn't already in the map, add it straight away
-	s, ok := r.discPeers[p] 
+	s, ok := r.discPeers[p]
 	if ok {
 		// check previous status
 		switch s {
@@ -76,10 +74,10 @@ func (r *CrawlResults) GetDiscvPeers() map[peer.ID]struct{} {
 		dicv[k] = struct{}{}
 	}
 
-	return dicv 
+	return dicv
 }
 
-func (r *CrawlResults) GetActivePeers() map[peer.ID]struct{}{
+func (r *CrawlResults) GetActivePeers() map[peer.ID]struct{} {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -91,10 +89,10 @@ func (r *CrawlResults) GetActivePeers() map[peer.ID]struct{}{
 		}
 	}
 
-	return atcv 
+	return atcv
 }
 
-func (r *CrawlResults) GetBlacklistedPeers() map[peer.ID]struct{}{
+func (r *CrawlResults) GetBlacklistedPeers() map[peer.ID]struct{} {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -108,7 +106,7 @@ func (r *CrawlResults) GetBlacklistedPeers() map[peer.ID]struct{}{
 	return blsp
 }
 
-func (r *CrawlResults) GetFailedPeers() map[peer.ID]struct{}{
+func (r *CrawlResults) GetFailedPeers() map[peer.ID]struct{} {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
