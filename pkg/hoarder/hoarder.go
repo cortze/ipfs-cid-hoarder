@@ -148,7 +148,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 func (c *CidHoarder) Run() error {
 	// Boostrap the kdht host
-	err := c.Pubhost.Boostrap(c.ctx)
+	err := c.Host.Boostrap(c.ctx)
 	if err != nil {
 		return errors.Wrap(err, "unable to boostrap the publisher or discoverer host with the kdht routing table.")
 	}
