@@ -53,7 +53,7 @@ func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 }
 
 func (httpCidSource *HttpCidSource) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Debug("Received request in server HTTP")
+	log.Info("Received request in server HTTP")
 	if r.URL.Path == "/ProviderRecord" {
 		if r.Method == http.MethodPost {
 			log.Debug("The request was a post method")
