@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -43,10 +44,6 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 	}).Trace("adding fetch_results to DB")
 
 	tot, suc, fail := fetchRes.GetSummary()
-	var isRetrievable bool
-	if suc > 0 {
-		isRetrievable = true
-	}
 
 	_, err = db.psqlPool.Exec(db.ctx, `
 	INSERT INTO fetch_results (
@@ -76,7 +73,7 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		tot,
 		suc,
 		fail,
-		isRetrievable,
+		fetchRes.IsRetrievable,
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to insert fetch_results at DB ")

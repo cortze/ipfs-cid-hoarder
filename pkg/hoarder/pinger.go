@@ -3,7 +3,6 @@ package hoarder
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -11,23 +10,21 @@ import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/peer"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	DialTimeout     = 20 * time.Second
+	LookupTimeout   = 60 * time.Second
 	minIterTime     = 500 * time.Millisecond
-	maxDialAttempts = 3 // Are three attempts enough?
-	dialGraceTime   = 10 * time.Second
+	maxDialAttempts = 1 // Are two attempts enough?
+	dialGraceTime   = 15 * time.Second
 )
 
 // CidPinger is the main object to schedule and monitor all the CID related metrics
 type CidPinger struct {
 	ctx context.Context
-	sync.Mutex
-	wg *sync.WaitGroup
+	wg  *sync.WaitGroup
 
 	host         *p2p.Host
 	dbCli        *db.DBClient
@@ -35,14 +32,33 @@ type CidPinger struct {
 	rounds       int
 	workers      int
 
-	init  bool
-	initC chan struct{}
+	init            bool
+	pingOrcDoneFlag bool
+	initC           chan struct{}
 
 	cidQ      *cidQueue
 	pingTaskC chan *models.CidInfo
 }
 
-// NewCidPinger return a CidPinger with the given configuration
+// NewCidPinger return a CidPinger with the given configuration,creates a new:
+//
+//	CidPinger struct {
+//		ctx context.Context
+//		sync.Mutex
+//		wg *sync.WaitGroup
+//
+//		host         *p2p.Host
+//		dbCli        *db.DBClient
+//		pingInterval time.Duration
+//		rounds       int
+//		workers      int
+//
+//		init  bool
+//		initC chan struct{}
+//
+//		cidQ      *cidQueue
+//		pingTaskC chan *models.CidInfo
+//	}
 func NewCidPinger(
 	ctx context.Context,
 	wg *sync.WaitGroup,
@@ -68,191 +84,41 @@ func NewCidPinger(
 
 // Run executes the main logic of the CID Pinger.
 // 1. runs the queue logic that schedules the pings
-// 2. launches the pinger pool that will perform all the CID monitoring calls
-func (p *CidPinger) Run() {
-	defer p.wg.Done()
+// 2. launchs the pinger pool that will perform all the CID monitoring calls
+func (pinger *CidPinger) Run() {
+	defer pinger.wg.Done()
 
 	var pingOrchWG sync.WaitGroup
-	var pingOrcDoneFlag bool
 	var pingerWG sync.WaitGroup
 
 	pingOrchWG.Add(1)
 	// Generate the Ping Orchester
-	go func(p *CidPinger, wg *sync.WaitGroup) {
-		defer pingOrchWG.Done()
-
-		logEntry := log.WithField("mod", "cid-orchester")
-		// we need to wait until the first CID is added, wait otherwise
-		<-p.initC
-
-		// generate a timer to determine
-		minTimeT := time.NewTicker(minIterTime)
-
-		for {
-			select {
-			case <-p.ctx.Done():
-				log.Info("shutdown was detected, closing Cid Ping Orchester")
-				return
-
-			default:
-				// loop over the list of CIDs, and check whether they need to be pinged or not
-				for _, c := range p.cidQ.cidArray {
-					// check if ctx was was closed
-					if p.ctx.Err() != nil {
-						log.Info("shutdown was detected, closing Cid Ping Orchester")
-						return
-					}
-					cStr := c.CID.Hash().B58String()
-					// check if the time for next ping has arrived
-					if time.Since(c.NextPing) < time.Duration(0) {
-						logEntry.Debugf("not in time to ping %s", cStr)
-						break
-					}
-
-					// increment Ping Counter
-					c.IncreasePingCounter()
-
-					// Add the CID to the pingTaskC
-					p.pingTaskC <- c
-
-					// check if they have reached the max-round counter
-					// if yes, remove them from the cidQ.cidArray
-					if c.GetPingCounter() >= p.rounds {
-						// delete the CID from the list
-						p.cidQ.removeCid(cStr)
-						logEntry.Infof("finished pinging CID %s - max pings reached %d", cStr, p.rounds)
-					}
-
-				}
-
-				// if CID pinger was initialized and there are no more CIDs to track, we are done with the study
-				if p.cidQ.Len() == 0 {
-					return
-				}
-
-				// reorg the array of CIDs from lowest next ping time to biggest one
-				p.cidQ.sortCidList()
-
-				// check if ticker for next iteration was raised
-				<-minTimeT.C
-			}
-		}
-
-	}(p, &pingOrchWG)
+	go pinger.runPingOrchester(&pingOrchWG)
 
 	// Launch CID pingers (workers)
-	for pinger := 0; pinger < p.workers; pinger++ {
+	for pingerCounter := 0; pingerCounter < pinger.workers; pingerCounter++ {
 		pingerWG.Add(1)
-		go func(p *CidPinger, wg *sync.WaitGroup, pingOrcDoneFlag *bool, pingerID int) {
-			defer wg.Done()
-
-			logEntry := log.WithField("pinger", pingerID)
-			logEntry.Debug("Initialized")
-			for {
-				// check if the ping orcherster has finished
-				if *pingOrcDoneFlag && len(p.pingTaskC) == 0 {
-					logEntry.Info("no more pings to orchestrate, finishing worker")
-					return
-				}
-
-				select {
-				case c, ok := <-p.pingTaskC:
-					// check if the models.CidInfo id not nil
-					if !ok {
-						logEntry.Warn("empty CID received from channel, finishing worker")
-						return
-					}
-
-					cStr := c.CID.Hash().B58String()
-					pingCounter := c.GetPingCounter()
-
-					logEntry.Infof("pinging CID %s created by %d | round %d from host %d", cStr, c.Creator.String(), pingCounter, p.host.ID().String())
-
-					// request the status of PR Holders
-					cidFetchRes := models.NewCidFetchResults(c.CID, pingCounter)
-
-					var wg sync.WaitGroup
-
-					wg.Add(1)
-					// DHT FindProviders call to see if the content is actually retrievable from the network
-					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
-						defer wg.Done()
-						var isRetrievable bool = false
-						t := time.Now()
-						providers, err := p.host.DHT.LookupForProviders(p.ctx, c.CID)
-						pingTime := time.Since(t)
-						fetchRes.FindProvDuration = pingTime
-						if err != nil {
-							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
-						}
-						// iter through the providers to see if it matches with the host's peerID
-						for _, paddrs := range providers {
-							if paddrs.ID == c.Creator {
-								isRetrievable = true
-							}
-						}
-						fmt.Println(time.Now(), "Providers for", c.CID.Hash().B58String(), "->", providers)
-
-						cidFetchRes.IsRetrievable = isRetrievable
-					}(p, c, cidFetchRes)
-
-					wg.Add(1)
-					// recalculate the closest k peers to the content
-					go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
-						defer wg.Done()
-						t := time.Now()
-
-						var hops dht.Hops
-
-						closestPeers, err := p.host.DHT.GetClosestPeers(p.ctx, string(c.CID.Hash()), &hops)
-						pingTime := time.Since(t)
-						fetchRes.TotalHops = hops.Total
-						fetchRes.HopsToClosest = hops.ToClosest
-						fetchRes.GetClosePeersDuration = pingTime
-						if err != nil {
-							logEntry.Warnf("unable to get the closest peers to cid %s - %s", cStr, err.Error())
-						}
-						for _, peer := range closestPeers {
-							cidFetchRes.AddClosestPeer(peer)
-						}
-					}(p, c, cidFetchRes)
-
-					// Ping in parallel each of the PRHolders
-					for _, peerInfo := range c.PRHolders {
-						wg.Add(1)
-						go func(wg *sync.WaitGroup, c *models.CidInfo, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
-							defer wg.Done()
-							pingRes := p.PingPRHolder(c, pingCounter, peerInfo.GetAddrInfo())
-							fetchRes.AddPRPingResults(pingRes)
-						}(&wg, c, peerInfo, cidFetchRes)
-					}
-
-					wg.Wait()
-
-					// update the finish time for the total fetch round
-					cidFetchRes.FinishTime = time.Now()
-
-					// add the fetch results to the array and persist it in the DB
-					p.dbCli.AddFetchResult(cidFetchRes)
-
-				case <-p.ctx.Done():
-					logEntry.Info("shutdown detected, closing pinger")
-					return
-				}
-			}
-
-		}(p, &pingerWG, &pingOrcDoneFlag, pinger)
+		go pinger.runPinger(&pingerWG, pingerCounter)
 	}
 
+	// wait until the ping orchester has finished
 	pingOrchWG.Wait()
-	log.Infof("finished pinging the CIDs on %d rounds", p.rounds)
+	log.Infof("finished pinging the CIDs on %d rounds", pinger.rounds)
+	pinger.pingOrcDoneFlag = true
 
-	pingOrcDoneFlag = true
-
+	// wait until the ping workers finish
 	pingerWG.Wait()
-	close(p.pingTaskC)
-
 	log.Debug("done from the CID Pinger")
+
+	// close all the pending channels
+	close(pinger.pingTaskC)
+
+	//close the publisher host
+	err := pinger.host.Close()
+	if err != nil {
+		log.Errorf("failed to close pinger host: %s", err)
+		return
+	}
 }
 
 // AddCidInfo adds a new CID to the pinging queue
@@ -265,7 +131,7 @@ func (p *CidPinger) AddCidInfo(c *models.CidInfo) {
 }
 
 // PingPRHolder dials a given PR Holder to check whether it's active or not, and whether it has the PRs or not
-func (p *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.AddrInfo) *models.PRPingResults {
+func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.AddrInfo) *models.PRPingResults {
 	logEntry := log.WithFields(log.Fields{
 		"cid": c.CID.Hash().B58String(),
 	})
@@ -273,49 +139,69 @@ func (p *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.AddrIn
 	var active, hasRecords bool
 	var connError string
 
-	// connect the peer
-	pingCtx, cancel := context.WithTimeout(p.ctx, DialTimeout)
-	defer cancel()
-
+	// track time of the process
 	tstart := time.Now()
 
-	// loop over max tries if the connection is connection refused/ connection reset by peer
-	for att := 0; att < maxDialAttempts; att++ {
-		// TODO: attempt at least to see if the connection refused
-		err := p.host.Connect(pingCtx, pAddr)
+	// fulfill the control fields from a successful connection
+	succesfulConnection := func() {
+		active = true
+		connError = p2p.NoConnError
+
+		// if the connection was successful, request whether it has the records or not
+		provs, _, err := pinger.host.DHT.GetProvidersFromPeer(pinger.ctx, pAddr.ID, c.CID.Hash())
 		if err != nil {
-			logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.CID.Hash().B58String(), err.Error())
-			connError = p2p.ParseConError(err)
-			// If the error is not linked to an connection refused or reset by peer, just break the look
-			if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
+			log.Warnf("unable to retrieve providers from peer %s - error: %s", pAddr.ID, err.Error())
+		} else {
+			logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
+		}
+		// iter through the providers to see if it matches with the host's peerID
+		for _, paddrs := range provs {
+			if paddrs.ID == c.Creator {
+				hasRecords = true
+				fmt.Println(time.Now(), "Peer", pAddr.ID.String(), "reporting on", c.CID.Hash().B58String(), " -> ", paddrs)
+			}
+		}
+	}
+
+	// check if we already have a connection open to the peer
+	peerList := pinger.host.Network().Peers()
+	connected := false
+	for _, p := range peerList {
+		if p.String() == pAddr.ID.String() {
+			connected = true
+			break
+		}
+	}
+
+	if connected {
+		logEntry.Debugf("peer %s was alread connected, success connection for Cid %s", pAddr.ID.String(), c.CID.Hash().B58String())
+		succesfulConnection()
+	} else {
+		// loop over max tries if the connection is connection refused/ connection reset by peer
+		for att := 0; att < maxDialAttempts; att++ {
+			// attempt to connect the peer
+			err := pinger.host.Connect(pinger.ctx, pAddr)
+			if err != nil {
+				logEntry.Debugf("unable to connect peer %s for Cid %s - error %s", pAddr.ID.String(), c.CID.Hash().B58String(), err.Error())
+				connError = p2p.ParseConError(err)
+				// If the error is not linked to an connection refused or reset by peer, just break the look
+				if connError != p2p.DialErrorConnectionRefused && connError != p2p.DialErrorStreamReset {
+					break
+				} else {
+					// add random delay between trials
+					ticker := time.NewTicker(dialGraceTime)
+					select {
+					case <-ticker.C:
+						continue
+					case <-pinger.ctx.Done():
+						break
+					}
+				}
+			} else {
+				logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.CID.Hash().B58String())
+				succesfulConnection()
 				break
 			}
-		} else {
-			logEntry.Debugf("succesful connection to peer %s for Cid %s", pAddr.ID.String(), c.CID.Hash().B58String())
-			active = true
-			connError = p2p.NoConnError
-
-			// if the connection was successful, request whether it has the records or not
-			provs, _, err := p.host.DHT.GetProvidersFromPeer(p.ctx, pAddr.ID, c.CID.Hash())
-			if err != nil {
-				log.Warnf("unable to retrieve providers from peer %s - error: %s", pAddr.ID, err.Error())
-			} else {
-				logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
-			}
-			// iter through the providers to see if it matches with the host's peerID
-			for _, paddrs := range provs {
-				if paddrs.ID == c.Creator {
-					hasRecords = true
-					fmt.Println(time.Now(), "Peer", pAddr.ID.String(), "reporting on", c.CID.Hash().B58String(), " -> ", paddrs)
-				}
-			}
-
-			// close connection and exit loop
-			err = p.host.Network().ClosePeer(pAddr.ID)
-			if err != nil {
-				logEntry.Errorf("unable to close connection to peer %s - %s", pAddr.ID.String(), err.Error())
-			}
-			break
 		}
 	}
 
@@ -332,91 +218,217 @@ func (p *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.AddrIn
 		connError)
 }
 
-// cidQueue is a simple queue of CIDs that allows rapid access to content through maps,
-// while being abel to sort the array by closer next ping time to determine which is
-// the next soonest peer to ping
-type cidQueue struct {
-	sync.RWMutex
+// runPingOrchester handles the way pings are going to happen:
+//
+// 1.) The ping orchester waits for a cid to be generated by:
+//
+//	func generateCids(...)
+//
+// and the cid to be sent to the:
+//
+//	initC chan struct{}
+//
+// inside the cid tracker generation by the:
+//
+//	func AddCidInfo(...)
+//
+// 2.) Loops over the queue of CidInfos and determines whether a cid needs to be pinged. If the cid needs to be pinged:
+//
+//	pinger.pingTaskC <- cidInfo
+//
+// # TODO connection between this and the next go routine
+//
+// 3.) This is a ongoing step. Keeps a timer using:
+//
+//	minTimeT := time.NewTicker(minIterTime)
+//
+// and waits until a new iteration occurs to restart looping over the cids:
+//
+//	<-minTimeT.C
+func (pinger *CidPinger) runPingOrchester(pingOrchWG *sync.WaitGroup) {
+	defer pingOrchWG.Done()
 
-	cidMap   map[string]*models.CidInfo
-	cidArray []*models.CidInfo
-}
+	logEntry := log.WithField("mod", "cid-orchester")
+	// we need to wait until the first CID is added, wait otherwise
+	// this cid is added inside the AddCidInfo method called from Cid tracker
+	<-pinger.initC
+	// generate a timer to determine
+	minTimeT := time.NewTicker(minIterTime)
 
-func newCidQueue() *cidQueue {
-	return &cidQueue{
-		cidMap:   make(map[string]*models.CidInfo),
-		cidArray: make([]*models.CidInfo, 0),
-	}
-}
+	for {
+		select {
+		case <-pinger.ctx.Done():
+			log.Info("shutdown was detected, closing Cid Ping Orchester")
+			return
 
-func (q *cidQueue) isCidAlready(c string) bool {
-	q.RLock()
-	defer q.RUnlock()
+		default:
+			// loop over the list of CIDs, and check whether they need to be pinged or not
+			for _, cidInfo := range pinger.cidQ.cidArray {
+				// check if ctx was was closed
+				if pinger.ctx.Err() != nil {
+					log.Info("shutdown was detected, closing Cid Ping Orchester")
+					return
+				}
 
-	_, ok := q.cidMap[c]
-	return ok
-}
+				cidStr := cidInfo.CID.Hash().B58String()
+				// check if the time for next ping has arrived
+				if !cidInfo.IsReadyForNextPing() {
+					logEntry.Debugf("not in time to ping %s", cidStr)
+					break // we assume that the Array is sorted with the lower NextPingTime at the begining, therefore, we break the loop
+				}
 
-func (q *cidQueue) addCid(c *models.CidInfo) {
-	q.Lock()
-	defer q.Unlock()
+				// increment Ping Counter
+				cidInfo.IncreasePingCounter()
 
-	q.cidMap[c.CID.Hash().B58String()] = c
-	q.cidArray = append(q.cidArray, c)
-}
+				// Add the CID to the pingTaskC
+				pinger.pingTaskC <- cidInfo
 
-func (q *cidQueue) removeCid(cStr string) {
-	delete(q.cidMap, cStr)
-	// check if len of the queue is only one
-	if q.Len() == 1 {
-		q.cidArray = make([]*models.CidInfo, 0)
-		return
-	}
-	item := -1
-	for idx, c := range q.cidArray {
-		if c.CID.Hash().B58String() == cStr {
-			item = idx
-			break
+				// check if they have finished the duration of the study
+				// if yes, remove them from the cidQ.cidArray
+				if cidInfo.IsFinished() {
+					// delete the CID from the list
+					pinger.cidQ.removeCid(cidStr)
+					logEntry.Infof("finished pinging CID %s - max pings reached %d", cidStr, pinger.rounds)
+				}
+
+			}
+
+			// if CID pinger was initialized and there are no more CIDs to track, we are done with the study
+			if pinger.cidQ.Len() == 0 {
+				return
+			}
+
+			// reorganize the array of CIDs from lowest next ping time to biggest one
+			pinger.cidQ.sortCidList()
+
+			// check if ticker for next iteration was raised
+			<-minTimeT.C
 		}
 	}
-	// check if the item was found
-	if item >= 0 {
-		q.cidArray = append(q.cidArray[:item], q.cidArray[(item+1):]...)
+}
+
+// runPinger creates the necessary pinger to retrieve the content from the network and ping the PR holders of the content.
+// 1.) Receives a cidInfo struct from the channel:
+//
+//	pinger.pingTaskC chan *models.CidInfo
+//
+// inside the generatePingOrchester goroutine.
+//
+// 2.) Requests the status of the PR holders(substeps):
+//
+//	1.) Finds the provider of the CIDs
+//
+//	2.) Recalculates the k closest peers
+//
+// The above requests are done to populate the CidFetchRes struct{...} and then
+//
+// 3.) Pings the PR holders in parallel calling the:
+//
+//	func PingPRholder(...)
+//
+// which adds the:
+//
+//	PRPingResults to the CidFetchRes field []*PRPingResults
+func (pinger *CidPinger) runPinger(wg *sync.WaitGroup, pingerID int) {
+	defer wg.Done()
+	minTimeT := time.NewTicker(minIterTime)
+	logEntry := log.WithField("pinger", pingerID)
+	logEntry.Debug("Initialized")
+	for {
+		// check if the ping orcherster has finished
+		if pinger.pingOrcDoneFlag && len(pinger.pingTaskC) == 0 {
+			logEntry.Info("no more pingTasks to perform orcherster has finished, finishing worker")
+			return
+		}
+		select {
+		case cidInfo := <-pinger.pingTaskC:
+			logEntry.Debug("new ping task received from channel")
+
+			cidStr := cidInfo.CID.Hash().B58String()
+			pingCounter := cidInfo.GetPingCounter()
+			logEntry.Infof("pinging CID %s for round %d", cidStr, pingCounter)
+
+			// request the status of PR Holders
+			cidFetchRes := models.NewCidFetchResults(cidInfo.CID, pingCounter)
+
+			var wg sync.WaitGroup
+
+			wg.Add(1)
+			// DHT FindProviders call to see if the content is actually retrievable from the network
+			go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
+				defer wg.Done()
+				var isRetrievable bool = false
+				t := time.Now()
+
+				ctxT, cancel := context.WithTimeout(p.ctx, LookupTimeout)
+				defer cancel()
+				providers, err := p.host.DHT.LookupForProviders(ctxT, c.CID)
+				pingTime := time.Since(t)
+				fetchRes.FindProvDuration = pingTime
+				if err != nil {
+					logEntry.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
+				}
+				// iter through the providers to see if it matches with the host's peerID
+				for _, paddrs := range providers {
+					if paddrs.ID == c.Creator {
+						isRetrievable = true
+					}
+				}
+				// Removable - Just double checking
+				if len(providers) == 0 && isRetrievable {
+					log.Errorf("missmatch - content retrievable but no providers (%d)", len(providers))
+				}
+				if len(providers) > 0 && !isRetrievable {
+					log.Error("missmatch - content not retrievable but found providers (%d)", len(providers))
+				}
+
+				fetchRes.IsRetrievable = isRetrievable
+				fmt.Println(time.Now(), "Providers for", c.CID.Hash().B58String(), "->", providers)
+			}(pinger, cidInfo, cidFetchRes)
+
+			wg.Add(1)
+			// recalculate the closest k peers to the content. This needs to be done due to node churn.(?)
+			go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
+				defer wg.Done()
+				t := time.Now()
+
+				ctxT, cancel := context.WithTimeout(p.ctx, LookupTimeout)
+				defer cancel()
+				closestPeers, lookupMetrics, err := p.host.DHT.GetClosestPeers(ctxT, string(c.CID.Hash()))
+				pingTime := time.Since(t)
+				fetchRes.TotalHops = lookupMetrics.GetHops()
+				fetchRes.HopsToClosest = lookupMetrics.GetHopsForPeerSet(closestPeers)
+				fetchRes.GetClosePeersDuration = pingTime
+				if err != nil {
+					logEntry.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
+				}
+				for _, peer := range closestPeers {
+					cidFetchRes.AddClosestPeer(peer)
+				}
+			}(pinger, cidInfo, cidFetchRes)
+
+			// Ping in parallel each of the PRHolders
+			for _, peerInfo := range cidInfo.PRHolders {
+				wg.Add(1)
+				go func(wg *sync.WaitGroup, c *models.CidInfo, peerInfo *models.PeerInfo, fetchRes *models.CidFetchResults) {
+					defer wg.Done()
+					pingRes := pinger.PingPRHolder(c, pingCounter, peerInfo.GetAddrInfo())
+					fetchRes.AddPRPingResults(pingRes)
+				}(&wg, cidInfo, peerInfo, cidFetchRes)
+			}
+
+			// wait until all the parallel routines are done
+			wg.Wait()
+			// update the finish time for the total fetch round
+			cidFetchRes.FinishTime = time.Now()
+			// add the fetch results to the array and persist it in the DB
+			pinger.dbCli.AddFetchResult(cidFetchRes)
+
+		case <-pinger.ctx.Done():
+			logEntry.Info("shutdown detected, closing pinger")
+			return
+		case <-minTimeT.C: // and min iter time has passed
+			// not ping task to read from the channel, checking again
+		}
 	}
-}
-
-func (q *cidQueue) getCid(cStr string) (*models.CidInfo, bool) {
-	q.RLock()
-	defer q.RUnlock()
-
-	c, ok := q.cidMap[cStr]
-	return c, ok
-}
-
-func (q *cidQueue) sortCidList() {
-	sort.Sort(q)
-}
-
-// Swap is part of sort.Interface.
-func (q *cidQueue) Swap(i, j int) {
-	q.Lock()
-	defer q.Unlock()
-
-	q.cidArray[i], q.cidArray[j] = q.cidArray[j], q.cidArray[i]
-}
-
-// Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by.
-func (q *cidQueue) Less(i, j int) bool {
-	q.RLock()
-	defer q.RUnlock()
-
-	return q.cidArray[i].NextPing.Before(q.cidArray[j].NextPing)
-}
-
-// Len is part of sort.Interface. We use the peer list to get the length of the array.
-func (q *cidQueue) Len() int {
-	q.RLock()
-	defer q.RUnlock()
-
-	return len(q.cidArray)
 }
