@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )

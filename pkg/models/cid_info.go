@@ -5,7 +5,7 @@ import (
 	"time"
 
 	cid "github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // CidInfo contains the basic information of the CID to track.
@@ -16,36 +16,71 @@ type CidInfo struct {
 	CID cid.Cid
 
 	GenTime     time.Time
-	ReqInterval time.Duration
+	PublishTime time.Time
+	ProvideTime time.Duration // time that took to publish the provider records
 
 	K             int         // Number of K peers that should get the initial PR
 	PRHolders     []*PeerInfo // Peers that took the responsability to keep the PR
 	PRPingResults []*CidFetchResults
-	ContentType   string  // Type of the content that is under the CID (Random, Video, Image...)
-	Source        string  // Track where is the content coming from (Random, Cid-File, Bitswap)
-	Creator       peer.ID // Peer hosting the content, so far only one (us)
+	ContentType   string // Type of the content that is under the CID (Random, Video, Image...)
+	Source        string // Track where is the content coming from (Random, Cid-File, Bitswap)
+	//TODO change source to CidSource
+	Creator peer.ID // Peer hosting the content, so far only one (us)
 
-	ProvideTime time.Duration // time that took to publish the provider records
-	NextPing    time.Time
-	PingCounter int
+	ReqInterval   time.Duration
+	StudyDuration time.Duration
+	NextPing      time.Time
+	PingCounter   int
 }
 
+// Creates a new:
+//
+//	CidInfo struct {
+//		m sync.Mutex
+//
+//		CID cid.Cid
+//
+//		GenTime     time.Time
+//		PublishTime time.Time
+//		ReqInterval time.Duration
+//
+//		K             int         // Number of K peers that should get the initial PR
+//		PRHolders     []*PeerInfo // Peers that took the responsability to keep the PR
+//		PRPingResults []*CidFetchResults
+//		ContentType   string  // Type of the content that is under the CID (Random, Video, Image...)
+//		Source        string  // Track where is the content coming from (Random, Cid-File, Bitswap)
+//		Creator       peer.ID // Peer hosting the content, so far only one (us)
+//
+//		ProvideTime time.Duration // time that took to publish the provider records
+//		NextPing    time.Time
+//		PingCounter int
+//	}
 func NewCidInfo(
 	id cid.Cid,
 	reqInt time.Duration,
+	studyDurt time.Duration,
 	contentType, source string,
 	creator peer.ID) *CidInfo {
 
 	return &CidInfo{
-		m:           sync.Mutex{},
-		CID:         id,
-		GenTime:     time.Now(), // fill the CID with the current time
-		ReqInterval: reqInt,
-		PRHolders:   make([]*PeerInfo, 0),
-		ContentType: contentType,
-		Source:      source,
-		Creator:     creator,
+		m:             sync.Mutex{},
+		CID:           id,
+		GenTime:       time.Now(), // fill the CID with the current time
+		ReqInterval:   reqInt,
+		StudyDuration: studyDurt,
+		PRHolders:     make([]*PeerInfo, 0),
+		ContentType:   contentType,
+		Source:        source,
+		Creator:       creator,
 	}
+}
+
+// AddPublicationTime adds the time at which the CID was published to the network
+func (c *CidInfo) AddPublicationTime(pubTime time.Time) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.PublishTime = pubTime
 }
 
 // AddProvideTime modifies the time that took to publish a CID
@@ -56,7 +91,16 @@ func (c *CidInfo) AddProvideTime(reqTime time.Duration) {
 	c.ProvideTime = reqTime
 }
 
-// AddPRHolder inserts a given Peer selected/attempted to keep the PRs for a CID
+func (c *CidInfo) AddCreator(creator peer.ID) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.Creator = creator
+}
+
+// AddPRHolder inserts a given Peer selected/attempted to keep the PRs for a CID,this is the CidInfo struct's field:
+//
+//	PRHolders     []*PeerInfo // Peers that took the responsability to keep the PR
 func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -65,7 +109,9 @@ func (c *CidInfo) AddPRHolder(prHolder *PeerInfo) {
 	c.K++
 }
 
-// AddPRFetchResults inserts the results of a given CidFetch round into the CID obj
+// AddPRFetchResults inserts the results of a given CidFetch round into the CID object:
+//
+//	CidInfo struct {...} contains PRPingResults []*CidFetchResults
 func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -73,9 +119,23 @@ func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	c.PRPingResults = append(c.PRPingResults, results)
 	// check if the CID is initialized or not
 	if c.NextPing == (time.Time{}) {
-		// Update the next ping time to gentime + providetime + req interval
-		c.NextPing = c.GenTime.Add(c.ProvideTime).Add(c.ReqInterval)
+		// Update the next ping time to PublicationTime + req interval
+		// take also into account the publication time
+		offset := c.ProvideTime / 2
+		c.NextPing = c.PublishTime.Add(offset).Add(c.ReqInterval)
 	}
+}
+
+// IsReadyForNextPing returns true if it's time to ping the CID
+// (taking into account the nextPing time previously calculated)
+func (c *CidInfo) IsReadyForNextPing() bool {
+	return time.Now().After(c.NextPing)
+}
+
+// IsFinished returns true if the study for the given CID has already finished (enough ping rounds to cover the study time)
+// (taking into account the publicationTime previously calculated)
+func (c *CidInfo) IsFinished() bool {
+	return time.Now().After(c.PublishTime.Add(c.StudyDuration))
 }
 
 // IncreasePingCounter increases the internal ping counter, later used to track the ping round

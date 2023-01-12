@@ -4,24 +4,24 @@ import (
 	"context"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // MessageSender handles sending wire protocol messages to a given peer
 type MessageSender struct {
-	m           pb.MessageSender
+	m             pb.MessageSender
 	blacklistedUA string
-	msgNot      *Notifier
+	msgNot        *Notifier
 }
 
 func NewCustomMessageSender(blacklistedUA string) *MessageSender {
 	return &MessageSender{
 		blacklistedUA: blacklistedUA,
-		msgNot:      NewMsgNotifier(),
+		msgNot:        NewMsgNotifier(),
 	}
 }
 func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSender {
@@ -34,7 +34,6 @@ func (ms *MessageSender) GetMsgNotifier() *Notifier {
 	return ms.msgNot
 }
 
-// SendRequest is a custom wrapper on top of the pb.MessageSender that sends a peer a message and waits for its response
 func (ms *MessageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
 	return ms.m.SendRequest(ctx, p, pmes)
 }
