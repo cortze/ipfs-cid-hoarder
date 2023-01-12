@@ -54,41 +54,44 @@ func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 
 func (httpCidSource *HttpCidSource) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Received request in server HTTP")
-	if r.Method == http.MethodPost {
-		log.Debug("The request was a post method")
-		// create a new TrackableCid instance
-		var providerRecords ProviderRecords
+	if r.URL.Path == "/ProviderRecord" {
+		if r.Method == http.MethodPost {
+			log.Debug("The request was a post method")
+			// create a new TrackableCid instance
+			var providerRecords ProviderRecords
 
-		// decode the request body into the TrackableCid struct
-		err := json.NewDecoder(r.Body).Decode(&providerRecords)
-		if err == nil {
-			log.Info("Decoded new encapsulated json received from post")
+			// decode the request body into the TrackableCid struct
+			err := json.NewDecoder(r.Body).Decode(&providerRecords)
+			if err == nil {
+				log.Info("Decoded new encapsulated json received from post")
 
-			// add the trackableCid to the list
-			httpCidSource.Enqueue(providerRecords)
+				// add the trackableCid to the list
+				httpCidSource.Enqueue(providerRecords)
+			} else {
+
+				http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			}
+
+		} else if r.Method == http.MethodGet {
+			log.Debug("The request was a get request")
+			// check if there are any trackableCids to return
+			if len(httpCidSource.providerRecords) != 0 {
+				// return the last unretrieved trackableCid
+				providerRecords := httpCidSource.Dequeue()
+				log.Info("Sending new encapsulated json cid to user with get method")
+				// send the trackableCid back to the client as a response
+				json.NewEncoder(w).Encode(providerRecords)
+			} else {
+
+				http.Error(w, "No record available currently", http.StatusNoContent)
+			}
+
 		} else {
-
-			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			// return "Method Not Allowed" error
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
-
-	} else if r.Method == http.MethodGet {
-		log.Debug("The request was a get request")
-		// check if there are any trackableCids to return
-		if len(httpCidSource.providerRecords) != 0 {
-			// return the last unretrieved trackableCid
-			providerRecords := httpCidSource.Dequeue()
-			log.Info("Sending new encapsulated json cid to user with get method")
-			// send the trackableCid back to the client as a response
-			json.NewEncoder(w).Encode(providerRecords)
-		} else {
-
-			http.Error(w, "No record available currently", http.StatusNoContent)
-		}
-
-	} else {
-		// return "Method Not Allowed" error
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+
 }
 
 func (httpCidSource *HttpCidSource) StartServer() error {
