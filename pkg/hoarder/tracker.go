@@ -91,7 +91,7 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 	// generate a timer to determine
 	minTimeT := time.NewTicker(5 * time.Second)
 	log.Debugf("Source is: %s and config source is: ", tracker.CidSource.Type(), config.HttpServerSource)
-
+	counter := 0
 	for true {
 		trackableCids, err := src.GetNewHttpCid(tracker.CidSource)
 
@@ -110,7 +110,8 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 			<-minTimeT.C
 			continue
 		}
-
+		log.Debugf("Sending CID number from get request: %d", counter)
+		counter++
 		trackableCidArrayC <- trackableCids
 		// check if ticker for next iteration was raised
 		<-minTimeT.C
