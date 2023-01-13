@@ -219,7 +219,6 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 					p2p.NoConnError,
 				)
 				cidInfo.AddCreator(trackableCid.Creator)
-				fetchRes.AddPRPingResults(pingRes)
 
 				log.Debugf("User agent received from provider store: %s", discoverer.host.GetUserAgentOfPeer(trackableCid.ID))
 
@@ -230,6 +229,8 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 				)
 
 				cidInfo.AddPRHolder(prHolderInfo)
+				fetchRes.AddPRPingResults(pingRes)
+
 			}
 			cidInfo.AddPRFetchResults(fetchRes)
 
