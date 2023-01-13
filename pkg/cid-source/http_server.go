@@ -35,7 +35,7 @@ func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
 	}
 	elem := httpCidSource.providerRecords[0]
 	httpCidSource.providerRecords = httpCidSource.providerRecords[1:]
-	log.Debugf("Removed element from queue, lenth is now: %d", len(httpCidSource.providerRecords))
+	log.Debugf("Removed element from queue, length is now: %d", len(httpCidSource.providerRecords))
 	return elem
 }
 
@@ -58,42 +58,40 @@ func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 
 func (httpCidSource *HttpCidSource) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Info("Received request in server HTTP")
-	if r.URL.Path == "/ProviderRecord" {
-		if r.Method == http.MethodPost {
-			log.Debug("The request was a post method")
-			// create a new TrackableCid instance
-			var providerRecords ProviderRecords
+	if r.Method == http.MethodPost {
+		log.Debug("The request was a post method")
+		// create a new TrackableCid instance
+		var providerRecords ProviderRecords
 
-			// decode the request body into the TrackableCid struct
-			err := json.NewDecoder(r.Body).Decode(&providerRecords)
-			if err == nil {
-				log.Info("Decoded new encapsulated json received from post")
+		// decode the request body into the TrackableCid struct
+		err := json.NewDecoder(r.Body).Decode(&providerRecords)
+		if err == nil {
+			log.Info("Decoded new encapsulated json received from post")
 
-				// add the trackableCid to the list
-				httpCidSource.Enqueue(providerRecords)
-			} else {
-
-				http.Error(w, "Error decoding request body", http.StatusBadRequest)
-			}
-
-		} else if r.Method == http.MethodGet {
-			log.Debug("The request was a get request")
-			// check if there are any trackableCids to return
-			if len(httpCidSource.providerRecords) != 0 {
-				// return the last unretrieved trackableCid
-				providerRecords := httpCidSource.Dequeue()
-				log.Info("Sending new encapsulated json cid to user with get method")
-				// send the trackableCid back to the client as a response
-				json.NewEncoder(w).Encode(providerRecords)
-			} else {
-
-				http.Error(w, "No record available currently", http.StatusNoContent)
-			}
-
+			// add the trackableCid to the list
+			httpCidSource.Enqueue(providerRecords)
 		} else {
-			// return "Method Not Allowed" error
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
 		}
+
+	} else if r.Method == http.MethodGet {
+		log.Debug("The request was a get request")
+		// check if there are any trackableCids to return
+		if len(httpCidSource.providerRecords) != 0 {
+			// return the last unretrieved trackableCid
+			providerRecords := httpCidSource.Dequeue()
+			log.Info("Sending new encapsulated json cid to user with get method")
+			// send the trackableCid back to the client as a response
+			json.NewEncoder(w).Encode(providerRecords)
+		} else {
+
+			http.Error(w, "No record available currently", http.StatusNoContent)
+		}
+
+	} else {
+		// return "Method Not Allowed" error
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 
 }
@@ -112,42 +110,6 @@ func (httpCidSource *HttpCidSource) StartServer() error {
 		Handler: httpCidSource,
 	}
 
-	/* http.HandleFunc("/ProviderRecord", func(w http.ResponseWriter, r *http.Request) {
-		log.Info("Set handler for requests")
-		if r.Method == http.MethodPost {
-			// create a new TrackableCid instance
-			var providerRecords ProviderRecords
-
-			// decode the request body into the TrackableCid struct
-			err := json.NewDecoder(r.Body).Decode(&providerRecords)
-			if err == nil {
-				log.Info("Decoded new encapsulated json received from post")
-
-				// add the trackableCid to the list
-				httpCidSource.Enqueue(providerRecords)
-			} else {
-
-				http.Error(w, "Error decoding request body", http.StatusBadRequest)
-			}
-
-		} else if r.Method == http.MethodGet {
-			// check if there are any trackableCids to return
-			if len(httpCidSource.providerRecords) != 0 {
-				// return the last unretrieved trackableCid
-				providerRecords := httpCidSource.Dequeue()
-				log.Info("Sending new encapsulated json cid to user with get method")
-				// send the trackableCid back to the client as a response
-				json.NewEncoder(w).Encode(providerRecords)
-			} else {
-
-				http.Error(w, "No record available currently", http.StatusNoContent)
-			}
-
-		} else {
-			// return "Method Not Allowed" error
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	}) */
 	if err := httpCidSource.server.ListenAndServe(); err != nil {
 		if err == http.ErrServerClosed {
 			log.Infof("Server closed under request: %v", err)
@@ -194,7 +156,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 	}
 
 	// send a GET request to the server
-	url := fmt.Sprintf("http://%s:%d/ProviderRecord", httpCidSource.hostname, httpCidSource.port)
+	url := fmt.Sprintf("http://%s:%d/", httpCidSource.hostname, httpCidSource.port)
 	resp, err := http.Get(url)
 	if err != nil {
 		return []TrackableCid{}, err
@@ -228,18 +190,21 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 		newCid, err := cid.Parse(providerRecord.CID)
 		if err != nil {
 			log.Errorf("could not convert string to cid %s", err)
+			continue
 		}
 
 		log.Debugf("It's peer id is: %s", providerRecord.ID)
 		newPid, err := peer.Decode(providerRecord.ID)
 		if err != nil {
 			log.Errorf("could not convert string to pid %s", err)
+			continue
 		}
 
 		log.Debugf("It's creator is: %s", providerRecord.Creator)
 		newCreator, err := peer.Decode(providerRecord.Creator)
 		if err != nil {
 			log.Errorf("could not convert string to creator pid %s", err)
+			continue
 		}
 
 		log.Debugf("It's provide time is: %s", providerRecord.ProvideTime)
@@ -247,6 +212,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 
 		if err != nil {
 			log.Errorf("Error while parsing provide time: %s", err)
+			continue
 		}
 
 		log.Debugf("It's publication time is: %s", providerRecord.PublicationTime)
@@ -254,6 +220,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 
 		if err != nil {
 			log.Errorf("Error while parsing publication time: %s", err)
+			continue
 		}
 
 		log.Debugf("It's user agent is: %s", providerRecord.UserAgent)
@@ -262,7 +229,7 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 		for i := 0; i < len(providerRecord.Addresses); i++ {
 			multiaddr, err := ma.NewMultiaddr(providerRecord.Addresses[i])
 			if err != nil {
-				//log.Errorf("could not convert string to multiaddress %s", err)
+				log.Errorf("could not convert string to multiaddress %s", err)
 				continue
 			}
 			multiaddresses = append(multiaddresses, multiaddr)
