@@ -27,6 +27,8 @@ type HttpCidSource struct {
 }
 
 func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
+	httpCidSource.lock.Lock()
+	defer httpCidSource.lock.Unlock()
 	if len(httpCidSource.providerRecords) == 0 {
 		log.Debug("Queue is empty")
 		return ProviderRecords{}
@@ -38,6 +40,8 @@ func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
 }
 
 func (httpCidSource *HttpCidSource) Enqueue(providerRecords ProviderRecords) {
+	httpCidSource.lock.Lock()
+	defer httpCidSource.lock.Unlock()
 	httpCidSource.providerRecords = append(httpCidSource.providerRecords, providerRecords)
 	log.Debugf("Added new element to queue, length is now: %d", len(httpCidSource.providerRecords))
 }

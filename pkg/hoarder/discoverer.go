@@ -233,6 +233,14 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			}
 			cidInfo.AddPRFetchResults(fetchRes)
 
+			tot, success, failed := cidInfo.GetFetchResultSummaryOfRound(0)
+			if tot < 0 {
+				log.Warnf("no ping results for the PR provide round of Cid %s", cidInfo.CID.Hash().B58String())
+			} else {
+				log.Infof("Cid %s - %d total PRHolders | %d successfull PRHolders | %d failed PRHolders",
+					cidIn, tot, success, failed)
+			}
+
 			discoverer.DBCli.AddCidInfo(cidInfo)
 			discoverer.DBCli.AddFetchResult(fetchRes)
 
