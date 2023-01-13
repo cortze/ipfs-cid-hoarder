@@ -89,7 +89,7 @@ func NewCidTracker(
 func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidArrayC chan<- []src.TrackableCid) {
 	defer genWG.Done()
 	// generate a timer to determine
-	minTimeT := time.NewTicker(10 * time.Second)
+	minTimeT := time.NewTicker(5 * time.Second)
 	log.Debugf("Source is: %s and config source is: ", tracker.CidSource.Type(), config.HttpServerSource)
 
 	for true {
