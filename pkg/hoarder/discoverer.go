@@ -153,13 +153,16 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.WaitGroup, trackableCidsChannel <-chan []src.TrackableCid) {
 	defer addProviderWG.Done()
 	ctx := discoverer.ctx
+	counter := 0
 	for {
 		select {
 		case trackableCids, ok := <-trackableCidsChannel:
 			if !ok {
+				log.Debug("Received not ok message from channel")
 				break
 			}
 			if trackableCids == nil {
+				log.Debug("Received nil trackable CIDs from channel")
 				break
 			}
 
@@ -167,10 +170,10 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			cidStr := tr.CID.Hash().B58String()
 
 			log.Debugf(
-				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v,ProvideTime:%s,UserAgent:%s",
-				cidStr, tr.ID.String(),
-				tr.Addresses, tr.ProvideTime, tr.UserAgent,
+				"New trackable CID array received from http channel. Cid:%s,ProvideTime:%s,UserAgent:%s. It's number is %d",
+				cidStr, tr.ProvideTime, tr.UserAgent, counter,
 			)
+			counter++
 
 			//the starting values for the discoverer
 			cidIn, err := cid.Parse(cidStr)
@@ -181,6 +184,11 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 
 			cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, discoverer.StudyDuration, config.JsonFileSource,
 				discoverer.CidSource.Type(), "")
+
+			cidInfo.AddPublicationTime(tr.PublicationTime)
+			cidInfo.AddProvideTime(tr.ProvideTime)
+			cidInfo.AddCreator(tr.Creator)
+
 			fetchRes := models.NewCidFetchResults(cidIn, 0)
 
 			// generate a new CidFetchResults
@@ -188,8 +196,10 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			fetchRes.TotalHops = 0
 			fetchRes.HopsToClosest = 0
 			for _, trackableCid := range trackableCids {
-
-				err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
+				log.Debugf(
+					"For looping the trackable CID array. The peer ID is: %s. The peer Multiaddresses are: %v. ",
+					trackableCid.ID.String(), trackableCid.Addresses)
+				/* err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 				if err != nil {
 					log.Errorf("error %s calling addpeertoproviderstore method", err)
 				} else {
@@ -202,9 +212,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 					log.Errorf("error %s calling addAgentVersionToProvideStore", err)
 				} else {
 					log.Debug("Added agent version to provider store")
-				}
-				cidInfo.AddPublicationTime(trackableCid.PublicationTime)
-				cidInfo.AddProvideTime(trackableCid.ProvideTime)
+				} */
 
 				//TODO discoverer starting ping res
 				pingRes := models.NewPRPingResults(
@@ -218,14 +226,13 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 					true,
 					p2p.NoConnError,
 				)
-				cidInfo.AddCreator(trackableCid.Creator)
 
-				log.Debugf("User agent received from provider store: %s", discoverer.host.GetUserAgentOfPeer(trackableCid.ID))
+				/* log.Debugf("User agent received from provider store: %s", discoverer.host.GetUserAgentOfPeer(trackableCid.ID)) */
 
 				prHolderInfo := models.NewPeerInfo(
 					trackableCid.ID,
-					discoverer.host.Peerstore().Addrs(trackableCid.ID),
-					discoverer.host.GetUserAgentOfPeer(trackableCid.ID),
+					trackableCid.Addresses,
+					trackableCid.UserAgent,
 				)
 
 				cidInfo.AddPRHolder(prHolderInfo)
