@@ -170,8 +170,8 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			cidStr := tr.CID.Hash().B58String()
 
 			log.Debugf(
-				"New trackable CID array received from http channel. Cid:%s,ProvideTime:%s,UserAgent:%s. It's number is %d",
-				cidStr, tr.ProvideTime, tr.UserAgent, counter,
+				"New trackable CID array received from http channel. Cid:%s,ProvideTime:%s,PublicationTime:%s,Creator:%s. It's number is %d",
+				cidStr, tr.ProvideTime, tr.PublicationTime, tr.Creator, counter,
 			)
 			counter++
 
@@ -197,8 +197,8 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			fetchRes.HopsToClosest = 0
 			for _, trackableCid := range trackableCids {
 				log.Debugf(
-					"For looping the trackable CID array. The peer ID is: %s. The peer Multiaddresses are: %v. ",
-					trackableCid.ID.String(), trackableCid.Addresses)
+					"For looping the trackable CID array for trackable CID: %d. The peer ID is: %s. The peer Multiaddresses are: %v. The user agent is: %s ",
+					counter, trackableCid.ID.String(), trackableCid.Addresses, trackableCid.UserAgent)
 				/* err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 				if err != nil {
 					log.Errorf("error %s calling addpeertoproviderstore method", err)
