@@ -10,34 +10,25 @@ import (
 
 // PRPingResults is the basic struct containing the result of the individual ping of a PR Holder.
 type PRPingResults struct {
-	Cid           cid.Cid
-	PeerID        peer.ID
-	Round         int
-	FetchTime     time.Time
-	FetchDuration time.Duration
-	Active        bool
-	HasRecords    bool
-	ConError      string
+	Cid          cid.Cid
+	PeerID       peer.ID
+	Round        int
+	cidPubTime   time.Time
+	PingTime     time.Time
+	PingDuration time.Duration
+	Active       bool
+	HasRecords   bool
+	ConError     string
 }
 
-// Creates a new:
-//
-//	PRPingResults struct {
-//		Cid           cid.Cid
-//		PeerID        peer.ID
-//		Round         int
-//		FetchTime     time.Time
-//		FetchDuration time.Duration
-//		Active        bool
-//		HasRecords    bool
-//		ConError      string
-//	}
+// NewPRPingResults creates a new struct with the basic status/performance info for each individual pings to PR Holders
 func NewPRPingResults(
 	cid cid.Cid,
 	p peer.ID,
 	round int,
-	fetchT time.Time,
-	fetchD time.Duration,
+	cidPubTime time.Time,
+	pingTime time.Time,
+	pingDuration time.Duration,
 	active bool,
 	hasRecords bool,
 	connError string) *PRPingResults {
@@ -46,19 +37,25 @@ func NewPRPingResults(
 		cid,
 		p,
 		round,
-		fetchT,
-		fetchD,
+		cidPubTime,
+		pingTime,
+		pingDuration,
 		active,
 		hasRecords,
 		connError,
 	}
 }
 
+// GetPingTimeSincePublication return the time range since the publication of the CID when we pinged the CID
+func (ping *PRPingResults) GetPingTimeSincePublication() time.Duration {
+	return ping.PingTime.Add(ping.PingDuration).Sub(ping.cidPubTime)
+}
+
 // CidFetchResults is the basic struct containing the summary of all the requests done for a given CID on a fetch round.
 type CidFetchResults struct {
-	m   sync.Mutex
-	Cid cid.Cid
-
+	m                     sync.Mutex
+	Cid                   cid.Cid
+	cidPubTime            time.Time // time when the CID was published
 	Round                 int
 	StartTime             time.Time
 	FinishTime            time.Time
@@ -72,29 +69,13 @@ type CidFetchResults struct {
 	ClosestPeers          []peer.ID
 }
 
-// Creates a new:
-//
-//	CidFetchResults struct {
-//		m   sync.Mutex
-//		Cid cid.Cid
-//
-//		Round                 int
-//		StartTime             time.Time
-//		FinishTime            time.Time
-//		TotalHops             int
-//		HopsToClosest         int
-//		PRHoldPingDuration    time.Duration
-//		FindProvDuration      time.Duration
-//		GetClosePeersDuration time.Duration
-//		PRPingResults         []*PRPingResults
-//		IsRetrievable         bool
-//		ClosestPeers          []peer.ID
-//	}
-func NewCidFetchResults(contentID cid.Cid, round int) *CidFetchResults {
+// NewCidFetchResults return the FetchResults struct that contains the basic information for the entire fetch round of a particular CID.
+func NewCidFetchResults(contentID cid.Cid, pubTime time.Time, round int) *CidFetchResults {
 	return &CidFetchResults{
 		m:             sync.Mutex{},
 		Cid:           contentID,
 		Round:         round,
+		cidPubTime:    pubTime,
 		StartTime:     time.Now(),
 		FinishTime:    time.Now(),
 		PRPingResults: make([]*PRPingResults, 0),
@@ -114,9 +95,18 @@ func (c *CidFetchResults) AddPRPingResults(pingRes *PRPingResults) {
 	defer c.m.Unlock()
 
 	c.PRPingResults = append(c.PRPingResults, pingRes)
-	if pingRes.FetchDuration > c.PRHoldPingDuration {
-		c.PRHoldPingDuration = pingRes.FetchDuration
+	if pingRes.PingDuration > c.PRHoldPingDuration {
+		c.PRHoldPingDuration = pingRes.PingDuration
 	}
+}
+
+func (c *CidFetchResults) GetPublicationTime() time.Time {
+	return c.cidPubTime
+}
+
+// GetPingTimeSincePublication return the time range since the publication of the CID when we pinged the CID
+func (c *CidFetchResults) GetFetchTimeSincePublication() time.Duration {
+	return c.FinishTime.Sub(c.cidPubTime)
 }
 
 // GetSummary returns the summary of the PR Holder pings for the fetch round

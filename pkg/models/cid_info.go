@@ -91,6 +91,7 @@ func (c *CidInfo) AddProvideTime(reqTime time.Duration) {
 	c.ProvideTime = reqTime
 }
 
+// AddCreator aggregates the Peer.ID of the host/client that created the CID
 func (c *CidInfo) AddCreator(creator peer.ID) {
 	c.m.Lock()
 	defer c.m.Unlock()
