@@ -62,12 +62,11 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		success_att,
 		fail_att,
 		is_retrievable)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		fetchRes.Cid.Hash().B58String(),
 		fetchRes.Round,
 		fetchRes.StartTime.Unix(),
 		fetchRes.GetFetchTimeSincePublication(),
-		fetchRes.StartTime,
 		fetchRes.FinishTime.Sub(fetchRes.StartTime).Milliseconds(),
 		fetchRes.TotalHops,
 		fetchRes.HopsToClosest,

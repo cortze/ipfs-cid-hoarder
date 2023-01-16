@@ -22,7 +22,7 @@ const (
 	JsonFileSource   = "json-file"
 	HttpServerSource = "http-server"
 	BitswapSource    = "bitswap"
-	RandomContent    = "random-content-gen"
+	RandomContent    = "random-bytes"
 )
 
 // Harcoded variables for the tool's profiling

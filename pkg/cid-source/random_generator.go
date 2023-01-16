@@ -30,7 +30,7 @@ func NewRandomCidGen(contentSize int, limit int) *RandomCidGen {
 }
 
 func (g *RandomCidGen) Type() string {
-	return config.RandomContent
+	return config.RandomSource
 }
 
 // TODO: is it worth keeping the content?
