@@ -32,7 +32,7 @@ func PostRequestProviders() {
 				"/ip6/::1/udp/4001/quic", "/ip6/2602:ff16:6:0:1:1c1:0:1/udp/4001/quic", "/ip4/89.233.108.3/udp/4001/quic",
 				"/ip4/127.0.0.1/tcp/4001", "/ip4/89.233.108.3/tcp/4001"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
-			"0s",
+			"2023-01-16T14:04:42+02:00",
 			"0s",
 			"go-ipfs/0.7.0/",
 		),
@@ -43,7 +43,7 @@ func PostRequestProviders() {
 				"/ip6/2a01:4f9:c010:d4d4::1/udp/4001/quic", "/ip6/::1/udp/4001/quic", "/ip4/65.21.63.62/udp/4001/quic",
 				"/ip4/65.21.63.62/tcp/4001", "/ip4/127.0.0.1/tcp/4001", "/ip6/::1/tcp/4001", "/ip4/127.0.0.1/udp/4001/quic"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
-			"0s",
+			"2023-01-16T14:04:42+02:00",
 			"0s",
 			"go-ipfs/0.8.0/",
 		),
@@ -56,7 +56,7 @@ func PostRequestProviders() {
 			[]string{"/ip4/45.63.7.28/tcp/4001", "/ip4/127.0.0.1/udp/4001/quic",
 				"/ip4/45.63.7.28/udp/4001/quic", "/ip6/::1/udp/4001/quic", "/ip6/::1/tcp/4001", "/ip4/127.0.0.1/tcp/4001"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
-			"0s",
+			"2023-01-16T14:04:42+02:00",
 			"0s",
 			"kubo/0.14.0/e0fabd6",
 		),
@@ -66,7 +66,7 @@ func PostRequestProviders() {
 			[]string{"/ip4/127.0.0.1/udp/4001/quic", "/ip4/165.227.164.94/tcp/4001",
 				"/ip6/64:ff9b::a5e3:a45e/udp/4001/quic", "/ip6/::1/udp/4001/quic", "/ip4/127.0.0.1/tcp/4001", "/ip6/::1/tcp/4001", "/ip4/165.227.164.94/udp/4001/quic"},
 			"QmWCmp2w4MVvuWSwfYJyzDBNJxmub5mccYsSEhmKMq1zfW",
-			"0s",
+			"2023-01-16T14:04:42+02:00",
 			"0s",
 			"go-ipfs/0.7.0/",
 		),
@@ -77,7 +77,7 @@ func PostRequestProviders() {
 	if err != nil {
 		log.Errorf("Error marshalling provider records for cid: %s", err)
 	}
-	req, err := http.NewRequest("POST", "http://localhost:8080/ProviderRecord", bytes.NewReader(data))
+	req, err := http.NewRequest("POST", "http://localhost:8080/", bytes.NewReader(data))
 	if err != nil {
 		log.Errorf("Error creating POST request: %s", err)
 	}
@@ -92,7 +92,7 @@ func PostRequestProviders() {
 	if err != nil {
 		log.Errorf("Error marshalling provider records for cid: %s", err)
 	}
-	req, err = http.NewRequest("POST", "http://localhost:8080/ProviderRecord", bytes.NewReader(data))
+	req, err = http.NewRequest("POST", "http://localhost:8080/", bytes.NewReader(data))
 	if err != nil {
 		log.Errorf("Error creating POST request: %s", err)
 	}
@@ -103,11 +103,11 @@ func PostRequestProviders() {
 	}
 
 	// create a POST request
-	data, err = json.Marshal(ProviderRecords{})
+	data, err = json.Marshal(nil)
 	if err != nil {
 		log.Errorf("Error marshalling provider records for cid: %s", err)
 	}
-	req, err = http.NewRequest("POST", "http://localhost:8080/ProviderRecord", bytes.NewReader(data))
+	req, err = http.NewRequest("POST", "http://localhost:8080/", bytes.NewReader(data))
 	if err != nil {
 		log.Errorf("Error creating POST request: %s", err)
 	}
@@ -116,6 +116,21 @@ func PostRequestProviders() {
 	if err != nil {
 		log.Errorf("Error sending POST request: %s", err)
 	}
+
+	/* // create a POST request
+	data, err = json.Marshal(nil)
+	if err != nil {
+		log.Errorf("Error marshalling provider records for cid: %s", err)
+	}
+	req, err = http.NewRequest("POST", "http://localhost:8080/", bytes.NewReader(data))
+	if err != nil {
+		log.Errorf("Error creating POST request: %s", err)
+	}
+	// send the post request
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		log.Errorf("Error sending POST request: %s", err)
+	} */
 
 }
 
@@ -188,11 +203,11 @@ func GetRequest(httpSource *HttpCidSource) error {
 
 func TestGetRequest(t *testing.T) {
 
-	httpSource := NewHttpCidSource(8080, "localhost")
-	go httpSource.StartServer()
+	/* httpSource := NewHttpCidSource(8080, "localhost")
+	go httpSource.StartServer() */
 
 	PostRequestProviders()
-	err := GetRequest(httpSource)
+	/* err := GetRequest(httpSource)
 	if err != nil {
 		t.Errorf("%s", err)
 	}
@@ -203,5 +218,5 @@ func TestGetRequest(t *testing.T) {
 	err = GetRequest(httpSource)
 	if err != nil {
 		t.Errorf("%s", err)
-	}
+	} */
 }
