@@ -150,7 +150,7 @@ func GetRequest(httpSource *HttpCidSource) error {
 
 	cidInfo := models.NewCidInfo(cidIn, 0, 0, config.JsonFileSource,
 		config.HttpServerSource, tr.Creator)
-	fetchRes := models.NewCidFetchResults(cidIn, 0)
+	fetchRes := models.NewCidFetchResults(cidIn, tr.PublicationTime, 0)
 
 	// generate a new CidFetchResults
 	//TODO starting data for the discoverer
@@ -167,12 +167,12 @@ func GetRequest(httpSource *HttpCidSource) error {
 			//the below are starting data for the discoverer
 			0,
 			time.Time{},
+			time.Time{},
 			0,
 			true,
 			true,
 			p2p.NoConnError,
 		)
-		cidInfo.AddCreator(trackableCid.Creator)
 		fetchRes.AddPRPingResults(pingRes)
 
 		prHolderInfo := models.NewPeerInfo(

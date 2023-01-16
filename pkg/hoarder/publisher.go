@@ -144,7 +144,7 @@ func (publisher *CidPublisher) addProviderMsgListener(msgNotWg *sync.WaitGroup, 
 		select {
 		case msgNot := <-msgNotChannel: //this receives a message from SendMessage in messages.go after the DHT.Provide operation is called from the PUT_PROVIDER method.
 			// check the msg type
-			casted_cid, err := cid.Cast(msgNot.Msg.GetKey())
+			castedCid, err := cid.Cast(msgNot.Msg.GetKey())
 			if err != nil {
 				log.Errorf("unable to cast msg key into cid. %s", err.Error())
 			}
@@ -155,35 +155,43 @@ func (publisher *CidPublisher) addProviderMsgListener(msgNotWg *sync.WaitGroup, 
 
 				if msgNot.Error != nil {
 					connError = p2p.ParseConError(msgNot.Error) //TODO: parse the errors in a better way
-					log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s", casted_cid.String(), msgNot.RemotePeer.String(), msgNot.Error.Error())
+					log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s", castedCid.String(), msgNot.RemotePeer.String(), msgNot.Error.Error())
 				} else {
 					active = true
 					hasRecords = true
 					connError = p2p.NoConnError
-					log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", casted_cid.String(), msgNot.RemotePeer.String())
+					log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", castedCid.String(), msgNot.RemotePeer.String())
+				}
+
+				// Read the CidInfo from the local Sync.Map struct
+				val, ok := publisher.CidMap.Load(castedCid.Hash().B58String())
+				cidInfo := val.(*models.CidInfo)
+				if !ok {
+					log.Panic("unable to find CidInfo on CidMap for Cid %s", castedCid.Hash().B58String())
+				}
+
+				// add the ping result
+				val, ok = firstCidFetchRes.Load(castedCid.Hash().B58String())
+				cidFetRes := val.(*models.CidFetchResults)
+				if !ok {
+					log.Panicf("CidFetcher not found for cid %s", castedCid.Hash().B58String())
 				}
 
 				//if no error occurred in p2p.MsgNotification the ping result will contain active = true and hasRecords = true,
 				//else it will have these fields as false.
 				pingRes := models.NewPRPingResults(
-					casted_cid,
+					castedCid,
 					msgNot.RemotePeer,
 					0, // round is 0 since is the ADD_PROVIDE result
+					cidFetRes.GetPublicationTime(),
 					msgNot.QueryTime,
 					msgNot.QueryDuration,
 					active,
 					hasRecords,
 					connError)
 
-				// add the ping result
-				val, ok := firstCidFetchRes.Load(casted_cid.Hash().B58String())
-				cidFetRes := val.(*models.CidFetchResults)
-				if !ok {
-					log.Errorf("CidFetcher not ready for cid %s", casted_cid.Hash().B58String())
-				} else {
-					// TODO: move into a seaparate method to make the DB interaction easier?
-					cidFetRes.AddPRPingResults(pingRes)
-				}
+				// TODO: move into a seaparate method to make the DB interaction easier?
+				cidFetRes.AddPRPingResults(pingRes)
 
 				useragent := publisher.host.GetUserAgentOfPeer(msgNot.RemotePeer)
 				log.Debugf("User agent is: %s", useragent)
@@ -195,14 +203,8 @@ func (publisher *CidPublisher) addProviderMsgListener(msgNotWg *sync.WaitGroup, 
 					useragent,
 				)
 
-				// add PRHolder to the CidInfo
-				val, ok = publisher.CidMap.Load(casted_cid.Hash().B58String())
-				cidInfo := val.(*models.CidInfo)
-				if !ok {
-					log.Warnf("unable to find CidInfo on CidMap for Cid %s", casted_cid.Hash().B58String())
-				} else {
-					cidInfo.AddPRHolder(prHolderInfo)
-				}
+				// add all the PRHolder info to the CidInfo
+				cidInfo.AddPRHolder(prHolderInfo)
 
 			default:
 				// the message that we tracked is not ADD_PROVIDER, skipping
@@ -278,6 +280,9 @@ func (publisher *CidPublisher) publishingProcess(
 			receivedCid := &receivedType.CID
 			logEntry.Debugf("new cid to publish %s", receivedCid.Hash().B58String())
 			receivedCidStr := receivedCid.Hash().B58String()
+
+			pubTime := time.Now()
+
 			// generate the new CidInfo cause a new CID was just received
 			//TODO the content type is not necessarily random content
 			cidInfo := models.NewCidInfo(*receivedCid, publisher.ReqInterval, publisher.StudyDuration, config.RandomContent, publisher.CidSource.Type(), publisher.host.ID())
@@ -286,7 +291,7 @@ func (publisher *CidPublisher) publishingProcess(
 			publisher.CidMap.Store(receivedCidStr, cidInfo)
 
 			// generate a new CidFetchResults
-			fetchRes := models.NewCidFetchResults(*receivedCid, 0) // First round = Publish PR
+			fetchRes := models.NewCidFetchResults(*receivedCid, pubTime, 0) // First round = Publish PR
 			cidFetchRes.Store(receivedCidStr, fetchRes)
 
 			// necessary stuff to get the different hop measurements
@@ -294,7 +299,6 @@ func (publisher *CidPublisher) publishingProcess(
 			// currently linking a ContextKey variable througth the context that we generate
 			ctx := context.WithValue(publisher.ctx, dht.ContextKey("lookupMetrics"), lookupMetrics)
 
-			pubTime := time.Now()
 			reqTime, err := provide(ctx, publisher, receivedCid)
 			if err != nil {
 				logEntry.Errorf("unable to Provide content. %s", err.Error())

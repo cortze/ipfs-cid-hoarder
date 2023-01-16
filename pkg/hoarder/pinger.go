@@ -211,6 +211,7 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 		c.CID,
 		pAddr.ID,
 		round,
+		c.PublishTime,
 		tstart,
 		fetchTime,
 		active,
@@ -349,7 +350,7 @@ func (pinger *CidPinger) runPinger(wg *sync.WaitGroup, pingerID int) {
 			logEntry.Infof("pinging CID %s for round %d", cidStr, pingCounter)
 
 			// request the status of PR Holders
-			cidFetchRes := models.NewCidFetchResults(cidInfo.CID, pingCounter)
+			cidFetchRes := models.NewCidFetchResults(cidInfo.CID, cidInfo.PublishTime, pingCounter)
 
 			var wg sync.WaitGroup
 

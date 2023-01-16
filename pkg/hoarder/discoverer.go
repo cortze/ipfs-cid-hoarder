@@ -181,7 +181,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 
 			cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, discoverer.StudyDuration, config.JsonFileSource,
 				discoverer.CidSource.Type(), "")
-			fetchRes := models.NewCidFetchResults(cidIn, 0)
+			fetchRes := models.NewCidFetchResults(cidIn, tr.PublicationTime, 0)
 
 			// generate a new CidFetchResults
 			//TODO starting data for the discoverer
@@ -212,7 +212,8 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 					trackableCid.ID,
 					//the below are starting data for the discoverer
 					0,
-					time.Time{},
+					tr.PublicationTime,
+					tr.PublicationTime,
 					0,
 					true,
 					true,
@@ -258,7 +259,7 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	}
 
 	cidInfo := models.NewCidInfo(cidIn, discoverer.ReqInterval, discoverer.StudyDuration, config.JsonFileSource, discoverer.CidSource.Type(), "")
-	fetchRes := models.NewCidFetchResults(cidIn, 0)
+	fetchRes := models.NewCidFetchResults(cidIn, time.Time{}, 0)
 
 	// generate a new CidFetchResults
 	//TODO starting data for the discoverer
@@ -273,7 +274,8 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 			val.ID,
 			//the below are starting data for the discoverer
 			0,
-			time.Time{},
+			val.PublicationTime,
+			val.PublicationTime,
 			0,
 			true,
 			true,
