@@ -15,7 +15,7 @@ func (db *DBClient) CreateCidInfoTable() error {
 		CREATE TABLE IF NOT EXISTS cid_info(
 		id SERIAL, 
 		cid_hash TEXT NOT NULL PRIMARY KEY,
-		gen_time FLOAT NOT NULL,
+		pub_time FLOAT NOT NULL,
 		provide_time FLOAT NOT NULL,
 		req_interval INT NOT NULL,
 		k INT NOT NULL,
@@ -39,7 +39,7 @@ func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) (err error) {
 	// insert the cidInfo
 	_, err = db.psqlPool.Exec(db.ctx, `INSERT INTO cid_info (
 		cid_hash,
-		gen_time,
+		pub_time,
 		provide_time,
 		req_interval,
 		k,
@@ -48,7 +48,7 @@ func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) (err error) {
 		creator) 
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		cidInfo.CID.Hash().B58String(),
-		cidInfo.GenTime.Unix(),
+		cidInfo.PublishTime.Unix(),
 		cidInfo.ProvideTime.Milliseconds(),
 		int(cidInfo.ReqInterval.Minutes()),
 		cidInfo.K,
