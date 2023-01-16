@@ -40,6 +40,7 @@ func (discoverer *CidDiscoverer) httpRun() {
 	genWG.Add(1)
 	go discoverer.generateCidsHttp(&genWG, trackableCidsChannel)
 	var addProviderWG sync.WaitGroup
+	addProviderWG.Add(1)
 	go discoverer.addProviderRecordsHttp(&addProviderWG, trackableCidsChannel)
 	genWG.Wait()
 	addProviderWG.Wait()
@@ -159,11 +160,11 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 		case trackableCids, ok := <-trackableCidsChannel:
 			if !ok {
 				log.Debug("Received not ok message from channel")
-				break
+				return
 			}
 			if trackableCids == nil {
 				log.Debug("Received nil trackable CIDs from channel")
-				break
+				return
 			}
 
 			tr := trackableCids[0]
@@ -198,7 +199,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 			for _, trackableCid := range trackableCids {
 				log.Debugf(
 					"For looping the trackable CID array for trackable CID: %d. The peer ID is: %s. The peer Multiaddresses are: %v. The user agent is: %s ",
-					counter, trackableCid.ID.String(), trackableCid.Addresses, trackableCid.UserAgent)
+					counter-1, trackableCid.ID.String(), trackableCid.Addresses, trackableCid.UserAgent)
 				/* err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 				if err != nil {
 					log.Errorf("error %s calling addpeertoproviderstore method", err)

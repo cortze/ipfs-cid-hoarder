@@ -134,6 +134,7 @@ func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
 		// We can use .Shutdown to gracefully shuts down the server without
 		// interrupting any active connection
 		httpCidSource.server.Shutdown(ctx)
+		log.Info("Shutted down http server")
 		stop <- true
 	}()
 
@@ -178,7 +179,8 @@ func GetNewHttpCid(source interface{}) ([]TrackableCid, error) {
 	}
 
 	if reflect.DeepEqual(providerRecords, ProviderRecords{}) {
-		return nil, errors.New("ended providing")
+		fmt.Println(providerRecords)
+		return nil, nil
 	}
 
 	var trackableCidPrs []TrackableCid
