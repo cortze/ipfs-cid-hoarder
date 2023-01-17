@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"strconv"
 
@@ -46,12 +47,12 @@ var DefaultConfig = Config{
 	AlreadyPublishedCIDs: false,
 	CidFile:              "cids/cid-list.json",
 	//TODO introduce type of CidFile
-	CidContentSize: 1000, // 1MB in KBs
-	CidNumber:      10,
-	Workers:        250,
+	CidContentSize: 1024, // 1MB in KBs
+	CidNumber:      math.MaxInt64,
+	Workers:        1, // return default value to a single worker (best relation with the kad-dht implementation - single stream per peers)
 	ReqInterval:    "30m",
-	StudyDuration:  "48h",
-	K:              20, // K-bucket parameter
+	StudyDuration:  "24/7", // run forever by default
+	K:              20,     // K-bucket parameter
 	HydraFilter:    false,
 }
 
@@ -64,7 +65,7 @@ type Config struct {
 	CidFile              string `json:"cid-file"`
 	ConfigJsonFile       string `json:"config-json-file"`
 	CidContentSize       int    `json:"cid-content-size"`
-	CidNumber            int    `json:"cid-number"` // in KBs
+	CidNumber            int64  `json:"cid-number"` // in KBs
 	Workers              int    `json:"workers"`
 	AlreadyPublishedCIDs bool   `json:"already-published-cids"` //already published CIDs skips the publishing phase of the hoarder.
 	ReqInterval          string `json:"req-interval"`
@@ -199,7 +200,7 @@ func (c *Config) apply(ctx *cli.Context) {
 			}
 			// check the number of random CIDs that we want to generate
 			if ctx.IsSet("cid-number") {
-				c.CidNumber = ctx.Int("cid-number")
+				c.CidNumber = ctx.Int64("cid-number")
 			} else {
 				c.CidNumber = DefaultConfig.CidNumber
 			}

@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -74,9 +75,17 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing ReqInterval "+conf.ReqInterval)
 	}
-	studyDuration, err := time.ParseDuration(conf.StudyDuration)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing StudyDuration"+conf.StudyDuration)
+
+	var studyDuration time.Duration
+	// check if the StudyDuration has been set to "forever"
+	if conf.StudyDuration == "24/7" {
+		// set the StudyDuration to the maximum possible
+		studyDuration = time.Duration(math.MaxInt64)
+	} else {
+		studyDuration, err = time.ParseDuration(conf.StudyDuration)
+		if err != nil {
+			return nil, errors.Wrap(err, "error parsing StudyDuration"+conf.StudyDuration)
+		}
 	}
 
 	log.Info("configured Hoarder to request at an interval of ", reqInterval, " and during ", studyDuration)

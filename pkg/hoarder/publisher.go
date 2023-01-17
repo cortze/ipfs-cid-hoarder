@@ -21,11 +21,11 @@ type CidPublisher struct {
 	//entries of this map are added inside the publishingProccess and received from addProviderMessageListener
 	CidMap sync.Map
 	//number of cids to publish
-	CidNumber int
+	CidNumber int64
 	*CidTracker
 }
 
-func NewCidPublisher(tracker *CidTracker, h *p2p.Host, cidNum int) (*CidPublisher, error) {
+func NewCidPublisher(tracker *CidTracker, h *p2p.Host, cidNum int64) (*CidPublisher, error) {
 	log.Debug("Creating a new CID publisher")
 	return &CidPublisher{
 		CidNumber:  cidNum,

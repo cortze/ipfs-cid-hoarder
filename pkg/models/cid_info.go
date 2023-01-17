@@ -119,7 +119,7 @@ func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 
 	c.PRPingResults = append(c.PRPingResults, results)
 	// check if the CID is initialized or not
-	if c.NextPing == (time.Time{}) {
+	if c.NextPing.IsZero() {
 		// Update the next ping time to PublicationTime + req interval
 		// take also into account the publication time
 		offset := c.ProvideTime / 2

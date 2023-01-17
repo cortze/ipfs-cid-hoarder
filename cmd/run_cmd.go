@@ -57,13 +57,13 @@ var RunCmd = &cli.Command{
 			Name:        "cid-number",
 			Usage:       "number of CIDs that will be generated for the study",
 			EnvVars:     []string{"IPFS_CID_HOARDER_CID_NUMBER"},
-			DefaultText: "1000 CIDs",
+			DefaultText: "Undefined CIDs",
 		},
 		&cli.IntFlag{
 			Name:        "workers",
 			Usage:       "max number of CIDs publish and ping workers",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
-			DefaultText: "250 CIDs",
+			DefaultText: "1 worker",
 		},
 		&cli.StringFlag{
 			Name:        "req-interval",
@@ -75,7 +75,7 @@ var RunCmd = &cli.Command{
 			Name:        "study-duration",
 			Usage:       "max time for the study to run (example '24h', '35h', '48h')",
 			EnvVars:     []string{"IPFS_CID_HOARDER_STUDY_DURATION"},
-			DefaultText: "48h",
+			DefaultText: "Undefined (24/7)",
 		},
 		&cli.IntFlag{
 			Name:        "k",
