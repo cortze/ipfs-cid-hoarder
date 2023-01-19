@@ -109,10 +109,10 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 		select {
 		case trackableCid, ok := <-trackableCidC:
 			if !ok {
-				break
+				return
 			}
 			if trackableCid.IsEmpty() {
-				break
+				return
 			}
 
 			cidStr := trackableCid.CID.Hash().B58String()
