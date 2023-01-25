@@ -144,6 +144,7 @@ func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
 		break
 	case <-stop:
 		log.Infof("Finished and shutting down http server")
+		break
 	}
 
 	return nil
