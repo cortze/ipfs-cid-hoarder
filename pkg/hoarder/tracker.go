@@ -112,10 +112,13 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 			break
 		}
 
-		log.Debugf("Sending CID number from get request: %d", counter)
-		counter++
-		trackableCidArrayC <- trackableCids
-		// check if ticker for next iteration was raised
+		for i := 0; i < len(trackableCids); i++ {
+			log.Debugf("Sending CID number from get request: %d", counter)
+			counter++
+			trackableCidArrayC <- trackableCids[i]
+			// check if ticker for next iteration was raised
+		}
+
 		<-minTimeT.C
 
 	}
