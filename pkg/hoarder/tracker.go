@@ -85,16 +85,20 @@ func NewCidTracker(
 }
 
 // Receives provider records from http server
-// they are received in form trackableCids{ pr1, pr2, pr3, pr4} for the same cid
+// they are received in form
+//[trackableCids{ pr1, pr2, pr3, pr4},
+//trackableCids{ pr1, pr2, pr3, pr4},
+//trackableCids{ pr1, pr2, pr3, pr4}]
+// for different cids each
 func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidArrayC chan<- []src.TrackableCid) {
 	defer genWG.Done()
-	// generate a timer to determine
-	minTimeT := time.NewTicker(5 * time.Second)
+	// generate a timer to determine when to start the next get request
+	minTimeT := time.NewTicker(10 * time.Second)
 	log.Debugf("Source is: %s and config source is: ", tracker.CidSource.Type(), config.HttpServerSource)
 	counter := 0
 	for true {
 		trackableCids, err := src.GetNewHttpCid(tracker.CidSource)
-
+		// error will be nil if cids are finished
 		if err != nil {
 			log.Errorf("error while getting new cid: %s", err)
 			// check if ticker for next iteration was raised
@@ -102,23 +106,25 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 			continue
 		}
 
-		//this implies that err is equal to nil so both are
-		if trackableCids == nil {
+		log.Debugf("TrackableCIDs received from HTTP server: %v", trackableCids)
+		for i := len(trackableCids) - 1; i >= 0; i-- {
+			// if the trackable cids is equal to nil shut down server and go routine
+			if trackableCids[i] != nil {
+				log.Debugf("Sending CID number from get request: %d", counter)
+				counter++
+				trackableCidArrayC <- trackableCids[i]
+				continue
+			}
+			// check if ticker for next iteration was raised (need to wait for the last cid to be inserted)
+			<-minTimeT.C
 			log.Debug("Received empty provider records")
-			trackableCidArrayC <- nil
+			trackableCidArrayC <- trackableCids[i]
 			close(trackableCidArrayC)
 			//gracefully shutdown server
 			go tracker.httpSource.Shutdown(tracker.ctx)
-			break
+			return
 		}
-
-		for i := 0; i < len(trackableCids); i++ {
-			log.Debugf("Sending CID number from get request: %d", counter)
-			counter++
-			trackableCidArrayC <- trackableCids[i]
-			// check if ticker for next iteration was raised
-		}
-
+		// check if ticker for next iteration was raised
 		<-minTimeT.C
 
 	}

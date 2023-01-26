@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"ipfs-cid-hoarder/pkg/config"
 	"net/http"
-	"reflect"
 	"sync"
 	"time"
 
@@ -189,10 +188,10 @@ func GetNewHttpCid(source interface{}) ([][]TrackableCid, error) {
 	for i := 0; i < len(providerRecords); i++ {
 		// will contain the PRS for each CID
 		var trackableCidPrs []TrackableCid
-		if reflect.DeepEqual(providerRecords[i], ProviderRecords{}) {
+		/* if reflect.DeepEqual(providerRecords[i], ProviderRecords{}) {
 			fmt.Println(providerRecords[i])
 			return nil, nil
-		}
+		} */
 		for _, providerRecord := range providerRecords[i].EncapsulatedJSONProviderRecords {
 			log.Debug("Read a new PR from the web server:")
 
