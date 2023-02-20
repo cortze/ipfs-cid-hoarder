@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"ipfs-cid-hoarder/pkg/config"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -17,15 +18,16 @@ import (
 )
 
 type HttpCidSource struct {
-	port            int
-	hostname        string
-	lock            sync.Mutex
-	server          *http.Server
-	providerRecords []ProviderRecords
-	isStarted       bool
+	port     int
+	hostname string
+	lock     sync.Mutex
+	server   *http.Server
+	//receive cids from provider and send them to the discoverer interface
+	providerRecordsChannel chan ProviderRecords
+	isStarted              bool
 }
 
-func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
+/* func (httpCidSource *HttpCidSource) Dequeue() ProviderRecords {
 	httpCidSource.lock.Lock()
 	defer httpCidSource.lock.Unlock()
 	if len(httpCidSource.providerRecords) == 0 {
@@ -43,15 +45,15 @@ func (httpCidSource *HttpCidSource) Enqueue(providerRecords ProviderRecords) {
 	defer httpCidSource.lock.Unlock()
 	httpCidSource.providerRecords = append(httpCidSource.providerRecords, providerRecords)
 	log.Debugf("Added new element to queue, length is now: %d", len(httpCidSource.providerRecords))
-}
+} */
 
 func NewHttpCidSource(port int, hostname string) *HttpCidSource {
 	return &HttpCidSource{
-		port:            port,
-		hostname:        hostname,
-		server:          nil,
-		isStarted:       false,
-		providerRecords: []ProviderRecords{},
+		port:                   port,
+		hostname:               hostname,
+		server:                 nil,
+		isStarted:              false,
+		providerRecordsChannel: make(chan ProviderRecords, 10),
 	}
 }
 
@@ -67,14 +69,15 @@ func (httpCidSource *HttpCidSource) ServeHTTP(w http.ResponseWriter, r *http.Req
 		if err == nil {
 			log.Info("Decoded new encapsulated json received from post")
 
-			// add the trackableCid to the list
-			httpCidSource.Enqueue(providerRecords)
+			//send the trackable cid over the channel received in method getNewCid
+			httpCidSource.providerRecordsChannel <- providerRecords
 		} else {
-
 			http.Error(w, "Error decoding request body", http.StatusBadRequest)
 		}
-
-	} else if r.Method == http.MethodGet {
+	} else {
+		// return "Method Not Allowed" error
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	} /* else if r.Method == http.MethodGet {
 		log.Debug("The request was a get request")
 		// check if there are any EncapsulatedJSONProviderRecords to return
 		if len(httpCidSource.providerRecords) != 0 {
@@ -92,10 +95,7 @@ func (httpCidSource *HttpCidSource) ServeHTTP(w http.ResponseWriter, r *http.Req
 			http.Error(w, "No record available currently", http.StatusNoContent)
 		}
 
-	} else {
-		// return "Method Not Allowed" error
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
+	}  */
 
 }
 
@@ -124,6 +124,7 @@ func (httpCidSource *HttpCidSource) StartServer() error {
 	return nil
 }
 
+//Gracefully shutdowns http server. Call after the provider has finished providing the cids
 func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
 	httpCidSource.lock.Lock()
 	defer httpCidSource.lock.Unlock()
@@ -137,6 +138,7 @@ func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
 		// We can use .Shutdown to gracefully shuts down the server without
 		// interrupting any active connection
 		httpCidSource.server.Shutdown(ctx)
+		close(httpCidSource.providerRecordsChannel)
 		log.Info("Shutted down http server")
 		stop <- true
 	}()
@@ -153,108 +155,93 @@ func (httpCidSource *HttpCidSource) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func GetNewHttpCid(source interface{}) ([][]TrackableCid, error) {
+func GetNewHttpCid(source interface{}, trackableCidArrayC chan<- []TrackableCid) ([]TrackableCid, error) {
 
 	httpCidSource, ok := source.(*HttpCidSource)
 	if !ok {
-		return [][]TrackableCid{}, fmt.Errorf("Invalid source type: %T", source)
+		return []TrackableCid{}, fmt.Errorf("Invalid source type: %T", source)
 	}
 
-	// send a GET request to the server
-	url := fmt.Sprintf("http://%s:%d/", httpCidSource.hostname, httpCidSource.port)
-	resp, err := http.Get(url)
-	if err != nil {
-		return [][]TrackableCid{}, err
-	}
-	defer resp.Body.Close()
-
-	// check the status code
-	if resp.StatusCode == http.StatusNoContent {
-		return [][]TrackableCid{}, errors.New(fmt.Sprintf("Error while retrieving new cid from stack: %s", resp.Status))
-	} else if resp.StatusCode != http.StatusOK {
-		return [][]TrackableCid{}, errors.New(fmt.Sprintf("Error retrieving trackableCid: %s", resp.Status))
-	}
-
-	// decode the response into a EncapsulatedJSONProviderRecord struct
-	var providerRecords []ProviderRecords
-	err = json.NewDecoder(resp.Body).Decode(&providerRecords)
-	if err != nil {
-		return [][]TrackableCid{}, errors.Wrap(err, " while decoding trackable cid")
-	}
-
-	// is an array of trackableCid arrays
-	var trackableCidArrays [][]TrackableCid
-
-	for i := 0; i < len(providerRecords); i++ {
-		// will contain the PRS for each CID
-		var trackableCidPrs []TrackableCid
-		/* if reflect.DeepEqual(providerRecords[i], ProviderRecords{}) {
-			fmt.Println(providerRecords[i])
-			return nil, nil
-		} */
-		for _, providerRecord := range providerRecords[i].EncapsulatedJSONProviderRecords {
-			log.Debug("Read a new PR from the web server:")
-
-			log.Debugf("It's cid is: %s", providerRecord.CID)
-			newCid, err := cid.Parse(providerRecord.CID)
-			if err != nil {
-				log.Errorf("could not convert string to cid %s", err)
-				continue
+	for {
+		select {
+		//channel filled up using post method
+		case providerRecords, ok := <-httpCidSource.providerRecordsChannel:
+			if !ok {
+				//return both nil to end the method
+				return nil, nil
 			}
 
-			log.Debugf("It's peer id is: %s", providerRecord.ID)
-			newPid, err := peer.Decode(providerRecord.ID)
-			if err != nil {
-				log.Errorf("could not convert string to pid %s", err)
-				continue
+			if reflect.DeepEqual(providerRecords.EncapsulatedJSONProviderRecords, nil) {
+				//return both nil to end the method
+				return nil, nil
 			}
 
-			log.Debugf("It's creator is: %s", providerRecord.Creator)
-			newCreator, err := peer.Decode(providerRecord.Creator)
-			if err != nil {
-				log.Errorf("could not convert string to creator pid %s", err)
-				continue
-			}
+			// is an array of trackableCid arrays
+			var trackableCidArray []TrackableCid
 
-			log.Debugf("It's provide time is: %s", providerRecord.ProvideTime)
-			newProvideTime, err := time.ParseDuration(providerRecord.ProvideTime)
+			for _, providerRecord := range providerRecords.EncapsulatedJSONProviderRecords {
+				log.Debug("Read a new PR from the web server:")
 
-			if err != nil {
-				log.Errorf("Error while parsing provide time: %s", err)
-				continue
-			}
-
-			log.Debugf("It's publication time is: %s", providerRecord.PublicationTime)
-			newPublicationTime, err := time.Parse(time.RFC3339, providerRecord.PublicationTime)
-
-			if err != nil {
-				log.Errorf("Error while parsing publication time: %s", err)
-				continue
-			}
-
-			log.Debugf("It's user agent is: %s", providerRecord.UserAgent)
-
-			multiaddresses := make([]ma.Multiaddr, 0)
-			for i := 0; i < len(providerRecord.Addresses); i++ {
-				multiaddr, err := ma.NewMultiaddr(providerRecord.Addresses[i])
+				log.Debugf("It's cid is: %s", providerRecord.CID)
+				newCid, err := cid.Parse(providerRecord.CID)
 				if err != nil {
-					log.Errorf("could not convert string to multiaddress %s", err)
+					log.Errorf("could not convert string to cid %s", err)
 					continue
 				}
-				multiaddresses = append(multiaddresses, multiaddr)
+
+				log.Debugf("It's peer id is: %s", providerRecord.ID)
+				newPid, err := peer.Decode(providerRecord.ID)
+				if err != nil {
+					log.Errorf("could not convert string to pid %s", err)
+					continue
+				}
+
+				log.Debugf("It's creator is: %s", providerRecord.Creator)
+				newCreator, err := peer.Decode(providerRecord.Creator)
+				if err != nil {
+					log.Errorf("could not convert string to creator pid %s", err)
+					continue
+				}
+
+				log.Debugf("It's provide time is: %s", providerRecord.ProvideTime)
+				newProvideTime, err := time.ParseDuration(providerRecord.ProvideTime)
+
+				if err != nil {
+					log.Errorf("Error while parsing provide time: %s", err)
+					continue
+				}
+
+				log.Debugf("It's publication time is: %s", providerRecord.PublicationTime)
+				newPublicationTime, err := time.Parse(time.RFC3339, providerRecord.PublicationTime)
+
+				if err != nil {
+					log.Errorf("Error while parsing publication time: %s", err)
+					continue
+				}
+
+				log.Debugf("It's user agent is: %s", providerRecord.UserAgent)
+
+				multiaddresses := make([]ma.Multiaddr, 0)
+				for i := 0; i < len(providerRecord.Addresses); i++ {
+					multiaddr, err := ma.NewMultiaddr(providerRecord.Addresses[i])
+					if err != nil {
+						log.Errorf("could not convert string to multiaddress %s", err)
+						continue
+					}
+					multiaddresses = append(multiaddresses, multiaddr)
+				}
+
+				log.Infof("generated new CID %s", newCid.Hash().B58String())
+
+				log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
+				trackableCid := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newPublicationTime, newProvideTime, providerRecord.UserAgent)
+				trackableCidArray = append(trackableCidArray, trackableCid)
 			}
+			trackableCidArrayC <- trackableCidArray
+		default:
 
-			log.Infof("generated new CID %s", newCid.Hash().B58String())
-
-			log.Infof("Read a new provider ID %s.The multiaddresses are %v. The creator is %s. The new CID is %s", string(newPid), multiaddresses, newCreator, newCid)
-			trackableCid := NewTrackableCid(newPid, newCid, newCreator, multiaddresses, newPublicationTime, newProvideTime, providerRecord.UserAgent)
-			trackableCidPrs = append(trackableCidPrs, trackableCid)
 		}
-		trackableCidArrays = append(trackableCidArrays, trackableCidPrs)
 	}
-
-	return trackableCidArrays, nil
-
 }
 
 func (httpCidSource *HttpCidSource) GetNewCid() (TrackableCid, error) {

@@ -93,41 +93,13 @@ func NewCidTracker(
 func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidArrayC chan<- []src.TrackableCid) {
 	defer genWG.Done()
 	// generate a timer to determine when to start the next get request
-	minTimeT := time.NewTicker(10 * time.Second)
+	/* minTimeT := time.NewTicker(10 * time.Second) */
 	log.Debugf("Source is: %s and config source is: ", tracker.CidSource.Type(), config.HttpServerSource)
-	counter := 0
-	for true {
-		trackableCids, err := src.GetNewHttpCid(tracker.CidSource)
-		// error will be nil if cids are finished
-		if err != nil {
-			log.Errorf("error while getting new cid: %s", err)
-			// check if ticker for next iteration was raised
-			<-minTimeT.C
-			continue
-		}
 
-		log.Debugf("TrackableCIDs received from HTTP server: %v", trackableCids)
-		for i := len(trackableCids) - 1; i >= 0; i-- {
-			// if the trackable cids is equal to nil shut down server and go routine
-			if trackableCids[i] != nil {
-				log.Debugf("Sending CID number from get request: %d", counter)
-				counter++
-				trackableCidArrayC <- trackableCids[i]
-				continue
-			}
-			// check if ticker for next iteration was raised (need to wait for the last cid to be inserted)
-			<-minTimeT.C
-			log.Debug("Received empty provider records")
-			trackableCidArrayC <- trackableCids[i]
-			close(trackableCidArrayC)
-			//gracefully shutdown server
-			go tracker.httpSource.Shutdown(tracker.ctx)
-			return
-		}
-		// check if ticker for next iteration was raised
-		<-minTimeT.C
+	go src.GetNewHttpCid(tracker.CidSource, trackableCidArrayC)
 
-	}
+	return
+
 }
 
 //Generates cids depending on the cid source

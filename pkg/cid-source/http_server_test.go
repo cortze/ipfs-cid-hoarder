@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"ipfs-cid-hoarder/pkg/config"
 	"ipfs-cid-hoarder/pkg/models"
 	"ipfs-cid-hoarder/pkg/p2p"
@@ -135,30 +135,32 @@ func PostRequestProviders() {
 
 }
 
-func GetRequest(httpSource *HttpCidSource) error {
-	trackableCidsArray, err := GetNewHttpCid(httpSource)
+func GetCidFromChannel(httpSource *HttpCidSource) error {
 
-	if err != nil {
-		fmt.Errorf("Error %s while getting trackable cid array of array ", err)
-		return err
-	}
+	trackableCidsChannel := make(chan []TrackableCid, 10)
 
-	if trackableCidsArray == nil {
-		go httpSource.Shutdown(context.Background())
-		return nil
-	}
+	go GetNewHttpCid(httpSource, trackableCidsChannel)
+	counter := 0
+	for {
+		select {
+		case trackableCids, ok := <-trackableCidsChannel:
+			if !ok {
+				log.Debug("Received not ok message from channel")
+				return errors.New("Received not ok message from channel")
+			}
+			if trackableCids == nil {
+				log.Debug("Received nil trackable CIDs from channel")
+				return errors.New("Received nil trackable CIDs from channel")
+			}
 
-	for i := 0; i < len(trackableCidsArray); i++ {
-		for j := 0; j < len(trackableCidsArray[i]); j++ {
-
-			tr := trackableCidsArray[i][j]
+			tr := trackableCids[0]
 			cidStr := tr.CID.Hash().B58String()
 
 			log.Debugf(
-				"New provide and CID received from channel. Cid:%s,Pid:%s,Mutliaddresses:%v,ProvideTime:%s,UserAgent:%s",
-				cidStr, tr.ID.String(),
-				tr.Addresses, tr.ProvideTime, tr.UserAgent,
+				"New trackable CID array received from http channel. Cid:%s,ProvideTime:%s,PublicationTime:%s,Creator:%s. It's number is %d",
+				cidStr, tr.ProvideTime, tr.PublicationTime, tr.Creator, counter,
 			)
+			counter++
 
 			//the starting values for the discoverer
 			cidIn, err := cid.Parse(cidStr)
@@ -166,18 +168,42 @@ func GetRequest(httpSource *HttpCidSource) error {
 			if err != nil {
 				log.Errorf("couldnt parse cid")
 			}
+			//dummy values for test
+			pingInterval, _ := time.ParseDuration("30m")
 
-			cidInfo := models.NewCidInfo(cidIn, 0, 0, config.JsonFileSource,
-				config.HttpServerSource, tr.Creator)
+			studyDuration, _ := time.ParseDuration("24h")
+
+			cidInfo := models.NewCidInfo(cidIn, pingInterval, studyDuration, config.JsonFileSource,
+				"http-server", "")
+
+			cidInfo.AddPublicationTime(tr.PublicationTime)
+			cidInfo.AddProvideTime(tr.ProvideTime)
+			cidInfo.AddCreator(tr.Creator)
+
 			fetchRes := models.NewCidFetchResults(cidIn, 0)
 
 			// generate a new CidFetchResults
 			//TODO starting data for the discoverer
 			fetchRes.TotalHops = 0
 			fetchRes.HopsToClosest = 0
-			for _, trackableCid := range trackableCidsArray[j] {
+			for _, trackableCid := range trackableCids {
+				log.Debugf(
+					"For looping the trackable CID array for trackable CID: %d. The peer ID is: %s. The peer Multiaddresses are: %v. The user agent is: %s ",
+					counter-1, trackableCid.ID.String(), trackableCid.Addresses, trackableCid.UserAgent)
+				/* err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
+				if err != nil {
+					log.Errorf("error %s calling addpeertoproviderstore method", err)
+				} else {
+					log.Debug("Added providers to provider store")
+				}
 
-				cidInfo.AddProvideTime(trackableCid.ProvideTime)
+				err = addAgentVersionToProvideStore(discoverer.host, trackableCid.ID, trackableCid.UserAgent)
+
+				if err != nil {
+					log.Errorf("error %s calling addAgentVersionToProvideStore", err)
+				} else {
+					log.Debug("Added agent version to provider store")
+				} */
 
 				//TODO discoverer starting ping res
 				pingRes := models.NewPRPingResults(
@@ -191,8 +217,8 @@ func GetRequest(httpSource *HttpCidSource) error {
 					true,
 					p2p.NoConnError,
 				)
-				cidInfo.AddCreator(trackableCid.Creator)
-				fetchRes.AddPRPingResults(pingRes)
+
+				/* log.Debugf("User agent received from provider store: %s", discoverer.host.GetUserAgentOfPeer(trackableCid.ID)) */
 
 				prHolderInfo := models.NewPeerInfo(
 					trackableCid.ID,
@@ -201,8 +227,20 @@ func GetRequest(httpSource *HttpCidSource) error {
 				)
 
 				cidInfo.AddPRHolder(prHolderInfo)
+				fetchRes.AddPRPingResults(pingRes)
+
 			}
 			cidInfo.AddPRFetchResults(fetchRes)
+
+			tot, success, failed := cidInfo.GetFetchResultSummaryOfRound(0)
+			if tot < 0 {
+				log.Warnf("no ping results for the PR provide round of Cid %s", cidInfo.CID.Hash().B58String())
+			} else {
+				log.Infof("Cid %s - %d total PRHolders | %d successfull PRHolders | %d failed PRHolders",
+					cidIn, tot, success, failed)
+			}
+		default:
+			//log.Debug("haven't received anything yet")
 		}
 	}
 
@@ -215,16 +253,9 @@ func TestGetRequest(t *testing.T) {
 	go httpSource.StartServer()
 
 	PostRequestProviders()
-	err := GetRequest(httpSource)
-	if err != nil {
+	_ = GetCidFromChannel(httpSource)
+	/* if err != nil {
 		t.Errorf("%s", err)
-	}
-	err = GetRequest(httpSource)
-	if err != nil {
-		t.Errorf("%s", err)
-	}
-	err = GetRequest(httpSource)
-	if err != nil {
-		t.Errorf("%s", err)
-	}
+	} */
+	httpSource.Shutdown(context.TODO())
 }
