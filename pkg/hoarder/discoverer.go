@@ -44,6 +44,7 @@ func (discoverer *CidDiscoverer) httpRun() {
 	go discoverer.addProviderRecordsHttp(&addProviderWG, trackableCidsChannel)
 	genWG.Wait()
 	addProviderWG.Wait()
+	go discoverer.httpSource.Shutdown(discoverer.ctx)
 	err := discoverer.host.Close()
 	if err != nil {
 		log.Errorf("failed to close host: %s", err)
