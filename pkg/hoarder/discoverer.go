@@ -36,13 +36,22 @@ func NewCidDiscoverer(tracker *CidTracker) (*CidDiscoverer, error) {
 func (discoverer *CidDiscoverer) httpRun() {
 	trackableCidsChannel := make(chan []src.TrackableCid, discoverer.Workers)
 	// CID generator
-	var genWG sync.WaitGroup
-	genWG.Add(1)
-	go discoverer.generateCidsHttp(&genWG, trackableCidsChannel)
+	/* var genWG sync.WaitGroup
+	genWG.Add(1) */
+	/* 	go discoverer.generateCidsHttp(&genWG, trackableCidsChannel)*/
+
+	// Receives provider records from http server
+	// they are received in form
+	//[trackableCids{ pr1, pr2, pr3, pr4},
+	//trackableCids{ pr1, pr2, pr3, pr4},
+	//trackableCids{ pr1, pr2, pr3, pr4}]
+	// for different cids each
+	go src.GetNewHttpCid(discoverer.CidSource, trackableCidsChannel)
+
 	var addProviderWG sync.WaitGroup
 	addProviderWG.Add(1)
 	go discoverer.addProviderRecordsHttp(&addProviderWG, trackableCidsChannel)
-	genWG.Wait()
+	/* genWG.Wait() */
 	addProviderWG.Wait()
 	go discoverer.httpSource.Shutdown(discoverer.ctx)
 	err := discoverer.host.Close()
@@ -158,6 +167,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 	counter := 0
 	for {
 		select {
+		//receives a trackable cids array from the getNewCidHttp method when a post request is received.
 		case trackableCids, ok := <-trackableCidsChannel:
 			if !ok {
 				log.Debug("Received not ok message from channel")
@@ -333,7 +343,7 @@ func addAddrtoPeerstore(h host.Host, pid peer.ID, multiaddr []ma.Multiaddr) {
 }
 */
 
-// Instead of adding directly to peerstore the API is the following
+//NOT USED Instead of adding directly to peerstore the API is the following
 func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid cid.Cid, multiaddr []ma.Multiaddr) error {
 	keyMH := cid.Hash()
 	err := h.DHT.ProviderStore().AddProvider(ctx, keyMH, peer.AddrInfo{ID: pid, Addrs: multiaddr})
@@ -343,6 +353,7 @@ func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid c
 	return nil
 }
 
+//NOT USED
 func addAgentVersionToProvideStore(h *p2p.Host, pid peer.ID, useragent string) error {
 	return h.Peerstore().Put(pid, "AgentVersion", useragent)
 }

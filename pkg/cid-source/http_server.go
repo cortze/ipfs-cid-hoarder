@@ -162,21 +162,24 @@ func GetNewHttpCid(source interface{}, trackableCidArrayC chan<- []TrackableCid)
 		return []TrackableCid{}, fmt.Errorf("Invalid source type: %T", source)
 	}
 
+	log.Debug("Starting to listen for CIDs received from post request through channel.")
 	for {
 		select {
 		//channel filled up using post method
 		case providerRecords, ok := <-httpCidSource.providerRecordsChannel:
 			if !ok {
 				//return both nil to end the method
+				log.Debug("Received not ok message in http server from channel")
 				return nil, nil
 			}
 
-			if reflect.DeepEqual(providerRecords.EncapsulatedJSONProviderRecords, nil) {
+			if reflect.DeepEqual(providerRecords, nil) {
 				//return both nil to end the method
+				log.Debug("Received empty provider records from channel")
 				return nil, nil
 			}
 
-			// is an array of trackableCid arrays
+			// is an array of trackableCids that are created from encapsulated provider records
 			var trackableCidArray []TrackableCid
 
 			for _, providerRecord := range providerRecords.EncapsulatedJSONProviderRecords {

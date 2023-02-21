@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	src "ipfs-cid-hoarder/pkg/cid-source"
-	"ipfs-cid-hoarder/pkg/config"
 	"ipfs-cid-hoarder/pkg/db"
 	"ipfs-cid-hoarder/pkg/p2p"
 )
@@ -84,23 +83,18 @@ func NewCidTracker(
 	}, nil
 }
 
-// Receives provider records from http server
-// they are received in form
-//[trackableCids{ pr1, pr2, pr3, pr4},
-//trackableCids{ pr1, pr2, pr3, pr4},
-//trackableCids{ pr1, pr2, pr3, pr4}]
-// for different cids each
-func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidArrayC chan<- []src.TrackableCid) {
+/* func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidArrayC chan<- []src.TrackableCid) {
 	defer genWG.Done()
 	// generate a timer to determine when to start the next get request
-	/* minTimeT := time.NewTicker(10 * time.Second) */
+	minTimeT := time.NewTicker(10 * time.Second)
 	log.Debugf("Source is: %s and config source is: ", tracker.CidSource.Type(), config.HttpServerSource)
 
 	go src.GetNewHttpCid(tracker.CidSource, trackableCidArrayC)
 
+	log.Debug("Exited from get new http cid")
 	return
 
-}
+} */
 
 //Generates cids depending on the cid source
 func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, trackableCidC chan<- *src.TrackableCid) {
