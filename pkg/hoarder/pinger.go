@@ -386,7 +386,7 @@ func (pinger *CidPinger) runPinger(wg *sync.WaitGroup, pingerID int) {
 			}(pinger, cidInfo, cidFetchRes)
 
 			wg.Add(1)
-			// recalculate the closest k peers to the content. This needs to be done due to node churn.(?)
+			// calculate the closest k peers to the content.
 			go func(p *CidPinger, c *models.CidInfo, fetchRes *models.CidFetchResults) {
 				defer wg.Done()
 				t := time.Now()

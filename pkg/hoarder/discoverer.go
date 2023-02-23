@@ -103,6 +103,7 @@ func (discoverer *CidDiscoverer) run() {
 
 func (discoverer *CidDiscoverer) addToMap(trackableCid *src.TrackableCid) {
 	cidStr := trackableCid.CID.Hash().B58String()
+	//if cid entry exists append new trackable cid received.
 	if typeInstance, ok := discoverer.CidMap[cidStr]; ok {
 		discoverer.CidMap[cidStr] = append(typeInstance, trackableCid)
 	} else {
@@ -117,6 +118,7 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 	ctx := discoverer.ctx
 	for {
 		select {
+		//receive trackable cids from generateCids interface method
 		case trackableCid, ok := <-trackableCidC:
 			if !ok {
 				return
@@ -133,15 +135,16 @@ func (discoverer *CidDiscoverer) addProvider(addProviderWG *sync.WaitGroup, trac
 				trackableCid.Addresses, trackableCid.ProvideTime, trackableCid.UserAgent,
 			)
 			discoverer.m.Lock()
+			//adds to map to be later for looped (collects all of the provider records for a specific CID)
 			discoverer.addToMap(trackableCid)
-
+			//not exactly useful because we run the pinger on a seperate host
 			err := addPeerToProviderStore(ctx, discoverer.host, trackableCid.ID, trackableCid.CID, trackableCid.Addresses)
 			if err != nil {
 				log.Errorf("error %s calling addpeertoproviderstore method", err)
 			} else {
 				log.Debug("Added providers to provider store")
 			}
-
+			//not exactly useful because we run the pinger on a seperate host
 			err = addAgentVersionToProvideStore(discoverer.host, trackableCid.ID, trackableCid.UserAgent)
 
 			if err != nil {
@@ -276,6 +279,7 @@ func (discoverer *CidDiscoverer) addProviderRecordsHttp(addProviderWG *sync.Wait
 }
 
 // This method essentially initializes the data for the pinger to be able to get information about the PR holders later.
+// Run for each CID received by generateCids which is stored inside the map.
 func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, cidstr string, trackableCidArr []*src.TrackableCid) {
 	defer discovererWG.Done()
 	//the starting values for the discoverer
@@ -289,13 +293,12 @@ func (discoverer *CidDiscoverer) discoveryProcess(discovererWG *sync.WaitGroup, 
 	fetchRes := models.NewCidFetchResults(cidIn, 0)
 
 	// generate a new CidFetchResults
-	//TODO starting data for the discoverer
 	fetchRes.TotalHops = 0
 	fetchRes.HopsToClosest = 0
 	for _, val := range trackableCidArr {
 		cidInfo.AddPublicationTime(val.PublicationTime)
 		cidInfo.AddProvideTime(val.ProvideTime)
-		//TODO discoverer starting ping res
+		//discoverer starting ping results != publisher where we can have the actual data
 		pingRes := models.NewPRPingResults(
 			cidIn,
 			val.ID,
@@ -343,7 +346,7 @@ func addAddrtoPeerstore(h host.Host, pid peer.ID, multiaddr []ma.Multiaddr) {
 }
 */
 
-//NOT USED Instead of adding directly to peerstore the API is the following
+//DEPRECATED Instead of adding directly to peerstore the API is the following
 func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid cid.Cid, multiaddr []ma.Multiaddr) error {
 	keyMH := cid.Hash()
 	err := h.DHT.ProviderStore().AddProvider(ctx, keyMH, peer.AddrInfo{ID: pid, Addrs: multiaddr})
@@ -353,7 +356,7 @@ func addPeerToProviderStore(ctx context.Context, h *p2p.Host, pid peer.ID, cid c
 	return nil
 }
 
-//NOT USED
+//DEPRECATED
 func addAgentVersionToProvideStore(h *p2p.Host, pid peer.ID, useragent string) error {
 	return h.Peerstore().Put(pid, "AgentVersion", useragent)
 }
