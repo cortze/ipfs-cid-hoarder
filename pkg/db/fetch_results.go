@@ -28,6 +28,7 @@ func (db *DBClient) CreateFetchResultsTable() error {
 		success_att INT NOT NULL,
 		fail_att INT NOT NULL,
 		is_retrievable BOOL NOT NULL,
+		pr_with_maddrs BOOL NOT NULL,
 
 		UNIQUE(cid_hash, ping_round),
 		FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
@@ -61,8 +62,9 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		k,
 		success_att,
 		fail_att,
-		is_retrievable)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		is_retrievable,
+		pr_with_maddrs)		 
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
 		fetchRes.Cid.Hash().B58String(),
 		fetchRes.Round,
 		fetchRes.StartTime.Unix(),
@@ -77,6 +79,7 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		suc,
 		fail,
 		fetchRes.IsRetrievable,
+		fetchRes.PRWithMAddr,
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to insert fetch_results at DB ")

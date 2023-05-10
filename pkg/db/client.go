@@ -29,7 +29,6 @@ type DBClient struct {
 	pingResultsC chan []*models.PRPingResults
 
 	persistC chan interface{}
-
 	doneC chan struct{}
 }
 
@@ -59,10 +58,6 @@ func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 		ctx:           ctx,
 		connectionUrl: url,
 		psqlPool:      psqlPool,
-		cidInfoC:      make(chan *models.CidInfo, bufferSize),
-		peerInfoC:     make(chan *models.PeerInfo, bufferSize),
-		fetchResultC:  make(chan *models.CidFetchResults, bufferSize),
-		pingResultsC:  make(chan []*models.PRPingResults, bufferSize),
 		persistC:      make(chan interface{}, bufferSize),
 		doneC:         make(chan struct{}),
 	}
@@ -135,10 +130,6 @@ func (db *DBClient) runPersisters() {
 	persisterWG.Wait()
 	log.Info("Done persisting study")
 
-	close(db.cidInfoC)
-	close(db.peerInfoC)
-	close(db.fetchResultC)
-	close(db.pingResultsC)
 	close(db.persistC)
 	close(db.doneC)
 }
@@ -159,50 +150,42 @@ func (db *DBClient) AddFetchResult(f *models.CidFetchResults) {
 // TODO: still not completed
 func (db *DBClient) Close() {
 	log.Info("closing DB for the CID Hoarder")
-	// send message on doneC
 	db.doneC <- struct{}{}
-	// db.psqlPool.Close()
+	db.psqlPool.Close()
 }
 
 // initTables creates all the necesary tables in the given DB
 func (db *DBClient) initTables() error {
 	var err error
-
 	// cid_info table
 	err = db.CreateCidInfoTable()
 	if err != nil {
 		return err
 	}
-
 	// peer_info table
 	err = db.CreatePeerInfoTable()
 	if err != nil {
 		return err
 	}
-
 	// pr_holders
 	err = db.CreatePRHoldersTable()
 	if err != nil {
 		return err
 	}
-
 	// fetch_results table
 	err = db.CreateFetchResultsTable()
 	if err != nil {
 		return err
 	}
-
 	// ping_results table
 	err = db.CreatePingResultsTable()
 	if err != nil {
 		return err
 	}
-
 	// k_closest_peers
 	err = db.CreateClosestPeersTable()
 	if err != nil {
 		return err
 	}
-
 	return err
 }

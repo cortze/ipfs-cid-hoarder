@@ -19,8 +19,7 @@ func (db *DBClient) CreateCidInfoTable() error {
 		provide_time FLOAT NOT NULL,
 		req_interval INT NOT NULL,
 		k INT NOT NULL,
-		content_type TEXT NOT NULL,
-		source TEXT NOT NULL,
+		prov_op TEXT NOT NULL,
 		creator TEXT NOT NULL
 	);`)
 	if err != nil {
@@ -43,17 +42,15 @@ func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) (err error) {
 		provide_time,
 		req_interval,
 		k,
-		content_type,
-		source,
+		prov_op,
 		creator) 
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+	VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		cidInfo.CID.Hash().B58String(),
 		cidInfo.PublishTime.Unix(),
 		cidInfo.ProvideTime.Milliseconds(),
 		int(cidInfo.ReqInterval.Minutes()),
 		cidInfo.K,
-		cidInfo.ContentType,
-		cidInfo.Source,
+		cidInfo.ProvideOp,
 		cidInfo.Creator.String(),
 	)
 	if err != nil {

@@ -22,6 +22,7 @@ func (db *DBClient) CreatePingResultsTable() error {
 			ping_duration FLOAT NOT NULL,
 			is_active BOOL NOT NULL,
 			has_records BOOL NOT NULL,
+			records_with_maddrs BOOL NOT NULL,
 			conn_error TEXT NOT NULL,
 
 			UNIQUE(cid_hash, ping_round, peer_id),
@@ -59,8 +60,9 @@ func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) (err erro
 			ping_duration,
 			is_active,
 			has_records,
+			records_with_maddrs,
 			conn_error)		 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 			cStr,
 			ping.Round,
 			ping.PeerID.String(),
@@ -69,6 +71,7 @@ func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) (err erro
 			ping.PingDuration.Milliseconds(),
 			ping.Active,
 			ping.HasRecords,
+			ping.RecordsWithMAddrs,
 			ping.ConError,
 		)
 		if err != nil {
