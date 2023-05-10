@@ -57,9 +57,9 @@ func New(ctx context.Context, privKey crypto.PrivKey, ip, port, blacklistUA stri
 	// create the official crawler
 	c, err := crawler.New(
 		h,
-		crawler.WithParallelism(1000),
+		crawler.WithParallelism(800),
 		crawler.WithMsgTimeout(40*time.Second),
-		crawler.WithConnectTimeout(40*time.Second),
+		crawler.WithConnectTimeout(60*time.Second),
 	)
 	if err != nil {
 		return nil, err
