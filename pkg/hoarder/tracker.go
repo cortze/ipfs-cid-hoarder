@@ -39,7 +39,8 @@ type CidTracker struct {
 	StudyDuration time.Duration
 }
 
-//Creates a new:
+// Creates a new:
+//
 //	CidTracker struct{
 //		ctx context.Context
 //		wg  *sync.WaitGroup
@@ -118,7 +119,7 @@ func (tracker *CidTracker) generateCidsHttp(genWG *sync.WaitGroup, trackableCidA
 	}
 }
 
-//Generates cids depending on the cid source
+// Generates cids depending on the cid source
 func (tracker *CidTracker) generateCids(genWG *sync.WaitGroup, trackableCidC chan<- *src.TrackableCid) {
 	defer genWG.Done()
 	// generate a timer to determine

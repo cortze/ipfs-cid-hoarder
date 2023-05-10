@@ -17,7 +17,8 @@ type cidQueue struct {
 	cidArray []*models.CidInfo
 }
 
-//Creates a new:
+// Creates a new:
+//
 //	cidQueue struct {
 //		sync.RWMutex
 //
