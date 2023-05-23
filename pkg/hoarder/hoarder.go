@@ -88,6 +88,10 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// ---- Generate the CidPublisher -----
 	// select the provide operation that we want to perform:
 	provOp := StandardDHTProvide
+	pubWorkers := 1
+	if !conf.SinglePublisher { 
+		pubWorkers = conf.Workers 
+	}
 	studyWG.Add(1)
 	cidPublisher, err := NewCidPublisher(
 		ctx,
@@ -103,7 +107,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		),
 		cidSet,
 		conf.K,
-		conf.Workers,
+		pubWorkers,
 		reqInterval,
 		cidPingTime,
 	)

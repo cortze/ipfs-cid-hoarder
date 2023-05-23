@@ -63,7 +63,8 @@ type CidFetchResults struct {
 	StartTime             time.Time
 	FinishTime            time.Time
 	TotalHops             int
-	HopsToClosest         int
+	HopsTreeDepth int
+	MinHopsToClosest int
 	PRHoldPingDuration    time.Duration
 	FindProvDuration      time.Duration
 	GetClosePeersDuration time.Duration

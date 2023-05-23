@@ -270,8 +270,9 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 				defer cancel()
 				closestPeers, lookupMetrics, err := p.host.DHT.GetClosestPeers(ctxT, string(c.CID.Hash()))
 				pingTime := time.Since(t)
-				fetchRes.TotalHops = lookupMetrics.GetHops()
-				fetchRes.HopsToClosest = lookupMetrics.GetHopsForPeerSet(closestPeers)
+				fetchRes.TotalHops = lookupMetrics.GetTotalHops()
+				fetchRes.HopsTreeDepth = lookupMetrics.GetTreeDepth()
+				fetchRes.MinHopsToClosest = lookupMetrics.GetMinHopsForPeerSet(lookupMetrics.GetClosestPeers())
 				fetchRes.GetClosePeersDuration = pingTime
 				if err != nil {
 					logEntry.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())

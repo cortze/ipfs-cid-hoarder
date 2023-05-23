@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 
@@ -16,6 +16,7 @@ import (
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -73,13 +74,20 @@ func NewHost(
 	// generate a new custom message sender
 	msgSender := NewCustomMessageSender(blacklistingUA)
 
+	// unlimit the resources for the host 
+	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
+	rm, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		return nil, fmt.Errorf("new resource manager: %w", err)
+	}
+
 	// generate the libp2p host
 	h, err := libp2p.New(
 		libp2p.WithDialTimeout(DialTimeout),
 		libp2p.ListenAddrs(mAddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(config.UserAgent),
-		libp2p.ResourceManager(network.NullResourceManager),
+		libp2p.ResourceManager(rm),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dht, err = kaddht.New(ctx, h,
@@ -137,7 +145,7 @@ func (h *Host) Boostrap(ctx context.Context) error {
 			} else {
 				atomic.AddInt64(&succCon, 1)
 			}
-		}(bnode)
+		}(*bnode)
 	}
 
 	wg.Wait()

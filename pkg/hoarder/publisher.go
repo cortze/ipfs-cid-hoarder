@@ -9,10 +9,10 @@ import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
 
-	"github.com/pkg/errors"
 	"github.com/ipfs/go-cid"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -267,6 +267,7 @@ func (publisher *CidPublisher) publishingProcess(
 	logEntry := log.WithField("publisherID", publisherID)
 	logEntry.Debugf("publisher ready")
 	generationDone := false
+	minIterTicker := time.NewTicker(minIterTime)
 	for {
 		// check if the generation is done to finish the publisher (with priority)
 		if generationDone && len(cidChannel) == 0 {
@@ -308,8 +309,9 @@ func (publisher *CidPublisher) publishingProcess(
 			}
 
 			// add the number of hops to the fetch results
-			fetchRes.TotalHops = lookupMetrics.GetHops()
-			fetchRes.HopsToClosest = lookupMetrics.GetHopsForPeerSet(lookupMetrics.GetClosestPeers())
+			fetchRes.TotalHops = lookupMetrics.GetTotalHops()
+			fetchRes.HopsTreeDepth = lookupMetrics.GetTreeDepth()
+			fetchRes.MinHopsToClosest = lookupMetrics.GetMinHopsForPeerSet(lookupMetrics.GetClosestPeers())
 
 			// Make sure we don't 
 			<- fetchRes.DoneC
@@ -329,11 +331,14 @@ func (publisher *CidPublisher) publishingProcess(
 		case <-publisher.ctx.Done():
 			logEntry.WithField("publisherID", publisherID).Debugf("shutdown detected, closing publisher")
 			return
+
 		case <- generationDoneC:
 			generationDone = true
-		default:
+
+		case <- minIterTicker.C:
 			// keep checking if the generation has ended to close the routine
 		}
+		minIterTicker.Reset(minIterTime)
 	}
 }
 
