@@ -180,14 +180,14 @@ func (publisher *CidPublisher) addProviderMsgListener(
 					//TODO: parse the errors in a better way
 					connError = p2p.ParseConError(msgNot.Error) 
 					log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s", 
-						castedCid.String(), msgNot.RemotePeer.String(), msgNot.Error.Error(),
+						castedCid.Hash().B58String(), msgNot.RemotePeer.String(), msgNot.Error.Error(),
 					)
 				} else {
 					// assume that if the peer replies successfully to the ADD_PROVIDER messages,
 					// the remote peer keeps the info (We are assuming also this for the Hydras)
 					active = true
 					connError = p2p.NoConnError
-					log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", castedCid.String(), msgNot.RemotePeer.String())
+					log.Debugf("Successfull PRHolder for CID %s of PRHolder %s", castedCid.Hash().B58String(), msgNot.RemotePeer.String())
 				}
 
 				// Read the CidInfo from the local Sync.Map struct

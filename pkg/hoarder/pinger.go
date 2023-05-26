@@ -179,9 +179,8 @@ func (pinger *CidPinger) runPingOrchester() {
 				if cidInfo.IsFinished() {
 					// delete the CID from the list
 					pinger.cidS.removeCid(cidStr)
-					logEntry.Infof("finished pinging CID %s - ping time duration reached %s + %s\n", 
-						cidStr, cidInfo.PublishTime, cidInfo.StudyDuration,
-					)
+					logEntry.Infof("finished pinging CID %s - pingend over %s", 
+						cidStr, cidInfo.StudyDuration)
 				}
 			}
 			// if CID pinger was initialized and there are no more CIDs to track, we are done with the study
@@ -270,13 +269,18 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 				defer cancel()
 				closestPeers, lookupMetrics, err := p.host.DHT.GetClosestPeers(ctxT, string(c.CID.Hash()))
 				pingTime := time.Since(t)
-				fetchRes.TotalHops = lookupMetrics.GetTotalHops()
-				fetchRes.HopsTreeDepth = lookupMetrics.GetTreeDepth()
-				fetchRes.MinHopsToClosest = lookupMetrics.GetMinHopsForPeerSet(lookupMetrics.GetClosestPeers())
-				fetchRes.GetClosePeersDuration = pingTime
 				if err != nil {
 					logEntry.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
+					fetchRes.TotalHops = -1
+					fetchRes.HopsTreeDepth = -1
+					fetchRes.MinHopsToClosest = -1
+				} else {
+					fetchRes.TotalHops = lookupMetrics.GetTotalHops()
+					fetchRes.HopsTreeDepth = lookupMetrics.GetTreeDepth()
+					fetchRes.MinHopsToClosest = lookupMetrics.GetMinHopsForPeerSet(lookupMetrics.GetClosestPeers())
 				}
+				fetchRes.GetClosePeersDuration = pingTime
+				
 				for _, peer := range closestPeers {
 					cidFetchRes.AddClosestPeer(peer)
 				}
@@ -336,7 +340,7 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 		if err != nil {
 			logEntry.Debugf("unable to retrieve providers from peer %s - error: %s", pAddr.ID, err.Error())
 		} else {
-			logEntry.Debugf("providers for Cid %s from peer %s - %v\n", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
+			logEntry.Debugf("providers for Cid %s from peer %s - %v", c.CID.Hash().B58String(), pAddr.ID.String(), provs)
 		}
 		// iter through the providers to see if it matches with the host's peerID
 		for _, paddrs := range provs {
@@ -385,7 +389,7 @@ func (pinger *CidPinger) PingPRHolder(c *models.CidInfo, round int, pAddr peer.A
 						break connetionRetry
 					}
 				} else {
-					logEntry.Infof("%d retries done without succesful connection %s\n", 
+					logEntry.Debugf("%d retries done without succesful connection %s", 
 						att+1, connError,
 					)					
 					break connetionRetry

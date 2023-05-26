@@ -66,7 +66,7 @@ func (g *CidGenerator) Run() (chan *cid.Cid, chan struct{}) {
 				contId, err := g.generator.getNewCid()
 				switch err {
 				case CidLimitError:
-					log.Infof("Cid limit reached: %d\n", g.cidNumber)
+					log.Infof("Cid generation marked reached: %d, clossing generator", g.cidNumber)
 					return
 				case nil:
 					log.Infof("generated new CID %s", contId.Hash().B58String())
