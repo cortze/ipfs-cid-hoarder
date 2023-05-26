@@ -2,49 +2,55 @@ package db
 
 import (
 	"context"
-	"os"
 	"sync"
+	"time"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
-const bufferSize = 20000
-const maxPersisters = 1
+const (
+	batchSize = 1024
+	batchFlushTime = 1 * time.Second
+	maxPersisters = 1
+)
 
 type DBClient struct {
 	ctx context.Context
 	m   sync.RWMutex
 
-	connectionUrl string // the url might not be necessary (better to remove it?¿)
 	psqlPool      *pgxpool.Pool
-
-	// Req Channels
-	cidInfoC     chan *models.CidInfo
-	peerInfoC    chan *models.PeerInfo
-	fetchResultC chan *models.CidFetchResults
-	pingResultsC chan []*models.PRPingResults
-
-	persistC chan interface{}
-	doneC chan struct{}
+	persistC chan persistable
+	closeCs []chan struct{}
 }
 
-func RemoveOldDBIfExists(oldDBPath string) {
-	os.Remove(oldDBPath)
+// persistable is the common structure that will be held to the db workers over the
+// persistC channel and added to a batch later on
+type persistable struct {
+	query string 
+	values []interface{}
+}
+
+func newPersistable () persistable {
+	return persistable{
+		query: "",
+		values: make([]interface{}, 0),
+	}
+}
+
+func (persis *persistable) isZero() bool {
+	return persis.query == "" 
 }
 
 // NewDBClient creates and returns a db.cli to persist data into a PostgreSQL database
 func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
-	logEntry := log.WithFields(log.Fields{
-		"db": url,
-	},
-	)
-	logEntry.Debug("initialising the db")
+	logEntry := log.WithFields(log.Fields{"db": url})
+	logEntry.Trace("initialising the db")
 
-	psqlPool, err := pgxpool.Connect(ctx, url)
+	psqlPool, err := pgxpool.New(ctx, url)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to initialise Posgres DB at "+url)
 	}
@@ -56,17 +62,16 @@ func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 
 	dbCli := &DBClient{
 		ctx:           ctx,
-		connectionUrl: url,
 		psqlPool:      psqlPool,
-		persistC:      make(chan interface{}, bufferSize),
-		doneC:         make(chan struct{}),
+		persistC:      make(chan persistable, maxPersisters),
+		closeCs:	   make([]chan struct{}, 0, maxPersisters),
 	}
 
 	err = dbCli.initTables()
 	if err != nil {
 		return nil, errors.Wrap(err, "initialising the tables")
 	}
-
+	
 	go dbCli.runPersisters()
 
 	logEntry.Infof("DB initialised")
@@ -76,83 +81,108 @@ func NewDBClient(ctx context.Context, url string) (*DBClient, error) {
 // runPersisters creates a pool of DB persistors
 // TODO: originally created for cuncurrency issues with SQLite3, might not be needed now with PostgreSQL
 func (db *DBClient) runPersisters() {
-	log.Info("Initializing DB persisters")
-
+	log.Debug("Initializing DB persisters")
+	
 	var persisterWG sync.WaitGroup
-	for persister := 1; persister <= maxPersisters; persister++ {
-		persisterWG.Add(4)
-		go func(wg *sync.WaitGroup, persisterID int) {
-			defer wg.Done()
-			logEntry := log.WithField("persister", persisterID)
-			for {
-				// give priority to the dbDone channel if it closed
-				select {
-				case <-db.doneC:
-					logEntry.Info("finish detected, closing persister")
-					return
-				default:
-				}
-
-				select {
-				case p := <-db.persistC:
-					switch p.(type) {
-					case (*models.CidInfo):
-						cidInfo := p.(*models.CidInfo)
-						logEntry.Debugf("persisting CID %s into DB", cidInfo.CID.Hash().B58String())
-						err := db.addCidInfo(cidInfo)
-						if err != nil {
-							logEntry.Error("error persisting CidInfo - " + err.Error())
-						}
-					case (*models.PeerInfo):
-						dbPeer := p.(*models.PeerInfo)
-						logEntry.Debugf("persisting peer %s into DB", dbPeer.ID.String())
-						err := db.addPeerInfo(dbPeer)
-						if err != nil {
-							logEntry.Error("error persisting PeerInfo - " + err.Error())
-						}
-					case (*models.CidFetchResults):
-						fetchRes := p.(*models.CidFetchResults)
-						logEntry.Debugf("persisting fetch info into DB")
-						err := db.addFetchResults(fetchRes)
-						if err != nil {
-							logEntry.Error("error persisting FetchResults - " + err.Error())
-						}
-					}
-				case <-db.ctx.Done():
-					logEntry.Info("shutdown detected, closing persister")
-					return
-				}
-			}
-		}(&persisterWG, persister)
-
+	for persisterID := 1; persisterID <= maxPersisters; persisterID++ {
+		// create a new closeC channel 
+		closeC := make(chan struct{}, 1)
+		db.closeCs = append(db.closeCs, closeC)
+		// launch one persiter more
+		persisterWG.Add(1)
+		go db.persisterWorker(closeC, &persisterWG, persisterID) 
 	}
 
 	persisterWG.Wait()
-	log.Info("Done persisting study")
-
 	close(db.persistC)
-	close(db.doneC)
+	for _, closeC := range db.closeCs {
+		close(closeC)
+	}
+	db.psqlPool.Close()
+	log.Info("DB client successfully finished")
 }
 
 func (db *DBClient) AddCidInfo(c *models.CidInfo) {
-	db.persistC <- c
+	log.WithFields(log.Fields{
+		"event_type": "cid_info",
+		"cid": c.CID.String(),
+	}).Trace("new event to perstist")
+
+	db.persistC <- db.addCidInfo(c)
+	db.persistC <- db.addNewPeerInfoSet(c.PRHolders)
+	db.persistC <- db.addPRHoldersSet(c.CID, c.PRHolders)
 }
 
 func (db *DBClient) AddPeerInfo(p *models.PeerInfo) {
-	db.persistC <- p
+	log.WithFields(log.Fields{
+		"event_type": "peer_info",
+		"peerID": p.ID.String(),
+	}).Trace("new event to perstist")
+
+	db.persistC <- db.addPeerInfo(p)
 }
 
 func (db *DBClient) AddFetchResult(f *models.CidFetchResults) {
-	db.persistC <- f
+	log.WithFields(log.Fields{
+		"event_type": "fetch_results",
+		"cid": f.Cid.Hash().B58String(),
+	}).Trace("new event to perstist")
+
+	db.persistC <- db.addFetchResults(f)
+	db.persistC <- db.addPingResultsSet(f.PRPingResults)
+	db.persistC <- db.addClosestPeerSet(&models.ClosestPeers{
+		Cid: f.Cid,
+		PingRound: f.Round,
+		Peers: f.ClosestPeers,
+	})
 }
 
-// Close closes all the connections opened with the DB
-// TODO: still not completed
-func (db *DBClient) Close() {
-	log.Info("closing DB for the CID Hoarder")
-	db.doneC <- struct{}{}
-	db.psqlPool.Close()
+// persisterWorker is the main logic of each of the main DB client persisters 
+// it batches a range of queries untill the flush time is achieved or the number of queries  
+// is reached
+func (db *DBClient) persisterWorker (closeC chan struct {}, wg *sync.WaitGroup, persisterID int) {
+	defer wg.Done()
+	logEntry := log.WithField("persister", persisterID)
+	
+	// control variables for the persister
+	shutdown := false
+	batcher := NewQueryBatch(db.ctx, db.psqlPool, batchSize)
+	flushTicker := time.NewTicker(batchFlushTime)
+
+	for {
+		// check if the routine needs to end
+		if shutdown && len(db.persistC) == 0 {
+			logEntry.Info("persister finished, C ya!")
+			return
+		}
+		// select over the different events/interruptions that might occur
+		select {
+		case persis := <-db.persistC:
+			if persis.isZero() {
+				continue
+			}
+			batcher.AddQuery(persis)
+			if batcher.IsReadyToPersist() {
+				logEntry.Trace("batcher full, flishing it")
+				batcher.PersistBatch()
+			}
+
+		case <- flushTicker.C:
+			logEntry.Trace("flush interval reached, persisting batch")
+			batcher.PersistBatch()
+
+		case <-closeC:
+			logEntry.Info("controled closure detected, closing persister")
+			shutdown = true	
+			continue
+
+		case <-db.ctx.Done():
+			logEntry.Info("sudden shutdown detected, closing persister")
+			return
+		}
+	}
 }
+
 
 // initTables creates all the necesary tables in the given DB
 func (db *DBClient) initTables() error {
@@ -189,3 +219,14 @@ func (db *DBClient) initTables() error {
 	}
 	return err
 }
+
+
+// Close makes sure that all the persisters are notified of the closure
+func (db *DBClient) Close() {
+	log.Info("orchestrating peacefull DB closing")
+	for _, closeC := range db.closeCs {
+		closeC <- struct{}{}
+	}
+}
+
+

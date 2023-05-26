@@ -19,7 +19,12 @@ func (db *DBClient) CreateClosestPeersTable() error {
 			peer_id TEXT NOT NULL,
 
 			FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
-		);`)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_k_closest_peers_cid_hash		ON k_closest_peers (cid_hash);
+		CREATE INDEX IF NOT EXISTS idx_k_closest_peers_ping_round	ON k_closest_peers (ping_round);
+		CREATE INDEX IF NOT EXISTS idx_k_closest_peers_peer_id		ON k_closest_peers (peer_id);
+		`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for k_closest_peers table generation")
 	}
@@ -27,42 +32,29 @@ func (db *DBClient) CreateClosestPeersTable() error {
 	return nil
 }
 
-func (db *DBClient) addClosestPeerSet(closestPeers *models.ClosestPeers) (err error) {
-	// first round has not closest peers
-	if closestPeers.PingRound == 0 {
-		return nil
+func (db *DBClient) addClosestPeerSet(closestPeers *models.ClosestPeers) persistable {
+	persis := newPersistable()
+
+	if closestPeers.PingRound == 0 || len(closestPeers.Peers) <= 0 {
+		return persis
 	}
 
-	if len(closestPeers.Peers) <= 0 {
-		return errors.New("unable to insert closest peers - no closest peers set given")
-	}
-
-	cStr := closestPeers.Cid.Hash().B58String()
-	log.WithFields(log.Fields{
-		"cid": cStr,
-	}).Debug("adding set of cid closest_peers to DB")
-
-	// insert each of the Peers holding the PR
-	for _, p := range closestPeers.Peers {
-		_, err = db.psqlPool.Exec(db.ctx, `
+	// compose the multiquery
+	persis.query = multiValueComposer(`
 		INSERT INTO k_closest_peers (
 			cid_hash,
 			ping_round,
-			peer_id)		 
-		VALUES ($1, $2, $3)`,
-			cStr,
-			closestPeers.PingRound,
-			p.String(),
-		)
-		if err != nil {
-			return errors.Wrap(err, "unable to insert closest_peers at DB ")
-		}
+			peer_id)`,
+		"",
+		len(closestPeers.Peers), // number of values
+		3) // number of items on value
 
-		log.WithFields(log.Fields{
-			"cid":        cStr,
-			"round":      closestPeers.PingRound,
-			"closePeers": len(closestPeers.Peers),
-		}).Trace("tx successfully saved closest_peers into DB")
+	// insert each of the Peers as values
+	for _, p := range closestPeers.Peers {
+		persis.values = append(persis.values, closestPeers.Cid.Hash().B58String())
+		persis.values = append(persis.values, closestPeers.PingRound)
+		persis.values = append(persis.values, p.String())
 	}
-	return err
+
+	return persis
 }

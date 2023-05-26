@@ -16,9 +16,9 @@ func (db *DBClient) CreateFetchResultsTable() error {
 		id SERIAL PRIMARY KEY, 
 		cid_hash TEXT NOT NULL,
 		ping_round INT NOT NULL,
-		fetch_time FLOAT NOT NULL,
-		fetch_time_since_publication FLOAT NOT NULL,
-		fetch_duration FLOAT NOT NULL,
+		fetch_time TIMESTAMP NOT NULL,
+		fetch_time_since_publication_m FLOAT NOT NULL,
+		fetch_duration_ms FLOAT NOT NULL,
 		total_hops INT NOT NULL,
 		hops_tree_depth INT NOT NULL,
 		min_hops_for_closest INT NOT NULL,
@@ -33,28 +33,29 @@ func (db *DBClient) CreateFetchResultsTable() error {
 
 		UNIQUE(cid_hash, ping_round),
 		FOREIGN KEY(cid_hash) REFERENCES cid_info(cid_hash)
-	);`)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_fetch_results_cid_hash						ON fetch_results (cid_hash);
+	CREATE INDEX IF NOT EXISTS idx_fetch_results_ping_round						ON fetch_results (ping_round);
+	CREATE INDEX IF NOT EXISTS idx_fetch_results_fetch_time						ON fetch_results (fetch_time);
+	CREATE INDEX IF NOT EXISTS idx_fetch_results_fetch_time_since_publication_m	ON fetch_results (fetch_time_since_publication_m);
+	`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for fetch_results table generation")
 	}
 	return nil
 }
 
-func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error) {
+func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) persistable {
+	persis := newPersistable()
 
-	log.WithFields(log.Fields{
-		"cid": fetchRes.Cid.Hash().B58String(),
-	}).Trace("adding fetch_results to DB")
-
-	tot, suc, fail := fetchRes.GetSummary()
-
-	_, err = db.psqlPool.Exec(db.ctx, `
+	persis.query = `
 	INSERT INTO fetch_results (
 		cid_hash,
 		ping_round,
 		fetch_time,
-		fetch_time_since_publication,
-		fetch_duration,
+		fetch_time_since_publication_m,
+		fetch_duration_ms,
 		total_hops,	
 		hops_tree_depth,
 		min_hops_for_closest,
@@ -66,38 +67,27 @@ func (db *DBClient) addFetchResults(fetchRes *models.CidFetchResults) (err error
 		fail_att,
 		is_retrievable,
 		pr_with_maddrs)		 
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
+
+	tot, suc, fail := fetchRes.GetSummary()
+
+	persis.values = append(persis.values, 
 		fetchRes.Cid.Hash().B58String(),
-		fetchRes.Round,
-		fetchRes.StartTime.Unix(),
-		fetchRes.GetFetchTimeSincePublication(),
-		fetchRes.FinishTime.Sub(fetchRes.StartTime).Milliseconds(),
+		fetchRes.Round, 
+		fetchRes.StartTime,
+		fetchRes.GetFetchTimeSincePublication().Minutes(), 
+		fetchRes.FinishTime.Sub(fetchRes.StartTime).Milliseconds(), 
 		fetchRes.TotalHops,
-		fetchRes.HopsTreeDepth,
-		fetchRes.MinHopsToClosest,
-		fetchRes.PRHoldPingDuration.Milliseconds(),
-		fetchRes.FindProvDuration.Milliseconds(),
-		fetchRes.GetClosePeersDuration.Milliseconds(),
-		tot,
-		suc,
+		fetchRes.HopsTreeDepth, 
+		fetchRes.MinHopsToClosest, 
+		fetchRes.PRHoldPingDuration.Milliseconds(), 
+		fetchRes.FindProvDuration.Milliseconds(), 
+		fetchRes.GetClosePeersDuration.Milliseconds(), 
+		tot, 
+		suc, 
 		fail,
 		fetchRes.IsRetrievable,
-		fetchRes.PRWithMAddr,
-	)
-	if err != nil {
-		return errors.Wrap(err, "unable to insert fetch_results at DB ")
-	}
+		fetchRes.PRWithMAddr)
 
-	err = db.addPingResultsSet(fetchRes.PRPingResults)
-	if err != nil {
-		return errors.Wrap(err, "persisting PingResults")
-	}
-
-	err = db.addClosestPeerSet(&models.ClosestPeers{
-		Cid:       fetchRes.Cid,
-		PingRound: fetchRes.Round,
-		Peers:     fetchRes.ClosestPeers,
-	})
-
-	return err
+	return persis
 }

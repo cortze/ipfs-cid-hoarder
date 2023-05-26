@@ -13,15 +13,21 @@ func (db *DBClient) CreateCidInfoTable() error {
 
 	_, err := db.psqlPool.Exec(db.ctx, `
 		CREATE TABLE IF NOT EXISTS cid_info(
-		id SERIAL, 
-		cid_hash TEXT NOT NULL PRIMARY KEY,
-		pub_time FLOAT NOT NULL,
-		provide_time FLOAT NOT NULL,
-		req_interval INT NOT NULL,
-		k INT NOT NULL,
-		prov_op TEXT NOT NULL,
-		creator TEXT NOT NULL
-	);`)
+			id SERIAL, 
+			cid_hash TEXT NOT NULL PRIMARY KEY,
+			pub_time TIMESTAMP NOT NULL,
+			provide_time_ms FLOAT NOT NULL,
+			req_interval_m INT NOT NULL,
+			k INT NOT NULL,
+			prov_op TEXT NOT NULL,
+			creator TEXT NOT NULL
+		);
+				
+		CREATE INDEX IF NOT EXISTS idx_cid_info_cid_hash			ON cid_info (cid_hash);
+		CREATE INDEX IF NOT EXISTS idx_cid_info_pub_time			ON cid_info (pub_time);
+		CREATE INDEX IF NOT EXISTS idx_cid_info_provide_time_ms		ON cid_info (provide_time_ms);
+		CREATE INDEX IF NOT EXISTS idx_cid_info_prov_op				ON cid_info (prov_op);
+	`)
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for CidInfo table generation")
 	}
@@ -29,51 +35,30 @@ func (db *DBClient) CreateCidInfoTable() error {
 	return nil
 }
 
-func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) (err error) {
-
-	log.WithFields(log.Fields{
-		"cid": cidInfo.CID.Hash().B58String(),
-	}).Trace("adding new cid info to DB")
-
-	// insert the cidInfo
-	_, err = db.psqlPool.Exec(db.ctx, `INSERT INTO cid_info (
+func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) persistable {
+	persis := newPersistable()
+	persis.query = `INSERT INTO cid_info(
 		cid_hash,
 		pub_time,
-		provide_time,
-		req_interval,
+		provide_time_ms,
+		req_interval_m,
 		k,
 		prov_op,
 		creator) 
-	VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		cidInfo.CID.Hash().B58String(),
-		cidInfo.PublishTime.Unix(),
-		cidInfo.ProvideTime.Milliseconds(),
-		int(cidInfo.ReqInterval.Minutes()),
-		cidInfo.K,
-		cidInfo.ProvideOp,
-		cidInfo.Creator.String(),
-	)
-	if err != nil {
-		return err
-	}
+	VALUES($1, $2, $3, $4, $5, $6, $7)`
 
-	// add the peer info of the PR holders
-	err = db.addNewPeerInfoSet(cidInfo.PRHolders)
-	if err != nil {
-		return errors.Wrap(err, "insering peer info")
-	}
+	persis.values = append(persis.values, cidInfo.CID.Hash().B58String())
+	persis.values = append(persis.values, cidInfo.PublishTime)
+	persis.values = append(persis.values, cidInfo.ProvideTime.Milliseconds())
+	persis.values = append(persis.values, int(cidInfo.ReqInterval.Minutes()))
+	persis.values = append(persis.values, cidInfo.K)
+	persis.values = append(persis.values, cidInfo.ProvideOp)
+	persis.values = append(persis.values, cidInfo.Creator.String())
 
-	// add the PR holders to the table
-	err = db.addPRHoldersSet(cidInfo.CID, cidInfo.PRHolders)
-	if err != nil {
-		return errors.Wrap(err, "inserting pr_holders")
-	}
-
-	return nil
+	return persis	
 }
 
 func (db *DBClient) GetIdOfCid(cidStr string) (id int, err error) {
-
 	row := db.psqlPool.QueryRow(db.ctx, `SELECT id FROM cid_info WHERE cid_hash=$1;`, cidStr)
 	err = row.Scan(&id)
 	if err != nil {
