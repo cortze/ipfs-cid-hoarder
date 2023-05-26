@@ -140,6 +140,9 @@ func RunHoarder(ctx *cli.Context) error {
 	
 	// lauch the Hoarder
 	err = cidHoarder.Run()
+	if err != nil {
+		return err
+	}
 
 	// wait until Hoarder finishes, or untill a stop signal comes
 	hoarderLoop:
