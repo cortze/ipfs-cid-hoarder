@@ -45,7 +45,7 @@ func NewCidInfo(
 	return &CidInfo{
 		CID:           id,
 		GenTime:       time.Now(), // fill the CID with the current time
-		K: k,
+		K: 0,
 		PRPingResults: make([]*CidFetchResults, 0, k),
 		PRHolders:     make([]*PeerInfo, 0),
 		ProvideOp:      provOp,
