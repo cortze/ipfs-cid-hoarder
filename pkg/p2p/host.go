@@ -8,20 +8,18 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
-	"github.com/cortze/ipfs-cid-hoarder/pkg/crawler"
-
 	log "github.com/sirupsen/logrus"
 
+	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
+
 	libp2p "github.com/libp2p/go-libp2p"
+	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
-
-	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -29,6 +27,14 @@ import (
 const (
 	DialTimeout = 60 * time.Second
 )
+
+type HostOptions struct {
+	IP string
+	Port string
+	K int
+	BlacklistingUA string
+	BlacklistedPeers map[peer.ID]struct{}
+}
 
 type Host struct {
 	ctx context.Context
@@ -40,8 +46,23 @@ type Host struct {
 	StartTime time.Time
 }
 
-func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucketSize int, hydraFilter bool) (*Host, error) {
+func NewHost(
+	ctx context.Context, 
+	ip, port string, 
+	bucketSize int, 
+	blacklistingUA string, 
+	blacklistedPeers map[peer.ID]struct{}) (*Host, error) {
 	log.Debug("Creating host")
+
+	// prevent dial backoffs
+	ctx = network.WithForceDirectDial(ctx, "prevent backoff")
+
+	// generate private key for the publisher Libp2p host
+	privKey, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
+	}
+	log.Debugf("Generated Priv Key for the host %s", PrivKeyToString(privKey))
 
 	// compose the multiaddress
 	mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", ip, port))
@@ -50,30 +71,15 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 	}
 
 	var dht *kaddht.IpfsDHT
-
-	// check if hydra filter has been tuned
-	var blacklistedUA string
-	var blacklistPeers map[peer.ID]struct{}
-	if hydraFilter {
-		log.Info("hydra-filter: ON -> crawling network to identify hydra-boosters (might take 5-7mins)")
-		blacklistedUA = config.DefaultBlacklistUserAgent
-		// launch light crawler identifying balcklistable peers
-		crawlResutls, err := crawler.RunLightCrawler(ctx, blacklistedUA)
-		if err != nil {
-			return nil, err
-		}
-		blacklistPeers = crawlResutls.GetBlacklistedPeers()
-	}
-
-	// // Configure the resource manager to not yell at us
-	// limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
-	// rm, err := rcmgr.NewResourceManager(limiter)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	// generate a new custom message sender
-	msgSender := NewCustomMessageSender(blacklistedUA)
+	msgSender := NewCustomMessageSender(blacklistingUA)
+
+	// unlimit the resources for the host 
+	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
+	rm, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		return nil, fmt.Errorf("new resource manager: %w", err)
+	}
 
 	// generate the libp2p host
 	h, err := libp2p.New(
@@ -81,7 +87,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 		libp2p.ListenAddrs(mAddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(config.UserAgent),
-		libp2p.ResourceManager(network.NullResourceManager),
+		libp2p.ResourceManager(rm),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dht, err = kaddht.New(ctx, h,
@@ -89,7 +95,7 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 				// Consider a Wrapper around MessageSender to get more details of underneath processes
 				kaddht.WithCustomMessageSender(msgSender.Init),
 				kaddht.BucketSize(bucketSize),
-				kaddht.WithPeerBlacklist(blacklistPeers), // always blacklist (can be an empty map or a full one)
+				kaddht.WithPeerBlacklist(blacklistedPeers), // always blacklist (can be an empty map or a full one)
 			)
 			return dht, err
 		}),
@@ -97,7 +103,6 @@ func NewHost(ctx context.Context, privKey crypto.PrivKey, ip, port string, bucke
 	if err != nil {
 		return nil, err
 	}
-
 	// check if the DHT is empty or not
 	if dht == nil {
 		return nil, errors.New("error - no IpfsDHT server has been initialized")
@@ -140,7 +145,7 @@ func (h *Host) Boostrap(ctx context.Context) error {
 			} else {
 				atomic.AddInt64(&succCon, 1)
 			}
-		}(bnode)
+		}(*bnode)
 	}
 
 	wg.Wait()

@@ -1,28 +1,12 @@
 package config
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"strconv"
-
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
 var log = logrus.WithField(
 	"module", "config",
-)
-
-const (
-	RandomSource     = "random-content-gen"
-	TextFileSource   = "text-file"
-	JsonFileSource   = "json-file"
-	HttpServerSource = "http-server"
-	BitswapSource    = "bitswap"
-	RandomContent    = "random-content-gen"
 )
 
 // Harcoded variables for the tool's profiling
@@ -34,192 +18,92 @@ var CliIp string = "0.0.0.0"
 var UserAgent string = "BSC-Cid-Hoarder"
 
 // Blacklisting UserAgents
-var DefaultBlacklistUserAgent = "hydra-booster"
+var DefaultBlacklistUserAgent = ""
 
 // default configuration
 var DefaultConfig = Config{
-	Port:                 "9010",
-	LogLevel:             "info",
-	Database:             "./data/ipfs-hoarder-db.db",
-	ConfigJsonFile:       "config.json",
-	CidSource:            "random-content-gen",
-	AlreadyPublishedCIDs: false,
-	CidFile:              "cids/cid-list.json",
-	//TODO introduce type of CidFile
-	CidContentSize: 1000, // 1MB in KBs
-	CidNumber:      10,
-	Workers:        250,
-	ReqInterval:    "30m",
-	StudyDuration:  "48h",
-	K:              20, // K-bucket parameter
-	HydraFilter:    false,
+	Port:            "9010",
+	LogLevel:        "info",
+	Database:        "postgres://user:password@ip:port/db",
+	CidContentSize:  1024, // 1MB in KBs
+	CidNumber:       10,
+	Workers:         250,
+	SinglePublisher: true,
+	ReqInterval:     "30m",
+	CidPingTime:     "48h",
+	K:               20,
+	BlacklistedUA:   DefaultBlacklistUserAgent,
 }
 
 // Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
-	Port                 string `json:"port"`
-	LogLevel             string `json:"log-level"`
-	Database             string `json:"database-endpoint"`
-	CidSource            string `json:"cid-source"`
-	CidFile              string `json:"cid-file"`
-	ConfigJsonFile       string `json:"config-json-file"`
-	CidContentSize       int    `json:"cid-content-size"`
-	CidNumber            int    `json:"cid-number"` // in KBs
-	Workers              int    `json:"workers"`
-	AlreadyPublishedCIDs bool   `json:"already-published-cids"` //already published CIDs skips the publishing phase of the hoarder.
-	ReqInterval          string `json:"req-interval"`
-	StudyDuration        string `json:"study-duration"`
-	K                    int    `json:"k"`
-	HydraFilter          bool   `json:"hydra-filter"`
+	Port            string `json:"port"`
+	LogLevel        string `json:"log-level"`
+	Database        string `json:"database-endpoint"`
+	CidContentSize  int    `json:"cid-content-size"`
+	CidNumber       int    `json:"cid-number"`
+	Workers         int    `json:"workers"`
+	SinglePublisher bool   `json:"single-publisher"`
+	ReqInterval     string `json:"req-interval"`
+	CidPingTime     string `json:"cid-ping-time"`
+	K               int    `json:"k"`
+	BlacklistedUA     string   `json:"blacklisted-ua"`
 }
 
 // Init takes the command line argumenst from the urfave/cli context and composes the configuration
 func NewConfig(ctx *cli.Context) (*Config, error) {
 	c := &Config{}
-	// TODO: work on reading config file from custom path/file (reproducibility)
-	// 		 export the current conf into a file?
-	if ctx.IsSet("name-of-config-json-file") {
-		c.ImportConfigFromJsonFile()
-	} else {
-		fmt.Println("applying arguments")
-		c.apply(ctx)
-	}
-
+	c.Apply(ctx)
 	return c, nil
 
 }
 
-//Exports the config struct into a json file
-func (c *Config) ExportConfigIntoJsonFile() error {
-	content, err := c.JsonConfig()
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile("config.json", content, 0644)
-	if err != nil {
-		return errors.Wrap(err, " while trying to write struct to file")
-	}
-
-	return nil
-}
-
-//Imports config struct from json file
-func (c *Config) ImportConfigFromJsonFile() error {
-	content, err := ioutil.ReadFile("config.json")
-	if err != nil {
-		return errors.Wrap(err, " while trying to import config from json file")
-	}
-	err = json.Unmarshal(content, &c)
-	if err != nil {
-		return errors.Wrap(err, " while trying to unmarshal json config")
-	}
-	return nil
-}
-
-//Returns a json representation of the config struct
-func (c *Config) JsonConfig() ([]byte, error) {
-	out, err := json.Marshal(c)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "while trying to format config struct into json")
-	}
-
-	return out, nil
-}
-
 // apply parses the arguments readed from cli.Context
-func (c *Config) apply(ctx *cli.Context) {
+func (c *Config) Apply(ctx *cli.Context) {
 	// Check if the flags have been set
 	if ctx.Command.Name == "run" {
 		if ctx.IsSet("port") {
 			c.Port = ctx.String("port")
-		} else {
-			c.Port = DefaultConfig.Port
 		}
+
 		if ctx.IsSet("log-level") {
 			c.LogLevel = ctx.String("log-level")
-		} else {
-			c.LogLevel = DefaultConfig.LogLevel
 		}
-		//field database endpoint is required to be set by the user
+
 		if ctx.IsSet("database-endpoint") {
 			c.Database = ctx.String("database-endpoint")
 		}
 
-		if ctx.IsSet("hydra-filter") {
-			c.HydraFilter = ctx.Bool("hydra-filter")
-		} else {
-			c.HydraFilter = DefaultConfig.HydraFilter
+		if ctx.IsSet("cid-content-size") {
+			c.CidContentSize = ctx.Int("cid-content-size")
 		}
 
-		// Time delay between the each of the PRHolder pings
-		if ctx.IsSet("req-interval") {
-			c.ReqInterval = ctx.String("req-interval")
-		} else {
-			c.ReqInterval = DefaultConfig.ReqInterval
+		if ctx.IsSet("cid-number") {
+			c.CidNumber = ctx.Int("cid-number")
 		}
 
-		if ctx.IsSet("already-published-cids") {
-			c.AlreadyPublishedCIDs, _ = strconv.ParseBool(ctx.String("already-published-cids"))
-		} else {
-			c.AlreadyPublishedCIDs = DefaultConfig.AlreadyPublishedCIDs
-		}
-		// Set the study duration time
-		if ctx.IsSet("study-duration") {
-			c.StudyDuration = ctx.String("study-duration")
-		} else {
-			c.StudyDuration = DefaultConfig.StudyDuration
-		}
-		// check the number of random CIDs that we want to generate
-		if ctx.IsSet("k") {
-			c.K = ctx.Int("k")
-		} else {
-			c.K = DefaultConfig.K
-		}
-		if ctx.IsSet("cid-source") {
-			c.CidSource = ctx.String("cid-source")
-		} else {
-			c.CidSource = DefaultConfig.CidSource
-		}
-		// batch of CIDs for the entire study
 		if ctx.IsSet("workers") {
 			c.Workers = ctx.Int("workers")
-		} else {
-			c.Workers = DefaultConfig.Workers
 		}
-		switch c.CidSource {
-		case RandomSource:
-			// check the size of the random content to generate
-			fmt.Println("random source for cids found")
-			if ctx.IsSet("cid-content-size") {
-				c.CidContentSize = ctx.Int("cid-content-size")
-			} else {
-				c.CidContentSize = DefaultConfig.CidContentSize
-			}
-			// check the number of random CIDs that we want to generate
-			if ctx.IsSet("cid-number") {
-				c.CidNumber = ctx.Int("cid-number")
-			} else {
-				c.CidNumber = DefaultConfig.CidNumber
-			}
 
-			//TODO support different types of cid files
-		case TextFileSource, JsonFileSource:
-			fmt.Println("text file source or json file source was found")
-			if ctx.IsSet("cid-file") {
-				c.CidFile = ctx.String("cid-file")
-			} else {
-				c.CidFile = DefaultConfig.CidFile
-			}
-		case HttpServerSource:
-			fmt.Println("will start http server")
-		case BitswapSource:
-			fmt.Println("bitswap content discovery not supported yet.")
-			os.Exit(0)
-		default:
-			log.Info("no cid source was given.")
-			os.Exit(0)
+		if ctx.IsSet("single-publisher") {
+			c.SinglePublisher = ctx.Bool("single-publisher")
+		}
+
+		if ctx.IsSet("req-interval") {
+			c.ReqInterval = ctx.String("req-interval")
+		}
+
+		if ctx.IsSet("cid-ping-time") {
+			c.CidPingTime = ctx.String("cid-ping-time")
+		}
+
+		if ctx.IsSet("k") {
+			c.K = ctx.Int("k")
+		}
+
+		if ctx.IsSet("blacklisted-ua") {
+			c.BlacklistedUA = ctx.String("blacklisted-ua")
 		}
 	}
 }

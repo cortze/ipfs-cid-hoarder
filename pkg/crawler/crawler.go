@@ -29,7 +29,7 @@ import (
 type Crawler struct {
 	ctx context.Context
 
-	crawler     *crawler.Crawler
+	crawler     *crawler.DefaultCrawler
 	h           host.Host
 	results     *CrawlResults
 	blacklistUA string
@@ -55,11 +55,11 @@ func New(ctx context.Context, privKey crypto.PrivKey, ip, port, blacklistUA stri
 	}
 
 	// create the official crawler
-	c, err := crawler.New(
+	c, err := crawler.NewDefaultCrawler(
 		h,
-		crawler.WithParallelism(1000),
-		crawler.WithMsgTimeout(40*time.Second),
-		crawler.WithConnectTimeout(40*time.Second),
+		crawler.WithParallelism(800),
+		crawler.WithMsgTimeout(50*time.Second),
+		crawler.WithConnectTimeout(60*time.Second),
 	)
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func (c *Crawler) run() *CrawlResults {
 	handleSucc := func(p peer.ID, rtPeers []*peer.AddrInfo) {
 		logEntry.Debugf("peer %s successfully connected", p.String())
 
-		// add the peer `P` to the list of active peers
+		// add the peer `P` to the list of Defaultactive peers
 		c.results.addPeer(p, active)
 
 		// add each of the `rtPeers` to the discovered peers

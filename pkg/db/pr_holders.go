@@ -9,9 +9,7 @@ import (
 )
 
 func (db *DBClient) CreatePRHoldersTable() error {
-
 	log.Debugf("creating table 'pr_holders' for DB")
-
 	_, err := db.psqlPool.Exec(db.ctx, `
 		CREATE TABLE IF NOT EXISTS pr_holders(
 			id SERIAL PRIMARY KEY, 
@@ -24,36 +22,27 @@ func (db *DBClient) CreatePRHoldersTable() error {
 	if err != nil {
 		return errors.Wrap(err, "error preparing statement for pr_holders table generation")
 	}
-
 	return nil
 }
 
-func (db *DBClient) addPRHoldersSet(c cid.Cid, prHolders []*models.PeerInfo) (err error) {
+func (db *DBClient) addPRHoldersSet(c cid.Cid, prHolders []*models.PeerInfo) persistable {
+	persis := newPersistable()
 	if len(prHolders) <= 0 {
-		return errors.New("unable to insert pr_holders - no pr_holders set given")
+		return persis
 	}
-	log.WithFields(log.Fields{
-		"cid": c.Hash().B58String(),
-	}).Debug("adding set of cid pr_holders to DB")
-
-	// insert each of the Peers holding the PR
-	for _, p := range prHolders {
-		_, err = db.psqlPool.Exec(db.ctx, `
+	persis.query = multiValueComposer(`
 		INSERT INTO pr_holders (
 			cid_hash,
-			peer_id)		 
-		VALUES ($1, $2)`,
-			c.Hash().B58String(),
-			p.ID.String(),
-		)
-		if err != nil {
-			return errors.Wrap(err, "unable to insert pr_holders at DB ")
-		}
+			peer_id)`,
+		"", // no appendix to the query
+		len(prHolders), // number of Values to insert
+		2) // number of items per value (cid_hash, peer_id)
 
-		log.WithFields(log.Fields{
-			"cid":        c.Hash().B58String(),
-			"pr_holders": len(prHolders),
-		}).Trace("tx successfully saved pr_holders into DB")
+	// add each of the items of the PR holders to the values 	
+	for _, p := range prHolders {
+		persis.values = append(persis.values, c.Hash().B58String())
+		persis.values = append(persis.values, p.ID.String())
 	}
-	return err
+
+	return persis
 }

@@ -8,19 +8,19 @@ import (
 )
 
 func (db *DBClient) CreatePingResultsTable() error {
-
 	log.Debugf("creating table 'ping_results' for DB")
-
 	_, err := db.psqlPool.Exec(db.ctx, `
 		CREATE TABLE IF NOT EXISTS ping_results(
 			id SERIAL PRIMARY KEY, 
 			cid_hash TEXT NOT NULL,
 			ping_round INT NOT NULL,
 			peer_id TEXT NOT NULL,
-			ping_time FLOAT NOT NULL,
-			ping_duration FLOAT NOT NULL,
+			ping_time TIMESTAMP NOT NULL,
+			ping_time_since_publication_m FLOAT NOT NULL,
+			ping_duration_ms FLOAT NOT NULL,
 			is_active BOOL NOT NULL,
 			has_records BOOL NOT NULL,
+			records_with_maddrs BOOL NOT NULL,
 			conn_error TEXT NOT NULL,
 
 			UNIQUE(cid_hash, ping_round, peer_id),
@@ -30,53 +30,44 @@ func (db *DBClient) CreatePingResultsTable() error {
 	if err != nil {
 		return errors.Wrap(err, "ping_results table")
 	}
-
 	return nil
 }
 
-func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) (err error) {
+func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) persistable {
+	persis := newPersistable()
 	if len(pingRes) <= 0 {
-		return errors.New("insert ping result set - no ping_results set given")
+		return 	persis 
 	}
-	cStr := pingRes[0].Cid.Hash().B58String()
-	pingRound := pingRes[0].Round
 
-	log.WithFields(log.Fields{
-		"cid": cStr,
-	}).Debug("adding set of cid ping_results to DB")
-
-	// insert each of the Peers holding the PR
-	for _, ping := range pingRes {
-
-		_, err = db.psqlPool.Exec(db.ctx, `
+	persis.query = multiValueComposer(`
 		INSERT INTO ping_results (
 			cid_hash,
 			ping_round,
 			peer_id,
 			ping_time,
-			ping_duration,
+			ping_time_since_publication_m,
+			ping_duration_ms,
 			is_active,
 			has_records,
-			conn_error)		 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			cStr,
-			ping.Round,
-			ping.PeerID.String(),
-			ping.FetchTime.Unix(),
-			ping.FetchDuration.Milliseconds(),
-			ping.Active,
-			ping.HasRecords,
-			ping.ConError,
-		)
-		if err != nil {
-			return errors.Wrap(err, "insert ping_results ")
-		}
+			records_with_maddrs,
+			conn_error)`,
+			"",
+			len(pingRes), // number of values
+			10) // number of items per value
 
-		log.WithFields(log.Fields{
-			"cid":   cStr,
-			"round": pingRound,
-			"pings": len(pingRes),
-		}).Trace("tx successfully saved ping_results into DB")
+	// insert each of the Peers holding the PR
+	for _, ping := range pingRes {
+		persis.values = append(persis.values, ping.Cid.Hash().B58String())
+		persis.values = append(persis.values, ping.Round)
+		persis.values = append(persis.values, ping.PeerID.String())
+		persis.values = append(persis.values, ping.PingTime)
+		persis.values = append(persis.values, ping.GetPingTimeSincePublication().Minutes())
+		persis.values = append(persis.values, ping.PingDuration.Milliseconds())
+		persis.values = append(persis.values, ping.Active)
+		persis.values = append(persis.values, ping.HasRecords)
+		persis.values = append(persis.values, ping.RecordsWithMAddrs)
+		persis.values = append(persis.values, ping.ConError)
 	}
-	return err
+
+	return persis
 }

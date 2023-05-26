@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"fmt"
 	"strings"
 
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
@@ -71,6 +70,9 @@ var KnownErrors = map[string]string{
 }
 
 func ParseConError(err error) string {
+	if err == nil {
+		return NoConnError
+	}
 	// nested error casting to the swarm.DialError to process all the errors that might come
 	connErr, ok := err.(*swarm.DialError)
 	if !ok && connErr != nil {
@@ -85,7 +87,5 @@ func ParseConError(err error) string {
 			return key
 		}
 	}
-
-	fmt.Println(err)
 	return DialErrorUnknown
 }

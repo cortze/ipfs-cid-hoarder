@@ -3,11 +3,12 @@ package cmd
 import (
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/hoarder"
-
-	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
@@ -19,9 +20,10 @@ var RunCmd = &cli.Command{
 	Action: RunHoarder,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:    "port",
-			Usage:   "port number where the hoarder will be spawned",
-			EnvVars: []string{"IPFS_CID_HOARDER_PORT"},
+			Name:        "port",
+			Usage:       "port number where the hoarder will be spawned",
+			EnvVars:     []string{"IPFS_CID_HOARDER_PORT"},
+			DefaultText: "9010",
 		},
 		&cli.StringFlag{
 			Name:        "log-level",
@@ -36,34 +38,29 @@ var RunCmd = &cli.Command{
 			DefaultText: "postgresql://user:password@localhost:5432/database",
 			Required:    true,
 		},
-		&cli.StringFlag{
-			Name:        "cid-source",
-			Usage:       "defines the mode where we want to run the tool [random-content-gen, text-file, json-file,bitswap]",
-			DefaultText: "text",
-		},
-		&cli.StringFlag{
-			Name:        "cid-file",
-			Usage:       "link to the file containing the files to track (txt/json files)",
-			EnvVars:     []string{"IPFS_CID_HOARDER_CID_FILE"},
-			DefaultText: "cids/test.txt",
-		},
 		&cli.IntFlag{
 			Name:        "cid-content-size",
 			Usage:       "size in KB of the random block generated",
 			EnvVars:     []string{"IPFS_CID_HOARDER_CID_CONTENT_SIZE"},
-			DefaultText: "1MB",
+			DefaultText: "1024 (1KB)",
 		},
 		&cli.IntFlag{
 			Name:        "cid-number",
-			Usage:       "number of CIDs that will be generated for the study",
+			Usage:       "number of CIDs that will be generated for the study, (set to -1 for a contineous measurement)",
 			EnvVars:     []string{"IPFS_CID_HOARDER_CID_NUMBER"},
-			DefaultText: "1000 CIDs",
+			DefaultText: "Undefined CIDs",
 		},
 		&cli.IntFlag{
 			Name:        "workers",
 			Usage:       "max number of CIDs publish and ping workers",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BATCH_SIZE"},
-			DefaultText: "250 CIDs",
+			DefaultText: "1 worker",
+		},
+		&cli.BoolFlag{
+			Name:        "single-publisher",
+			Usage:       "defines whether the hoarderder uses only a single publisher worker (improves publish time accuracy)",
+			EnvVars:     []string{"IPFS_CID_HOARDER_SINGLE_PUBLISHER"},
+			DefaultText: "false",
 		},
 		&cli.StringFlag{
 			Name:        "req-interval",
@@ -72,9 +69,9 @@ var RunCmd = &cli.Command{
 			DefaultText: "30m",
 		},
 		&cli.StringFlag{
-			Name:        "study-duration",
-			Usage:       "max time for the study to run (example '24h', '35h', '48h')",
-			EnvVars:     []string{"IPFS_CID_HOARDER_STUDY_DURATION"},
+			Name:        "cid-ping-time",
+			Usage:       "max time that each CID will be track for (example '24h', '35h', '48h')",
+			EnvVars:     []string{"IPFS_CID_HOARDER_CID_PING_TIME"},
 			DefaultText: "48h",
 		},
 		&cli.IntFlag{
@@ -84,54 +81,29 @@ var RunCmd = &cli.Command{
 			DefaultText: "K=20",
 		},
 		&cli.StringFlag{
-			Name:        "already-published-cids",
-			Usage:       "if the cids are already published in the network the tool has to only ping them and not publish them",
-			EnvVars:     []string{"IPFS_CID_HOARDER_PUBLISHED_CIDS"},
-			DefaultText: "false",
-		},
-		&cli.StringFlag{
-			Name:        "config-file",
-			Usage:       "reads a config struct from the specified json file(not yet tested might not work)",
-			EnvVars:     []string{"IPFS_CID_HOARDER_CONFIG_FILE"},
-			DefaultText: "config.json",
-		},
-		&cli.BoolFlag{
-			Name:        "hydra-filter",
-			Usage:       "boolean representation to activate or not the filter to avoid connections to hydras",
-			EnvVars:     []string{"IPFS_CID_HOARDER_HYDRA_FILTER"},
-			DefaultText: "false",
+			Name:        "blacklisted-ua",
+			Usage:       "user agent that wants to be balcklisted from having interactions with",
+			EnvVars:     []string{"IPFS_CID_HOARDER_BLACKLISTED_UA"},
+			DefaultText: "no-blacklisting",
 		},
 	},
 }
 
 func RunHoarder(ctx *cli.Context) error {
 	// here goes all the magic
-
 	// generate config from the urfave/cli context
-	conf, err := config.NewConfig(ctx)
-	if err != nil {
-		return errors.Wrap(err, "unable to generate config from arguments")
-	}
+	conf := &config.DefaultConfig
+	conf.Apply(ctx)
 
 	file, err := config.ParseLogOutput("terminal")
-
 	if err != nil {
 		return err
 	}
-
 	// set the logs configurations
 	log.SetFormatter(config.ParseLogFormatter("text"))
 	log.SetOutput(file)
 	// log.SetOutput(config.ParseLogOutput("terminal"))
 	log.SetLevel(config.ParseLogLevel(conf.LogLevel))
-
-	jsonConf, err := conf.JsonConfig()
-
-	if err != nil {
-		log.Errorf("error %s while converting config into json", err)
-	}
-
-	log.Debug(string(jsonConf))
 
 	// expose the pprof and prometheus metrics
 	go func() {
@@ -144,11 +116,52 @@ func RunHoarder(ctx *cli.Context) error {
 	}()
 
 	// Initialize the CidHoarder
-	log.Info("Running Cid-Hoarder on mode")
+	log.WithFields(log.Fields{
+		"log-level": conf.LogLevel,
+		"port": conf.Port,
+		"database": conf.Database,
+		"cid-size": conf.CidContentSize,
+		"cid-number": conf.CidNumber,
+		"workers": conf.Workers,
+		"single-publisher": conf.SinglePublisher,
+		"req-interval": conf.ReqInterval,
+		"cid-ping-time": conf.CidPingTime,
+		"k": conf.K,
+		"blacklisted-ua": conf.BlacklistedUA,
+
+	}).Info("running cid-hoarder")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
 		return err
 	}
 
-	return cidHoarder.Run()
+	signalC := make(chan os.Signal, 1)
+	signal.Notify(signalC, syscall.SIGKILL, syscall.SIGTERM, os.Interrupt)
+	
+	// lauch the Hoarder
+	err = cidHoarder.Run()
+	if err != nil {
+		return err
+	}
+
+	// wait until Hoarder finishes, or untill a stop signal comes
+	hoarderLoop:
+	for {
+		select {
+		case <- signalC:
+			log.Info("cntr-C detected, closing hoarder peacefully")
+			cidHoarder.Close()
+			break hoarderLoop	
+
+		case <- ctx.Context.Done():
+			log.Info("context died, closing hoarder peacefully")
+			cidHoarder.Close()
+			break hoarderLoop	
+
+		case <- cidHoarder.FinishedC:
+			log.Info("cid hoarder sucessfully finished")
+			break hoarderLoop	
+		}
+	}
+	return nil
 }

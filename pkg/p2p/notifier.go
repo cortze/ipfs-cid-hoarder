@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-//This is the struct type received and send by the notifier's channel.
+// This is the struct type received and send by the notifier's channel.
 type MsgNotification struct {
 	RemotePeer    peer.ID
 	QueryTime     time.Time
@@ -29,10 +29,12 @@ func NewMsgNotifier() *Notifier {
 	}
 }
 
-//This returns the channel of the notifier struct:
+// This returns the channel of the notifier struct:
 //
-// 	msgChan chan *MsgNotification
-//The notifier channel receives and sends:
+//	msgChan chan *MsgNotification
+//
+// The notifier channel receives and sends:
+//
 //	MsgNotification struct{
 //		RemotePeer    peer.ID
 //		QueryTime     time.Time
@@ -45,17 +47,21 @@ func (notifier_instance *Notifier) GetNotifierChan() chan *MsgNotification {
 	return notifier_instance.msgChan
 }
 
-//Sends a new:
+// Sends a new:
+//
 //	MsgNotification struct{
 //	...
 //	}
+//
 // To the underlying channel:
+//
 //	msgChan chan *MsgNotification
 func (notifier_instance *Notifier) Notify(msgStatus *MsgNotification) {
 	notifier_instance.msgChan <- msgStatus
 }
 
 // Closes the underlying:
+//
 //	msgChan chan *MsgNotification
 func (notifier_instance *Notifier) Close() {
 	close(notifier_instance.msgChan)
