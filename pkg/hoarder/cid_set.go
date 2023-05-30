@@ -80,6 +80,14 @@ func (s *cidSet) getCid(cStr string) (*models.CidInfo, bool) {
 	return c, ok
 }
 
+func (s *cidSet) getCidList() []*models.CidInfo {
+	s.RLock()
+	defer s.RUnlock()
+	cidList := make([]*models.CidInfo, s.Len())
+	cidList = append(cidList, s.cidArray...)
+	return cidList
+}
+
 func (s *cidSet) sortCidList() {
 	sort.Sort(s)
 	return

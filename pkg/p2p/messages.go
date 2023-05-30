@@ -15,14 +15,18 @@ import (
 type MessageSender struct {
 	m             pb.MessageSender
 	blacklistedUA string
-	msgNot        *Notifier
+	msgNot        *MsgNotifier
 }
 
-func NewCustomMessageSender(blacklistedUA string) *MessageSender {
-	return &MessageSender{
+func NewCustomMessageSender(blacklistedUA string, withMsgNot bool) *MessageSender {
+	msgSender := &MessageSender{
 		blacklistedUA: blacklistedUA,
-		msgNot:        NewMsgNotifier(),
 	}
+	// only generate a notifier if requested
+	if withMsgNot {
+		msgSender.msgNot = NewMsgNotifier()
+	}  
+	return msgSender 
 }
 func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSender {
 	msgSender := net.NewMessageSenderImpl(h, protocols, ms.blacklistedUA)
@@ -30,7 +34,7 @@ func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSe
 	return ms
 }
 
-func (ms *MessageSender) GetMsgNotifier() *Notifier {
+func (ms *MessageSender) GetMsgNotifier() *MsgNotifier {
 	return ms.msgNot
 }
 
@@ -41,19 +45,20 @@ func (ms *MessageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 // SendMessage is a custom wrapper on top of the pb.MessageSender that sends a given msg to a peer and
 // notifies throught the given notification channel of the sent msg status
 func (ms *MessageSender) SendMessage(ctx context.Context, p peer.ID, pmes *pb.Message) error {
-	// Keep track of the time that takes to send the msg
 	startT := time.Now()
 	err := ms.m.SendMessage(ctx, p, pmes)
 	t := time.Since(startT)
 
-	// compose the Notifier
-	not := &MsgNotification{
-		RemotePeer:    p,
-		QueryTime:     startT,
-		QueryDuration: t,
-		Msg:           *pmes,
-		Error:         err,
+	// only notify if the notifier was enabled
+	if ms.msgNot != nil {
+		not := &MsgNotification{
+			RemotePeer:    p,
+			QueryTime:     startT,
+			QueryDuration: t,
+			Msg:           *pmes,
+			Error:         err,
+		}
+		ms.msgNot.Notify(not)
 	}
-	ms.msgNot.Notify(not)
 	return err
 }

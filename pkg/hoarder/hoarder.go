@@ -30,6 +30,8 @@ type CidHoarder struct {
 
 func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error) {
 	var err error
+	var studyWG sync.WaitGroup
+	cidSet := newCidSet()
 
 	// ----- Compose the DB client -----
 	dbInstance, err := db.NewDBClient(ctx, conf.Database)
@@ -38,14 +40,16 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}
 
 	// ------ Configure the settings for the Libp2p hosts ------
-	hostOpts := p2p.HostOptions {
+	hostOpts := p2p.DHTHostOptions {
 		IP: "0.0.0.0",
 		Port: conf.Port,
+		ProvOp: p2p.GetProvOpFromConf(conf.ProvideOperation),
+		WithNotifier: false,
 		K: conf.K,
 		BlacklistingUA: conf.BlacklistedUA,
 	}
 	if conf.BlacklistedUA != "" {
-		log.Infof("UA blacklisting activated -> crawling network to identify %s (might take 5-7mins)\n", 
+		log.Infof("UA blacklisting activated -> crawling network to identify %s (might take 5-7mins)", 
 			hostOpts.BlacklistingUA,
 		)
 		// launch light crawler identifying balcklistable peers
@@ -57,7 +61,6 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}
 
 	//  ------ Study Parameters ---------
-	var studyWG sync.WaitGroup
 	reqInterval, err := time.ParseDuration(conf.ReqInterval)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing ReqInterval "+conf.ReqInterval)
@@ -70,34 +73,32 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	log.Info("configured Hoarder to request at an interval of ", reqInterval, " and during ", cidPingTime)
 
 	// ----- Generate the CidPinger -----
-	cidSet := newCidSet()
+	pingerHostOpts := hostOpts
 	studyWG.Add(1)
 	cidPinger, err := NewCidPinger(
 		ctx, 
 		&studyWG, 
-		hostOpts, 
+		pingerHostOpts, 
 		dbInstance, 
 		reqInterval, 
 		conf.Workers, 
-		cidSet,
-	)
+		cidSet)
 	if err != nil {
 		return nil, err
 	}
 
 	// ---- Generate the CidPublisher -----
 	// select the provide operation that we want to perform:
-	provOp := StandardDHTProvide
+	publisherHostOpts := hostOpts
+	publisherHostOpts.WithNotifier = true // the only time were want to have the notifier
 	pubWorkers := 1
 	if !conf.SinglePublisher { 
 		pubWorkers = conf.Workers 
 	}
-	studyWG.Add(1)
 	cidPublisher, err := NewCidPublisher(
 		ctx,
 		&studyWG,
-		hostOpts,
-		provOp,
+		publisherHostOpts,
 		dbInstance,
 		NewCidGenerator(
 			ctx,
@@ -125,10 +126,11 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 }
 
 func (c *CidHoarder) Run() error {
-	// Launch the publisher and the pinger
+	c.wg.Add(1)
 	go c.cidPublisher.Run()
+	c.wg.Add(1)
 	go c.cidPinger.Run()
-	// wait until the app has been closed / finished to notify 
+
 	go func (){
 		c.wg.Wait()
 		c.dbCli.Close()

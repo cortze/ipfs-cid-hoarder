@@ -12,13 +12,8 @@ var log = logrus.WithField(
 // Harcoded variables for the tool's profiling
 var PprofIp = "127.0.0.1"
 var PprofPort = "9020"
-
-// Hardcoded variables for the cli host
-var CliIp string = "0.0.0.0"
-var UserAgent string = "BSC-Cid-Hoarder"
-
-// Blacklisting UserAgents
 var DefaultBlacklistUserAgent = ""
+var DefaultDHTProvideOperation = "standard"
 
 // default configuration
 var DefaultConfig = Config{
@@ -32,6 +27,7 @@ var DefaultConfig = Config{
 	ReqInterval:     "30m",
 	CidPingTime:     "48h",
 	K:               20,
+	ProvideOperation: DefaultDHTProvideOperation,
 	BlacklistedUA:   DefaultBlacklistUserAgent,
 }
 
@@ -47,6 +43,7 @@ type Config struct {
 	ReqInterval     string `json:"req-interval"`
 	CidPingTime     string `json:"cid-ping-time"`
 	K               int    `json:"k"`
+	ProvideOperation string `json:"prov-op"`
 	BlacklistedUA     string   `json:"blacklisted-ua"`
 }
 
@@ -100,6 +97,10 @@ func (c *Config) Apply(ctx *cli.Context) {
 
 		if ctx.IsSet("k") {
 			c.K = ctx.Int("k")
+		}
+
+		if ctx.IsSet("prov-op") {
+			c.ProvideOperation = ctx.String("prov-op")
 		}
 
 		if ctx.IsSet("blacklisted-ua") {

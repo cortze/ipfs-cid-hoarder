@@ -81,6 +81,12 @@ var RunCmd = &cli.Command{
 			DefaultText: "K=20",
 		},
 		&cli.StringFlag{
+			Name: "prov-op",
+			Usage: "select the algorithm to povide CIDs in the DHT",
+			EnvVars: []string{"IPFS_CID_HOARDER_PROV_OP"},
+			DefaultText: "standard/optimistic",
+		},
+		&cli.StringFlag{
 			Name:        "blacklisted-ua",
 			Usage:       "user agent that wants to be balcklisted from having interactions with",
 			EnvVars:     []string{"IPFS_CID_HOARDER_BLACKLISTED_UA"},
@@ -127,8 +133,8 @@ func RunHoarder(ctx *cli.Context) error {
 		"req-interval": conf.ReqInterval,
 		"cid-ping-time": conf.CidPingTime,
 		"k": conf.K,
+		"prov-op": conf.ProvideOperation,
 		"blacklisted-ua": conf.BlacklistedUA,
-
 	}).Info("running cid-hoarder")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
