@@ -55,7 +55,7 @@ func (db *DBClient) addCidInfo(cidInfo *models.CidInfo) persistable {
 	persis.values = append(persis.values, cidInfo.ProvideOp)
 	persis.values = append(persis.values, cidInfo.Creator.String())
 
-	return persis	
+	return persis
 }
 
 func (db *DBClient) GetIdOfCid(cidStr string) (id int, err error) {

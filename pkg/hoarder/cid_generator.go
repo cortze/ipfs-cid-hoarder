@@ -17,9 +17,9 @@ var (
 
 // CidGenerator composes the basic object that generates set of CIDs defined in the configuration
 type CidGenerator struct {
-	ctx       context.Context
-	hoarderWG *sync.WaitGroup
-	generatorWG       *sync.WaitGroup
+	ctx         context.Context
+	hoarderWG   *sync.WaitGroup
+	generatorWG *sync.WaitGroup
 
 	contentSize int
 	cidNumber   int
@@ -27,7 +27,7 @@ type CidGenerator struct {
 	generator *randomCidGen
 	newCidC   chan *cid.Cid
 	doneC     chan struct{}
-	doneNotC chan struct{}
+	doneNotC  chan struct{}
 }
 
 // NewCidTracker generates a new instance of the CIDTracker
@@ -45,7 +45,7 @@ func NewCidGenerator(
 		generator:   newRandomCidGen(cSize, cNumber),
 		newCidC:     make(chan *cid.Cid, 1),
 		doneC:       make(chan struct{}, 1),
-		doneNotC:       make(chan struct{}, 1),
+		doneNotC:    make(chan struct{}, 1),
 	}
 }
 
@@ -61,7 +61,7 @@ func (g *CidGenerator) Run() (chan *cid.Cid, chan struct{}) {
 				return
 			case <-g.doneC:
 				log.Info("controled shutdown detected on CidGenerator")
-				return 
+				return
 			default:
 				contId, err := g.generator.getNewCid()
 				switch err {
@@ -117,7 +117,6 @@ func (g *randomCidGen) getNewCid() (cid.Cid, error) {
 	content := make([]byte, g.contentSize)
 	rand.Read(content)
 
-	//TODO do we have to have different CID types?
 	// configure the type of CID that we want
 	pref := cid.Prefix{
 		Version:  1,

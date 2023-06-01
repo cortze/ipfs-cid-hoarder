@@ -47,7 +47,7 @@ func (db *DBClient) addClosestPeerSet(closestPeers *models.ClosestPeers) persist
 			peer_id)`,
 		"",
 		len(closestPeers.Peers), // number of values
-		3) // number of items on value
+		3)                       // number of items on value
 
 	// insert each of the Peers as values
 	for _, p := range closestPeers.Peers {

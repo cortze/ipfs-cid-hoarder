@@ -23,8 +23,8 @@ type CidInfo struct {
 	PRHolders     []*PeerInfo // Peers that took the responsability to keep the PR
 	PRPingResults []*CidFetchResults
 
-	ProvideOp  string // Track where is the content coming from (Random, Cid-File, Bitswap)
-	Creator peer.ID // Peer hosting the content, so far only one (us)
+	ProvideOp string  // Track where is the content coming from (Random, Cid-File, Bitswap)
+	Creator   peer.ID // Peer hosting the content, so far only one (us)
 
 	ReqInterval   time.Duration
 	StudyDuration time.Duration
@@ -45,19 +45,19 @@ func NewCidInfo(
 	return &CidInfo{
 		CID:           id,
 		GenTime:       time.Now(), // fill the CID with the current time
-		K: 0,
+		K:             0,
 		PRPingResults: make([]*CidFetchResults, 0, k),
 		PRHolders:     make([]*PeerInfo, 0),
-		ProvideOp:      provOp,
+		ProvideOp:     provOp,
 		Creator:       creator,
 		ReqInterval:   reqInt,
 		StudyDuration: studyDurt,
 	}
 }
 
-// IsInit return a boolean depending on whether the 
+// IsInit return a boolean depending on whether the
 func (c *CidInfo) IsInit() bool {
-	return len(c.PRPingResults) > 0 
+	return len(c.PRPingResults) > 0
 }
 
 // AddPublicationTime adds the time at which the CID was published to the network
@@ -109,7 +109,7 @@ func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 func (c *CidInfo) IsReadyForNextPing() bool {
 	c.m.RLock()
 	defer c.m.RUnlock()
-	return !c.NextPing.IsZero() && time.Now().After(c.NextPing) 
+	return !c.NextPing.IsZero() && time.Now().After(c.NextPing)
 }
 
 // IsFinished returns true if the study for the given CID has already finished (enough ping rounds to cover the study time)

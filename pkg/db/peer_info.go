@@ -34,7 +34,7 @@ func (db *DBClient) CreatePeerInfoTable() error {
 func (db *DBClient) addNewPeerInfoSet(pInfos []*models.PeerInfo) persistable {
 	persis := newPersistable()
 	if len(pInfos) <= 0 {
-		return	persis
+		return persis
 	}
 
 	// compose the query
@@ -51,11 +51,11 @@ func (db *DBClient) addNewPeerInfoSet(pInfos []*models.PeerInfo) persistable {
 
 	// add the values
 	for _, pInfo := range pInfos {
-		persis.values = append(persis.values, 
-			pInfo.ID.String(), 
-			pInfo.MultiAddr, 
-			pInfo.UserAgent, 
-			pInfo.Client, 
+		persis.values = append(persis.values,
+			pInfo.ID.String(),
+			pInfo.MultiAddr,
+			pInfo.UserAgent,
+			pInfo.Client,
 			pInfo.Version)
 	}
 
@@ -65,7 +65,7 @@ func (db *DBClient) addNewPeerInfoSet(pInfos []*models.PeerInfo) persistable {
 func (db *DBClient) addPeerInfo(pInfo *models.PeerInfo) persistable {
 	persis := newPersistable()
 
-	// compose the query 
+	// compose the query
 	persis.query = `
 		INSERT INTO peer_info (
 			peer_id,

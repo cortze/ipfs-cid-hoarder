@@ -10,16 +10,16 @@ import (
 
 // PRPingResults is the basic struct containing the result of the individual ping of a PR Holder.
 type PRPingResults struct {
-	Cid          cid.Cid
-	PeerID       peer.ID
-	Round        int
-	cidPubTime   time.Time
-	PingTime     time.Time
-	PingDuration time.Duration
-	Active       bool
-	HasRecords   bool
+	Cid               cid.Cid
+	PeerID            peer.ID
+	Round             int
+	cidPubTime        time.Time
+	PingTime          time.Time
+	PingDuration      time.Duration
+	Active            bool
+	HasRecords        bool
 	RecordsWithMAddrs bool
-	ConError     string
+	ConError          string
 }
 
 // NewPRPingResults creates a new struct with the basic status/performance info for each individual pings to PR Holders
@@ -63,17 +63,17 @@ type CidFetchResults struct {
 	StartTime             time.Time
 	FinishTime            time.Time
 	TotalHops             int
-	HopsTreeDepth int
-	MinHopsToClosest int
+	HopsTreeDepth         int
+	MinHopsToClosest      int
 	PRHoldPingDuration    time.Duration
 	FindProvDuration      time.Duration
 	GetClosePeersDuration time.Duration
 	PRPingResults         []*PRPingResults
 	IsRetrievable         bool
-	PRWithMAddr bool
+	PRWithMAddr           bool
 	ClosestPeers          []peer.ID
-	Target int
-	DoneC chan struct{}
+	Target                int
+	DoneC                 chan struct{}
 }
 
 // NewCidFetchResults return the FetchResults struct that contains the basic information for the entire fetch round of a particular CID.
@@ -86,8 +86,8 @@ func NewCidFetchResults(contentID cid.Cid, pubTime time.Time, round int, target 
 		FinishTime:    time.Now(),
 		PRPingResults: make([]*PRPingResults, 0),
 		ClosestPeers:  make([]peer.ID, 0),
-		Target: target, // K
-		DoneC: make(chan struct{}, 1),
+		Target:        target, // K
+		DoneC:         make(chan struct{}, 1),
 	}
 }
 
