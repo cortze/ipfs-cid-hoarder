@@ -104,8 +104,8 @@ func (q *QueryBatch) persistBatch() error {
 	if qerr != nil {
 		log.WithFields(log.Fields{
 			"error":  qerr.Error(),
-			"query":  q.persistables[cnt+1].query,
-			"values": q.persistables[cnt+1].values,
+			"query":  q.persistables[cnt-1].query,
+			"values": q.persistables[cnt-1].values,
 		}).Errorf("unable to persist query")
 		return errors.Wrap(qerr, "error persisting batch")
 	}
