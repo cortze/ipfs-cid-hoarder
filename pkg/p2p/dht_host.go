@@ -143,7 +143,7 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 	}
 
 	log.WithFields(log.Fields{
-		"id":         opts.ID,
+		"host-id":    opts.ID,
 		"multiaddrs": h.Addrs(),
 		"peer_id":    h.ID().String(),
 	}).Debug("generated new host")
@@ -160,7 +160,7 @@ func (h *DHTHost) bootstrap() error {
 	var succCon int64
 	var wg sync.WaitGroup
 
-	hlog := log.WithField("id", h.id)
+	hlog := log.WithField("host-id", h.id)
 	for _, bnode := range kaddht.GetDefaultBootstrapPeerAddrInfos() {
 		wg.Add(1)
 		go func(bn peer.AddrInfo) {
@@ -288,7 +288,7 @@ func (h *DHTHost) PingPRHolderOnCid(
 	defer h.removeCidPing(cid)
 
 	hlog := log.WithFields(log.Fields{
-		"id":        h.id,
+		"host-id":   h.id,
 		"cid":       cid.CID.Hash().B58String(),
 		"pr-holder": remotePeer.ID.String(),
 	})
@@ -385,8 +385,8 @@ func (h *DHTHost) ProvideCid(ctx context.Context, cid *models.CidInfo) (time.Dur
 	defer h.removeCidPing(cid)
 
 	log.WithFields(log.Fields{
-		"id":  h.id,
-		"cid": cid.CID.Hash().B58String(),
+		"host-id": h.id,
+		"cid":     cid.CID.Hash().B58String(),
 	}).Debug("providing cid with", cid.ProvideOp)
 	startT := time.Now()
 	lookupMetrics, err := h.dht.DetailedProvide(ctx, cid.CID, true)
@@ -401,8 +401,8 @@ func (h *DHTHost) FindProvidersOfCID(
 	defer h.removeCidPing(cid)
 
 	log.WithFields(log.Fields{
-		"id":  h.id,
-		"cid": cid.CID.Hash().B58String(),
+		"host-id": h.id,
+		"cid":     cid.CID.Hash().B58String(),
 	}).Debug("looking for providers")
 	startT := time.Now()
 	providers, err := h.dht.LookupForProviders(ctx, cid.CID)
@@ -410,7 +410,7 @@ func (h *DHTHost) FindProvidersOfCID(
 }
 
 func (h *DHTHost) Close() {
-	hlog := log.WithField("id", h.id)
+	hlog := log.WithField("host-id", h.id)
 	var err error
 
 	err = h.dht.Close()
@@ -422,4 +422,5 @@ func (h *DHTHost) Close() {
 	if err != nil {
 		hlog.Error(errors.Wrap(err, "unable to close libp2p host"))
 	}
+	hlog.Info("successfully closed")
 }

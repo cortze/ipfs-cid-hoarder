@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -30,27 +31,43 @@ func NewHostPool(ctx context.Context, poolSize int, hOpts DHTHostOptions) (*Host
 	hostMap := make(map[peer.ID]*DHTHost)
 	hostArray := make([]*DHTHost, 0, poolSize)
 
-	for hostId := 0; hostId < poolSize; hostId++ {
-		hOpts.ID = hostId
-		h, err := NewDHTHost(
-			ctx,
-			hOpts)
-		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("unable to create host %d", hostId))
-		}
-		hostMap[h.ID()] = h
-		hostArray = append(hostArray, h)
-	}
+	plog := log.WithField("mod", "host-pool")
+	plog.Infof("initializing %d hosts", poolSize)
+
 	hostPool := &HostPool{
 		sync.RWMutex{},
 		ctx,
 		hostMap,
 		hostArray,
 	}
-	log.WithFields(log.Fields{
+
+	var errG errgroup.Group
+	for hostId := 0; hostId < poolSize; hostId++ {
+		hOpts.ID = hostId
+		errG.Go(func() error {
+			return hostPool.OneMoreHost(hOpts)
+		})
+	}
+	err := errG.Wait()
+	if err != nil {
+		return nil, err
+	}
+	plog.WithFields(log.Fields{
 		"pool-size": poolSize,
-	}).Info("host pool initialized")
+	}).Info("hosts initialized")
 	return hostPool, nil
+}
+
+func (p *HostPool) OneMoreHost(hOpts DHTHostOptions) error {
+	h, err := NewDHTHost(p.ctx, hOpts)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("unable to create host %d", hOpts.ID))
+	}
+	p.m.Lock()
+	defer p.m.Unlock()
+	p.hostMap[h.ID()] = h
+	p.hostArray = append(p.hostArray, h)
+	return nil
 }
 
 func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
