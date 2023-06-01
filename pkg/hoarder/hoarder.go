@@ -19,11 +19,11 @@ type CidHoarder struct {
 	ctx context.Context
 	wg  *sync.WaitGroup
 
-	dbCli         *db.DBClient
+	dbCli *db.DBClient
 
-	cidSet *cidSet
-	cidPublisher  *CidPublisher
-	cidPinger     *CidPinger
+	cidSet       *cidSet
+	cidPublisher *CidPublisher
+	cidPinger    *CidPinger
 
 	FinishedC chan struct{}
 }
@@ -40,16 +40,16 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	}
 
 	// ------ Configure the settings for the Libp2p hosts ------
-	hostOpts := p2p.DHTHostOptions {
-		IP: "0.0.0.0",
-		Port: conf.Port,
-		ProvOp: p2p.GetProvOpFromConf(conf.ProvideOperation),
-		WithNotifier: false,
-		K: conf.K,
+	hostOpts := p2p.DHTHostOptions{
+		IP:             "0.0.0.0",
+		Port:           conf.Port,
+		ProvOp:         p2p.GetProvOpFromConf(conf.ProvideOperation),
+		WithNotifier:   false,
+		K:              conf.K,
 		BlacklistingUA: conf.BlacklistedUA,
 	}
 	if conf.BlacklistedUA != "" {
-		log.Infof("UA blacklisting activated -> crawling network to identify %s (might take 5-7mins)", 
+		log.Infof("UA blacklisting activated -> crawling network to identify %s (might take 5-7mins)",
 			hostOpts.BlacklistingUA,
 		)
 		// launch light crawler identifying balcklistable peers
@@ -76,12 +76,12 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	pingerHostOpts := hostOpts
 	studyWG.Add(1)
 	cidPinger, err := NewCidPinger(
-		ctx, 
-		&studyWG, 
-		pingerHostOpts, 
-		dbInstance, 
-		reqInterval, 
-		conf.Workers, 
+		ctx,
+		&studyWG,
+		pingerHostOpts,
+		dbInstance,
+		reqInterval,
+		conf.Workers,
 		cidSet)
 	if err != nil {
 		return nil, err
@@ -92,8 +92,8 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	publisherHostOpts := hostOpts
 	publisherHostOpts.WithNotifier = true // the only time were want to have the notifier
 	pubWorkers := 1
-	if !conf.SinglePublisher { 
-		pubWorkers = conf.Workers 
+	if !conf.SinglePublisher {
+		pubWorkers = conf.Workers
 	}
 	cidPublisher, err := NewCidPublisher(
 		ctx,
@@ -116,12 +116,12 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		return nil, err
 	}
 	return &CidHoarder{
-		ctx:           ctx,
-		wg:            &studyWG,
-		dbCli:         dbInstance,
-		cidPublisher:  cidPublisher,
-		cidPinger:     cidPinger,
-		FinishedC: make(chan struct{}, 1),
+		ctx:          ctx,
+		wg:           &studyWG,
+		dbCli:        dbInstance,
+		cidPublisher: cidPublisher,
+		cidPinger:    cidPinger,
+		FinishedC:    make(chan struct{}, 1),
 	}, nil
 }
 
@@ -131,8 +131,9 @@ func (c *CidHoarder) Run() error {
 	c.wg.Add(1)
 	go c.cidPinger.Run()
 
-	go func (){
+	go func() {
 		c.wg.Wait()
+		log.Info("publisher and pinger successfully closed (at hoarder point), closing db")
 		c.dbCli.Close()
 		log.Info("hoarder run finished, organically closed")
 		c.FinishedC <- struct{}{}

@@ -2,6 +2,7 @@ package hoarder
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -14,32 +15,34 @@ import (
 )
 
 const (
-	LookupTimeout   = 60 * time.Second
-	minIterTime     = 500 * time.Millisecond
-	maxDialAttempts = 2 // Are two attempts enough?
-	dialGraceTime   = 5 * time.Second
+	pingTimeout   = 2 * 60 * time.Second
+	minIterTime   = 500 * time.Millisecond
+	dialGraceTime = 5 * time.Second
 )
 
 // CidPinger is the main object to schedule and monitor all the CID related metrics
 type CidPinger struct {
-	ctx context.Context
+	ctx   context.Context
 	appWG *sync.WaitGroup
 
-	orchersterWG *sync.WaitGroup
-	pingersWG *sync.WaitGroup
+	orchersterWG     *sync.WaitGroup
+	pingersWG        *sync.WaitGroup
 	orchersterCloseC chan struct{}
-	pingersCloseC chan struct{}
+	pingersCloseC    chan struct{}
 
-	host         *p2p.DHTHost
+	hostPool     *p2p.HostPool
 	dbCli        *db.DBClient
 	pingInterval time.Duration
 	workers      int
 
-	init            bool
+	cidS          *cidSet
+	pingTaskC     chan pingTask
+	closePingerCs []chan struct{}
+}
 
-	cidS      *cidSet
-	pingTaskC chan *models.CidInfo
-
+type pingTask struct {
+	host *p2p.DHTHost
+	*models.CidInfo
 }
 
 // NewCidPinger return a CidPinger with the given configuration
@@ -53,8 +56,11 @@ func NewCidPinger(
 	cidSet *cidSet) (*CidPinger, error) {
 
 	log.WithField("mod", "pinger").Info("initializing...")
-	h, err := p2p.NewDHTHost(
+	// Hack: multiple pinger hosts to have concurrency calls:
+	// https://github.com/libp2p/go-libp2p-kad-dht/issues/805
+	hostPool, err := p2p.NewHostPool( // hosts are already bootstrapped
 		ctx,
+		(workers/5)+1,
 		hostOpts,
 	)
 	if err != nil {
@@ -62,18 +68,19 @@ func NewCidPinger(
 	}
 	log.WithField("mod", "pinger").Info("initialized...")
 	return &CidPinger{
-		ctx:          ctx,
-		appWG:		  appWG,
-		orchersterWG: new(sync.WaitGroup),
-		pingersWG: new(sync.WaitGroup),
+		ctx:              ctx,
+		appWG:            appWG,
+		orchersterWG:     new(sync.WaitGroup),
+		pingersWG:        new(sync.WaitGroup),
 		orchersterCloseC: make(chan struct{}, 1),
-		pingersCloseC: make(chan struct{}, 1),
-		host:         h,
-		dbCli:        dbCli,
-		pingInterval: pingInterval,
-		pingTaskC:    make(chan *models.CidInfo, workers), // TODO: hardcoded
-		workers:      workers,
-		cidS:         cidSet,
+		pingersCloseC:    make(chan struct{}, 1),
+		hostPool:         hostPool,
+		dbCli:            dbCli,
+		pingInterval:     pingInterval,
+		pingTaskC:        make(chan pingTask, workers),
+		workers:          workers,
+		cidS:             cidSet,
+		closePingerCs:    make([]chan struct{}, 0, workers),
 	}, nil
 }
 
@@ -85,102 +92,123 @@ func (pinger *CidPinger) Run() {
 
 	plog := log.WithField("module", "pinger")
 
-	// TODO: consider having multiple pinger hosts to have concurrency calls:
-	// https://github.com/libp2p/go-libp2p-kad-dht/issues/805
-	err := pinger.host.Init()
-	if err != nil {
-		plog.Panic(err)	
-	}
-
 	pinger.orchersterWG.Add(1)
 	go pinger.runPingOrchester()
 
 	for pingerCounter := 0; pingerCounter < pinger.workers; pingerCounter++ {
 		pinger.pingersWG.Add(1)
-		go pinger.runPinger(pingerCounter)
+		closeC := make(chan struct{})
+		go pinger.runPinger(pingerCounter, closeC)
+		pinger.closePingerCs = append(pinger.closePingerCs, closeC)
 	}
 
 	// closing step of the pinger
 	pinger.orchersterWG.Wait()
 	plog.Infof("finished pinging the CIDs")
-	pinger.pingersCloseC <- struct{}{}
+	for _, closeC := range pinger.closePingerCs {
+		closeC <- struct{}{}
+	}
 
 	pinger.pingersWG.Wait()
 	plog.Info("done from the CID Pinger")
 
 	close(pinger.pingTaskC)
-	pinger.host.Close()
+	pinger.hostPool.Close()
 }
-
 
 // runPingOrchester orchestrates all the pings based on the next ping time of the cids
 func (pinger *CidPinger) runPingOrchester() {
 	defer pinger.orchersterWG.Done()
 	olog := log.WithField("pinger", "orchester")
-	
+
 	minTimeT := time.NewTicker(minIterTime)
+
 	// ensure that the cidSet is not freshly created
-initLoop:
 	for !pinger.cidS.isInit() {
 		select {
-		case<- minTimeT.C:
+		case <-minTimeT.C:
 			olog.Trace("cid set still not initialized")
 			minTimeT.Reset(minIterTime)
-		case <- pinger.orchersterCloseC:
-			break initLoop
+		case <-pinger.orchersterCloseC:
+			break
 		}
 	}
-orchersterLoop:
+
+	// orchester loop
 	for {
 		select {
 		case <-pinger.ctx.Done():
 			olog.Info("shutdown was detected, closing Cid Ping Orchester")
-			break orchersterLoop
+			return
 
-		case <- pinger.orchersterCloseC:
+		case <-pinger.orchersterCloseC:
 			olog.Info("shutdown was detected, closing Cid Ping Orchester")
-			break orchersterLoop
+			return
 
 		default:
 			// loop over the list of CIDs, and check whether they need to be pinged or not
-			for _, cidInfo := range pinger.cidS.cidArray {
+			sortSet := false
+			if pinger.cidS.Next() {
+				cidInfo := pinger.cidS.Cid()
+				if cidInfo == nil {
+					sortSet = true
+					goto updateCidSet
+				}
 				cidStr := cidInfo.CID.Hash().B58String()
 				if !cidInfo.IsReadyForNextPing() {
 					if cidInfo.NextPing.IsZero() {
 						// as we organize the cids by ping time, "zero" time gets first
-						// breaking always the loop until all the Cids have been generated 
+						// breaking always the loop until all the Cids have been generated
 						// and published, thus, let the foor loop find a valid time
-						continue
+						goto updateCidSet
 					} else {
-						olog.Debugf("not in time to ping %s next ping %s", cidStr, cidInfo.NextPing)
-						break
+						olog.Debugf("not in time to ping %s next ping in %s", cidStr, cidInfo.NextPing.Sub(time.Now()))
+						sortSet = true
+						goto updateCidSet
 					}
 				}
-
 				cidInfo.IncreasePingCounter()
-				pinger.pingTaskC <- cidInfo
+				h, err := pinger.hostPool.GetBestHost(cidInfo)
+				switch err {
+				case nil:
+					olog.Debug(fmt.Sprintf("got host %d for next ping (%d) ongoing pings",
+						h.GetHostID(), h.GetOngoingCidPings()))
+				case p2p.ErrorRetrievingBestHost:
+					olog.Warn(err)
+				}
+
 				if cidInfo.IsFinished() {
 					pinger.cidS.removeCid(cidStr)
-					olog.Infof("finished pinging CID %s - pingend over %s", 
-						cidStr, cidInfo.StudyDuration)
+					olog.Infof("finished pinging CID %s - pingend over %s - %d left",
+						cidStr,
+						cidInfo.StudyDuration,
+						pinger.cidS.Len())
 				}
-			}
-			// if CID pinger was initialized and there are no more CIDs to track, we are done with the study
-			if pinger.cidS.Len() == 0 {
-				olog.Info("no more cids to ping, closing orcherster")
-				break orchersterLoop
+				pinger.pingTaskC <- pingTask{h, cidInfo}
+
+			} else {
+				sortSet = true
 			}
 
-			olog.Debugf("reorgananizing (%d) CIDs based on their next ping time", pinger.cidS.Len())
-			pinger.cidS.sortCidList()
-			<-minTimeT.C
-			minTimeT.Reset(minIterTime)
+		updateCidSet:
+			// if there are no more CIDs to track, we are done with the study
+			if pinger.cidS.Len() == 0 {
+				olog.Info("no more cids to ping, closing orcherster")
+				return
+			}
+			// check if we need to update the CidSet
+			if sortSet {
+				olog.Debugf("reorgananizing (%d) CIDs based on their next ping time", pinger.cidS.Len())
+				pinger.cidS.SortCidList()
+				<-minTimeT.C
+				minTimeT.Reset(minIterTime)
+			}
 		}
 	}
 }
 
 // runPinger creates the necessary pinger to retrieve the content from the network and ping the PR holders of the content.
-func (pinger *CidPinger) runPinger(pingerID int) {
+func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 	defer pinger.pingersWG.Done()
 
 	minTimeT := time.NewTicker(minIterTime)
@@ -195,21 +223,23 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 			return
 		}
 		select {
-		case cidInfo := <-pinger.pingTaskC:
+		case pingT := <-pinger.pingTaskC:
 			var wg sync.WaitGroup
 
-			cidStr := cidInfo.CID.Hash().B58String()
-			pingCounter := cidInfo.GetPingCounter()
-			plog.Infof("pinging CID %s for round %d", cidStr, pingCounter)
+			cidStr := pingT.CID.Hash().B58String()
+			pingCounter := pingT.GetPingCounter()
+			plog.Infof("pinging CID %s for round %d with host %d", cidStr, pingCounter, pingT.host.GetHostID())
 
 			// request the status of PR Holders
 			cidFetchRes := models.NewCidFetchResults(
-				cidInfo.CID, 
-				cidInfo.PublishTime, 
-				pingCounter, 
-				cidInfo.K,
+				pingT.CID,
+				pingT.PublishTime,
+				pingCounter,
+				pingT.K,
 			)
-			
+
+			pingCtx, cancel := context.WithTimeout(pinger.ctx, pingTimeout)
+			defer cancel()
 			// DHT FindProviders call to see if the content is actually retrievable from the network
 			wg.Add(1)
 			go func() {
@@ -217,18 +247,16 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 				var isRetrievable bool = false
 				var prWithMAddrs bool = false
 
-				ctxT, cancel := context.WithTimeout(pinger.ctx, LookupTimeout)
-				defer cancel()
-				queryDuration, providers, err := pinger.host.FindProvidersOfCID(ctxT, cidInfo)
+				queryDuration, providers, err := pingT.host.FindProvidersOfCID(pingCtx, pingT.CidInfo)
 				cidFetchRes.FindProvDuration = queryDuration
 				if err != nil {
-					plog.Warnf("unable to lookup for provider of cid %s - %s", 
+					plog.Warnf("unable to lookup for provider of cid %s - %s",
 						cidStr, err.Error(),
 					)
 				}
 				// iter through the providers to see if it matches with the host's peerID
 				for _, paddrs := range providers {
-					if paddrs.ID == cidInfo.Creator {
+					if paddrs.ID == pingT.Creator {
 						isRetrievable = true
 						if len(paddrs.Addrs) > 0 {
 							prWithMAddrs = true
@@ -243,11 +271,12 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				ctxT, cancel := context.WithTimeout(pinger.ctx, LookupTimeout)
-				defer cancel()
-				queryDuration, closestPeers, lookupMetrics, err := pinger.host.GetClosestPeersToCid(ctxT, cidInfo)
+				queryDuration, closestPeers, lookupMetrics, err := pingT.host.GetClosestPeersToCid(pingCtx, pingT.CidInfo)
 				if err != nil {
 					plog.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
+				}
+				// just because we got an error, doesn't necesarelly mean that there are no lookup results
+				if lookupMetrics == nil {
 					cidFetchRes.TotalHops = -1
 					cidFetchRes.HopsTreeDepth = -1
 					cidFetchRes.MinHopsToClosest = -1
@@ -263,17 +292,17 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 			}()
 
 			// Ping in parallel each of the PRHolders
-			for _, remotePeer := range cidInfo.PRHolders {
+			for _, remotePeer := range pingT.CidInfo.PRHolders {
 				wg.Add(1)
-				go func() {
+				go func(remotePeer models.PeerInfo) {
 					defer wg.Done()
-					pingRes := pinger.host.PingPRHolderOnCid(
-						pinger.ctx, 
-						remotePeer.GetAddrInfo(), 
-						cidInfo)
+					pingRes := pingT.host.PingPRHolderOnCid(
+						pingCtx,
+						remotePeer.GetAddrInfo(),
+						pingT.CidInfo)
 					pingRes.Round = pingCounter
 					cidFetchRes.AddPRPingResults(pingRes)
-				}()
+				}(*remotePeer)
 			}
 			wg.Wait() // wait for all the routines to finish
 			cidFetchRes.FinishTime = time.Now()
@@ -282,8 +311,8 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 		case <-pinger.ctx.Done():
 			plog.Info("shutdown detected, closing pinger")
 			return
-		
-		case <- pinger.pingersCloseC:
+
+		case <-closeC:
 			plog.Info("gracefull shutdown detected")
 			closePingerF = true
 			return
@@ -294,9 +323,7 @@ func (pinger *CidPinger) runPinger(pingerID int) {
 	}
 }
 
-
 func (pinger *CidPinger) Close() {
 	log.WithField("mod", "pinger").Info("shutdown detected from the CidPinger")
 	pinger.orchersterCloseC <- struct{}{}
 }
-

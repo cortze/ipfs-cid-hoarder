@@ -16,11 +16,11 @@ import (
 )
 
 type CidPublisher struct {
-	ctx context.Context
-	appWG  *sync.WaitGroup
+	ctx   context.Context
+	appWG *sync.WaitGroup
 
 	host         *p2p.DHTHost
-	dhtProvide	p2p.ProvideOption
+	dhtProvide   p2p.ProvideOption
 	DBCli        *db.DBClient
 	cidGenerator *CidGenerator
 
@@ -31,7 +31,7 @@ type CidPublisher struct {
 	ReqInterval time.Duration
 	CidPingTime time.Duration
 
-	// main set of Cids that will keep track of them over the run 
+	// main set of Cids that will keep track of them over the run
 	cidSet *cidSet
 }
 
@@ -48,23 +48,19 @@ func NewCidPublisher(
 ) (*CidPublisher, error) {
 
 	log.WithField("mod", "publisher").Info("initializing...")
-	h, err := p2p.NewDHTHost(
+	h, err := p2p.NewDHTHost( // host is already bootstrapped
 		ctx,
 		hostOpts,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "publisher:")
 	}
-	err = h.Init()
-	if err != nil {
-		log.Panic(errors.Wrap(err, "publisher"))
-	}
 	log.WithField("mod", "publisher").Info("initialized...")
 	return &CidPublisher{
 		ctx:          ctx,
-		appWG:           appWG,
+		appWG:        appWG,
 		host:         h,
-		dhtProvide: hostOpts.ProvOp,
+		dhtProvide:   hostOpts.ProvOp,
 		DBCli:        db,
 		MsgNot:       h.GetMsgNotifier(),
 		cidGenerator: generator,
@@ -72,7 +68,7 @@ func NewCidPublisher(
 		ReqInterval:  reqInterval,
 		CidPingTime:  cidPingTime,
 		Workers:      workers,
-		cidSet: cidSet,
+		cidSet:       cidSet,
 	}, nil
 }
 
@@ -85,8 +81,8 @@ func (publisher *CidPublisher) Run() {
 	var publisherWG sync.WaitGroup
 	var msgNotWG sync.WaitGroup
 	var firstCidFetchRes sync.Map
-	generationDoneC := make(chan struct {}, 1)
-	publicationDoneC := make(chan struct {}, 1)
+	generationDoneC := make(chan struct{}, 1)
+	publicationDoneC := make(chan struct{}, 1)
 
 	// IPFS DHT Message Notification Listener
 	msgNotWG.Add(1)
@@ -109,9 +105,9 @@ func (publisher *CidPublisher) Run() {
 		)
 	}
 
-	<- genDoneC
+	<-genDoneC
 	log.Info("generation process finished successfully")
-	generationDoneC <- struct{}{} 
+	generationDoneC <- struct{}{}
 
 	publisherWG.Wait()
 	log.Info("publication process finished successfully")
@@ -137,9 +133,9 @@ func (publisher *CidPublisher) addProviderMsgListener(
 	}()
 	for {
 		select {
-		// this receives a message from SendMessage in messages.go after the DHT.Provide operation 
+		// this receives a message from SendMessage in messages.go after the DHT.Provide operation
 		// is called from the PUT_PROVIDER method.
-		case msgNot := <-msgNotChannel: 
+		case msgNot := <-msgNotChannel:
 			// check the msg type
 			castedCid, err := cid.Cast(msgNot.Msg.GetKey())
 			if err != nil {
@@ -152,8 +148,8 @@ func (publisher *CidPublisher) addProviderMsgListener(
 
 				if msgNot.Error != nil {
 					//TODO: parse the errors in a better way
-					connError = p2p.ParseConError(msgNot.Error) 
-					log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s", 
+					connError = p2p.ParseConError(msgNot.Error)
+					log.Debugf("Failed putting PR for CID %s of PRHolder %s - error %s",
 						castedCid.Hash().B58String(), msgNot.RemotePeer.String(), msgNot.Error.Error(),
 					)
 				} else {
@@ -214,8 +210,8 @@ func (publisher *CidPublisher) addProviderMsgListener(
 		case <-publisher.ctx.Done():
 			log.Info("context has been closed, finishing Cid Publisher")
 			return
-		
-		case <- publicationDoneC:
+
+		case <-publicationDoneC:
 			// if the publication has finished, we don't expect more messages to arrive, the host
 			// has been shut down
 			log.Info("publication done and not missing sent msgs to check, closing msgNotChannel")
@@ -236,7 +232,7 @@ func (publisher *CidPublisher) publishingProcess(
 	cidFetchRes *sync.Map) {
 
 	defer publisherWG.Done()
-	
+
 	// if there is no msg to check and ctx is still active, check if we have finished
 	logEntry := log.WithField("publisherID", publisherID)
 	logEntry.Debugf("publisher ready")
@@ -262,15 +258,14 @@ func (publisher *CidPublisher) publishingProcess(
 				string(publisher.dhtProvide),
 				publisher.host.ID(),
 			)
-			
+
 			// track the new Cid into the cidSet
 			publisher.cidSet.addCid(cidInfo)
 			pubTime := time.Now()
-			// compose the fetchRes of the publication phase 
+			// compose the fetchRes of the publication phase
 			fetchRes := models.NewCidFetchResults(*nextCid, pubTime, 0, publisher.K)
 			cidFetchRes.Store(cidStr, fetchRes)
 
-			// TODO: should I limit to 2 mins the provide operation?
 			reqTime, lookupMetrics, err := publisher.host.ProvideCid(publisher.ctx, cidInfo)
 			if err != nil {
 				logEntry.Errorf("unable to Provide content. %s", err.Error())
@@ -286,9 +281,9 @@ func (publisher *CidPublisher) publishingProcess(
 			}
 
 			// Make sure we have received all the messages from the publication
-			<- fetchRes.DoneC
+			<-fetchRes.DoneC
 
-			// update the info of the Cid After its publication 
+			// update the info of the Cid After its publication
 			cidInfo.AddPublicationTime(pubTime)
 			cidInfo.AddProvideTime(reqTime)
 			cidInfo.AddPRFetchResults(fetchRes)
@@ -298,16 +293,16 @@ func (publisher *CidPublisher) publishingProcess(
 			publisher.DBCli.AddFetchResult(fetchRes)
 
 			// print summary of the publication (round 0)
-			publisher.printSummary(logEntry, cidInfo, 0)		
+			publisher.printSummary(logEntry, cidInfo, 0)
 
 		case <-publisher.ctx.Done():
 			logEntry.WithField("publisherID", publisherID).Debugf("shutdown detected, closing publisher")
 			return
 
-		case <- generationDoneC:
+		case <-generationDoneC:
 			generationDone = true
 
-		case <- minIterTicker.C:
+		case <-minIterTicker.C:
 			// keep checking if the generation has ended to close the routine
 		}
 		minIterTicker.Reset(minIterTime)
@@ -319,17 +314,16 @@ func (publisher *CidPublisher) printSummary(logE *log.Entry, cInfo *models.CidIn
 	// Calculate success ratio on adding PR into PRHolders
 	tot, success, failed := cInfo.GetFetchResultSummaryOfRound(round)
 	if tot < 0 {
-		logE.Warnf("no ping results for the PR provide round of Cid %s", 
-		cInfo.CID.Hash().B58String())
+		logE.Warnf("no ping results for the PR provide round of Cid %s",
+			cInfo.CID.Hash().B58String())
 	} else {
 		logE.Infof("Cid %s - %d total PRHolders | %d successfull PRHolders | %d failed PRHolders",
 			cInfo.CID.Hash().B58String(), tot, success, failed)
 	}
 }
 
-
 func (publisher *CidPublisher) Close() {
 	// close the generator and everything else will be closed in cascade
 	publisher.cidGenerator.Close()
-	
+
 }
