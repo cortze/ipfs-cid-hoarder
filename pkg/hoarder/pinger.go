@@ -90,7 +90,7 @@ func NewCidPinger(
 func (pinger *CidPinger) Run() {
 	defer pinger.appWG.Done()
 
-	plog := log.WithField("module", "pinger")
+	plog := log.WithField("service", "pinger")
 
 	pinger.orchersterWG.Add(1)
 	go pinger.runPingOrchester()
@@ -110,10 +110,11 @@ func (pinger *CidPinger) Run() {
 	}
 
 	pinger.pingersWG.Wait()
-	plog.Info("done from the CID Pinger")
+	plog.Info("finished the pinging phase")
 
 	close(pinger.pingTaskC)
 	pinger.hostPool.Close()
+	plog.Info("successfully closed")
 }
 
 // runPingOrchester orchestrates all the pings based on the next ping time of the cids
@@ -179,7 +180,7 @@ func (pinger *CidPinger) runPingOrchester() {
 
 				if cidInfo.IsFinished() {
 					pinger.cidS.removeCid(cidStr)
-					olog.Infof("finished pinging CID %s - pingend over %s - %d left",
+					olog.Infof("finished pinging CID %s - pingend over %s (%d remaining)",
 						cidStr,
 						cidInfo.StudyDuration,
 						pinger.cidS.Len())

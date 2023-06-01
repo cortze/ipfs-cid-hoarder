@@ -18,7 +18,6 @@ var (
 // CidGenerator composes the basic object that generates set of CIDs defined in the configuration
 type CidGenerator struct {
 	ctx         context.Context
-	hoarderWG   *sync.WaitGroup
 	generatorWG *sync.WaitGroup
 
 	contentSize int
@@ -33,61 +32,57 @@ type CidGenerator struct {
 // NewCidTracker generates a new instance of the CIDTracker
 func NewCidGenerator(
 	ctx context.Context,
-	hoarderWG *sync.WaitGroup,
 	cSize, cNumber int) *CidGenerator {
 
 	return &CidGenerator{
 		ctx:         ctx,
-		hoarderWG:   hoarderWG,
 		generatorWG: new(sync.WaitGroup),
 		contentSize: cSize,
 		cidNumber:   cNumber,
 		generator:   newRandomCidGen(cSize, cNumber),
 		newCidC:     make(chan *cid.Cid, 1),
 		doneC:       make(chan struct{}, 1),
-		doneNotC:    make(chan struct{}, 1),
 	}
 }
 
 // Generates cids depending on the cid source
-func (g *CidGenerator) Run() (chan *cid.Cid, chan struct{}) {
+func (g *CidGenerator) Run() (chan *cid.Cid, *sync.WaitGroup) {
 	g.generatorWG.Add(1)
 	go func() {
-		defer g.generatorWG.Done()
+		glog := log.WithField("mod", "cid-generator")
+		defer func() {
+			g.generatorWG.Done()
+			glog.Info("successfully closed")
+			close(g.doneC)
+		}()
 		for {
 			select {
 			case <-g.ctx.Done():
-				log.Info("context shutdown detected on CidGenerator")
+				glog.Info("context shutdown detected")
 				return
 			case <-g.doneC:
-				log.Info("controled shutdown detected on CidGenerator")
+				glog.Info("controled shutdown detected")
 				return
 			default:
 				contId, err := g.generator.getNewCid()
 				switch err {
 				case CidLimitError:
-					log.Infof("Cid generation marked reached: %d, clossing generator", g.cidNumber)
+					glog.Infof("Cid mark reached: %d, clossing generator", g.cidNumber)
 					return
 				case nil:
-					log.Infof("generated new CID %s", contId.Hash().B58String())
+					glog.Infof("generated new CID %s", contId.Hash().B58String())
 					g.newCidC <- &contId
 				default:
-					log.Error("Error generating new CID: %s", err.Error())
+					glog.Error("Error generating new CID: %s", err.Error())
 				}
 			}
 		}
 	}()
-	return g.newCidC, g.doneNotC
+	return g.newCidC, g.generatorWG
 }
 
 func (g *CidGenerator) Close() {
 	g.doneC <- struct{}{}
-	g.generatorWG.Wait()
-	g.hoarderWG.Done()
-	log.Info("cid generator successfully closed")
-	g.doneNotC <- struct{}{}
-	close(g.doneC)
-	close(g.doneNotC)
 }
 
 type randomCidGen struct {
@@ -108,7 +103,7 @@ func newRandomCidGen(contentSize int, limit int) *randomCidGen {
 
 // getRandomContent returns generates an array of random bytes with the given size and the composed CID of the content
 func (g *randomCidGen) getNewCid() (cid.Cid, error) {
-	if g.cidsGenerated >= g.limit {
+	if g.cidsGenerated >= g.limit && g.limit > 0 { // allow cid-number = -1 to propose continuously untill stop
 		return cid.Cid{}, CidLimitError
 	}
 

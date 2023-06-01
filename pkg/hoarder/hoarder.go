@@ -74,7 +74,6 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 
 	// ----- Generate the CidPinger -----
 	pingerHostOpts := hostOpts
-	studyWG.Add(1)
 	cidPinger, err := NewCidPinger(
 		ctx,
 		&studyWG,
@@ -102,7 +101,6 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		dbInstance,
 		NewCidGenerator(
 			ctx,
-			&studyWG,
 			conf.CidContentSize,
 			conf.CidNumber,
 		),
@@ -131,21 +129,19 @@ func (c *CidHoarder) Run() error {
 	c.wg.Add(1)
 	go c.cidPinger.Run()
 
+	hlog := log.WithField("mod", "hoarder")
 	go func() {
 		c.wg.Wait()
-		log.Info("publisher and pinger successfully closed (at hoarder point), closing db")
+		hlog.Info("publisher and pinger successfully closed")
 		c.dbCli.Close()
-		log.Info("hoarder run finished, organically closed")
+		hlog.Info("run finished, organically closed")
 		c.FinishedC <- struct{}{}
 	}()
 	return nil
 }
 
 func (c *CidHoarder) Close() {
+	log.Info("hoarder interruption detected!")
 	c.cidPublisher.Close()
 	c.cidPinger.Close()
-	c.wg.Wait()
-	// after the CidTracker has already finished, close the DB
-	c.dbCli.Close()
-	log.Info("hoarder interruption successfully closed! C ya")
 }
