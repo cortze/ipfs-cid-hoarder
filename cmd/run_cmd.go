@@ -155,15 +155,14 @@ hoarderLoop:
 	for {
 		select {
 		case <-signalC:
-			log.Info("cntr-C detected, closing hoarder peacefully")
+			log.Info("ctrl-C detected, closing hoarder peacefully")
 			cidHoarder.Close()
-			break hoarderLoop
 
 		case <-ctx.Context.Done():
 			log.Info("context died, closing hoarder peacefully")
 			cidHoarder.Close()
-			break hoarderLoop
-
+		
+		// finishedC will always determine when the Hoarder has finished
 		case <-cidHoarder.FinishedC:
 			log.Info("cid hoarder sucessfully finished")
 			break hoarderLoop
