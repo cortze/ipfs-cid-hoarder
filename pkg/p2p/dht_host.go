@@ -3,15 +3,18 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
+	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-xor/key"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -23,7 +26,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-type ProvideOption string 
+type ProvideOption string
 
 func GetProvOpFromConf(strOp string) ProvideOption {
 	provOp := StandardDHTProvide // Default
@@ -38,35 +41,37 @@ func GetProvOpFromConf(strOp string) ProvideOption {
 
 var (
 	StandardDHTProvide ProvideOption = "std-dht-provide"
-	OpDHTProvide ProvideOption = "op-provide"
-	
+	OpDHTProvide       ProvideOption = "op-provide"
+
 	DefaultUserAgent string = "cid-hoarder"
-	PingGraceTime = 5 * time.Second
-	MaxDialAttempts = 3
-	DialTimeout = 60 * time.Second
+	PingGraceTime           = 5 * time.Second
+	MaxDialAttempts         = 2
+	DialTimeout             = 60 * time.Second
 )
 
 type DHTHostOptions struct {
-	ID int
-	IP string
-	Port string
-	ProvOp ProvideOption
-	WithNotifier bool
-	K int
-	BlacklistingUA string
+	ID               int
+	IP               string
+	Port             string
+	ProvOp           ProvideOption
+	WithNotifier     bool
+	K                int
+	BlacklistingUA   string
 	BlacklistedPeers map[peer.ID]struct{}
 }
-
 
 // DHT Host is the main operational instance to communicate with the IPFS DHT
 type DHTHost struct {
 	ctx context.Context
+	m   sync.RWMutex
 	// host related
-	id int
-	dht *kaddht.IpfsDHT
-	host host.Host
+	id                  int
+	dht                 *kaddht.IpfsDHT
+	host                host.Host
 	internalMsgNotifier *MsgNotifier
-	initTime time.Time
+	initTime            time.Time
+	// dht query related
+	ongoingPings map[cid.Cid]int
 }
 
 func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
@@ -102,7 +107,7 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dhtOpts := make([]kaddht.Option, 0)
-			dhtOpts = append(dhtOpts, 
+			dhtOpts = append(dhtOpts,
 				kaddht.Mode(kaddht.ModeClient),
 				kaddht.WithCustomMessageSender(msgSender.Init),
 				kaddht.BucketSize(opts.K),
@@ -123,30 +128,36 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 
 	dhtHost := &DHTHost{
 		ctx,
+		sync.RWMutex{},
 		opts.ID,
 		dht,
 		h,
 		msgSender.GetMsgNotifier(),
 		time.Now(),
+		make(map[cid.Cid]int),
+	}
+
+	err = dhtHost.Init()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to init host")
 	}
 
 	log.WithFields(log.Fields{
-		"id": opts.ID,
+		"id":         opts.ID,
 		"multiaddrs": h.Addrs(),
-		"peer_id": h.ID().String(),
+		"peer_id":    h.ID().String(),
 	}).Debug("generated new host")
 
-	return dhtHost, nil 
+	return dhtHost, nil
 }
 
-// Init makes sure that all the components of the DHT host are successfully initialized 
+// Init makes sure that all the components of the DHT host are successfully initialized
 func (h *DHTHost) Init() error {
 	return h.bootstrap()
 }
 
 func (h *DHTHost) bootstrap() error {
-	var succCon int64 
-
+	var succCon int64
 	var wg sync.WaitGroup
 
 	hlog := log.WithField("id", h.id)
@@ -156,9 +167,9 @@ func (h *DHTHost) bootstrap() error {
 			defer wg.Done()
 			err := h.host.Connect(h.ctx, bn)
 			if err != nil {
-				hlog.Debug("unable to connect bootstrap node:", bn.String())
+				hlog.Trace("unable to connect bootstrap node:", bn.String())
 			} else {
-				hlog.Debug("successful connection to bootstrap node:", bn.String())
+				hlog.Trace("successful connection to bootstrap node:", bn.String())
 				atomic.AddInt64(&succCon, 1)
 			}
 		}(*bnode)
@@ -175,7 +186,11 @@ func (h *DHTHost) bootstrap() error {
 	return err
 }
 
-func (h *DHTHost) GetMsgNotifier() *MsgNotifier{
+func (h *DHTHost) GetHostID() int {
+	return h.id
+}
+
+func (h *DHTHost) GetMsgNotifier() *MsgNotifier {
 	return h.internalMsgNotifier
 }
 
@@ -209,19 +224,77 @@ func (h *DHTHost) ID() peer.ID {
 	return h.host.ID()
 }
 
+// control the number of CIDs the host is concurrently pinging
+
+func (h *DHTHost) addCidPing(cidInfo *models.CidInfo) {
+	h.m.Lock()
+	defer h.m.Unlock()
+	val, ok := h.ongoingPings[cidInfo.CID]
+	if ok {
+		val++
+	} else {
+		val = 1
+	}
+	h.ongoingPings[cidInfo.CID] = val
+}
+
+func (h *DHTHost) removeCidPing(cidInfo *models.CidInfo) {
+	h.m.Lock()
+	defer h.m.Unlock()
+	val, ok := h.ongoingPings[cidInfo.CID]
+	if !ok {
+		return
+	}
+	val++
+	if val <= 0 {
+		delete(h.ongoingPings, cidInfo.CID)
+	}
+}
+
+func (h *DHTHost) GetOngoingCidPings() int {
+	h.m.RLock()
+	defer h.m.RUnlock()
+	return len(h.ongoingPings)
+}
+
+func (h *DHTHost) XORDistanceToOngoingCids(cidHash cid.Cid) (*big.Int, bool) {
+	cidK := key.BytesKey([]byte(cidHash.Hash()))
+	xorDist := big.NewInt(0)
+	h.m.RLock()
+	defer h.m.RUnlock()
+	if h.GetOngoingCidPings() == 0 {
+		return xorDist, true
+	}
+	for ongoingCid, _ := range h.ongoingPings {
+		onK := key.BytesKey([]byte(ongoingCid.Hash()))
+		auxXor := key.DistInt(onK, cidK)
+		isNull := xorDist.Cmp(big.NewInt(0))
+		isBigger := auxXor.Cmp(xorDist)
+		if isNull == int(big.Exact) || isBigger == int(big.Above) {
+			xorDist = auxXor
+		}
+	}
+	return xorDist, false
+}
+
+// dht pinger related methods
+
 func (h *DHTHost) PingPRHolderOnCid(
-	ctx context.Context, 
-	remotePeer peer.AddrInfo, 
+	ctx context.Context,
+	remotePeer peer.AddrInfo,
 	cid *models.CidInfo) *models.PRPingResults {
 
+	h.addCidPing(cid)
+	defer h.removeCidPing(cid)
+
 	hlog := log.WithFields(log.Fields{
-		"id": h.id,
-		"cid": cid.CID.Hash().String(),
+		"id":        h.id,
+		"cid":       cid.CID.Hash().B58String(),
 		"pr-holder": remotePeer.ID.String(),
 	})
 
 	var active, hasRecords, recordsWithMAddrs bool
-	var connError string
+	var connError string = DialErrorUnknown
 	tstart := time.Now()
 
 	// fulfill the control fields from a successful connection
@@ -235,7 +308,7 @@ func (h *DHTHost) PingPRHolderOnCid(
 		} else {
 			hlog.Debugf("found providers: %v", providers)
 		}
-		
+
 		for _, provider := range providers {
 			if provider.ID == cid.Creator {
 				hasRecords = true
@@ -251,17 +324,17 @@ func (h *DHTHost) PingPRHolderOnCid(
 		succesfulConnection()
 	} else {
 		// loop over max tries if the connection is connection refused/ connection reset by peer
-		connetionRetry:
+	connetionRetry:
 		for att := 0; att < MaxDialAttempts; att++ {
 			// attempt to connect the peer
 			err := h.host.Connect(ctx, remotePeer)
-			connError := ParseConError(err)
+			connError = ParseConError(err)
 			switch connError {
 			case NoConnError: // no error at all
 				hlog.Debugf("succesful connection")
 				succesfulConnection()
 				break connetionRetry
-		
+
 			case DialErrorConnectionRefused, DialErrorStreamReset:
 				// the error is due to a connection rejected, try again
 				hlog.Debugf("error on connection attempt %s, retrying", err.Error())
@@ -274,7 +347,7 @@ func (h *DHTHost) PingPRHolderOnCid(
 						break connetionRetry
 					}
 				} else {
-					hlog.Debugf("error on %d retry %s", att+1, connError)					
+					hlog.Debugf("error on %d retry %s", att+1, connError)
 					break connetionRetry
 				}
 
@@ -289,7 +362,7 @@ func (h *DHTHost) PingPRHolderOnCid(
 		remotePeer.ID,
 		-1, // caller will need to update the Round with the given idx
 		cid.PublishTime,
-		tstart, 
+		tstart,
 		time.Since(tstart),
 		active,
 		hasRecords,
@@ -298,25 +371,38 @@ func (h *DHTHost) PingPRHolderOnCid(
 }
 
 func (h *DHTHost) GetClosestPeersToCid(ctx context.Context, cid *models.CidInfo) (time.Duration, []peer.ID, *kaddht.LookupMetrics, error) {
+
+	h.addCidPing(cid)
+	defer h.removeCidPing(cid)
+
 	startT := time.Now()
 	closestPeers, lookupMetrics, err := h.dht.GetClosestPeers(ctx, string(cid.CID.Hash()))
-	return time.Since(startT), closestPeers, lookupMetrics, err 
+	return time.Since(startT), closestPeers, lookupMetrics, err
 }
 
 func (h *DHTHost) ProvideCid(ctx context.Context, cid *models.CidInfo) (time.Duration, *kaddht.LookupMetrics, error) {
+	h.addCidPing(cid)
+	defer h.removeCidPing(cid)
+
 	log.WithFields(log.Fields{
-		"id": h.id,
-		"cid": cid.CID.Hash().String(),
+		"id":  h.id,
+		"cid": cid.CID.Hash().B58String(),
 	}).Debug("providing cid with", cid.ProvideOp)
 	startT := time.Now()
 	lookupMetrics, err := h.dht.DetailedProvide(ctx, cid.CID, true)
 	return time.Since(startT), lookupMetrics, err
 }
 
-func (h *DHTHost) FindProvidersOfCID(ctx context.Context, cid *models.CidInfo) (time.Duration, []peer.AddrInfo, error) {
+func (h *DHTHost) FindProvidersOfCID(
+	ctx context.Context,
+	cid *models.CidInfo) (time.Duration, []peer.AddrInfo, error) {
+
+	h.addCidPing(cid)
+	defer h.removeCidPing(cid)
+
 	log.WithFields(log.Fields{
-		"id": h.id,
-		"cid": cid.CID.Hash().String(),
+		"id":  h.id,
+		"cid": cid.CID.Hash().B58String(),
 	}).Debug("looking for providers")
 	startT := time.Now()
 	providers, err := h.dht.LookupForProviders(ctx, cid.CID)
@@ -337,5 +423,3 @@ func (h *DHTHost) Close() {
 		hlog.Error(errors.Wrap(err, "unable to close libp2p host"))
 	}
 }
-
-

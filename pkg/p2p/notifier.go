@@ -7,7 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-
 // MsgNotifier represents the communication channel or the debugging channel
 // for the Hoarder to identify the messages sent over the DHT messenger
 type MsgNotifier struct {

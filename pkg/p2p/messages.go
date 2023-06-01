@@ -25,8 +25,8 @@ func NewCustomMessageSender(blacklistedUA string, withMsgNot bool) *MessageSende
 	// only generate a notifier if requested
 	if withMsgNot {
 		msgSender.msgNot = NewMsgNotifier()
-	}  
-	return msgSender 
+	}
+	return msgSender
 }
 func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSender {
 	msgSender := net.NewMessageSenderImpl(h, protocols, ms.blacklistedUA)
