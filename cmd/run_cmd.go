@@ -81,9 +81,9 @@ var RunCmd = &cli.Command{
 			DefaultText: "K=20",
 		},
 		&cli.StringFlag{
-			Name: "prov-op",
-			Usage: "select the algorithm to povide CIDs in the DHT",
-			EnvVars: []string{"IPFS_CID_HOARDER_PROV_OP"},
+			Name:        "prov-op",
+			Usage:       "select the algorithm to povide CIDs in the DHT",
+			EnvVars:     []string{"IPFS_CID_HOARDER_PROV_OP"},
 			DefaultText: "standard/optimistic",
 		},
 		&cli.StringFlag{
@@ -123,18 +123,18 @@ func RunHoarder(ctx *cli.Context) error {
 
 	// Initialize the CidHoarder
 	log.WithFields(log.Fields{
-		"log-level": conf.LogLevel,
-		"port": conf.Port,
-		"database": conf.Database,
-		"cid-size": conf.CidContentSize,
-		"cid-number": conf.CidNumber,
-		"workers": conf.Workers,
+		"log-level":        conf.LogLevel,
+		"port":             conf.Port,
+		"database":         conf.Database,
+		"cid-size":         conf.CidContentSize,
+		"cid-number":       conf.CidNumber,
+		"workers":          conf.Workers,
 		"single-publisher": conf.SinglePublisher,
-		"req-interval": conf.ReqInterval,
-		"cid-ping-time": conf.CidPingTime,
-		"k": conf.K,
-		"prov-op": conf.ProvideOperation,
-		"blacklisted-ua": conf.BlacklistedUA,
+		"req-interval":     conf.ReqInterval,
+		"cid-ping-time":    conf.CidPingTime,
+		"k":                conf.K,
+		"prov-op":          conf.ProvideOperation,
+		"blacklisted-ua":   conf.BlacklistedUA,
 	}).Info("running cid-hoarder")
 	cidHoarder, err := hoarder.NewCidHoarder(ctx.Context, conf)
 	if err != nil {
@@ -143,7 +143,7 @@ func RunHoarder(ctx *cli.Context) error {
 
 	signalC := make(chan os.Signal, 1)
 	signal.Notify(signalC, syscall.SIGKILL, syscall.SIGTERM, os.Interrupt)
-	
+
 	// lauch the Hoarder
 	err = cidHoarder.Run()
 	if err != nil {
@@ -151,22 +151,22 @@ func RunHoarder(ctx *cli.Context) error {
 	}
 
 	// wait until Hoarder finishes, or untill a stop signal comes
-	hoarderLoop:
+hoarderLoop:
 	for {
 		select {
-		case <- signalC:
+		case <-signalC:
 			log.Info("cntr-C detected, closing hoarder peacefully")
 			cidHoarder.Close()
-			break hoarderLoop	
+			break hoarderLoop
 
-		case <- ctx.Context.Done():
+		case <-ctx.Context.Done():
 			log.Info("context died, closing hoarder peacefully")
 			cidHoarder.Close()
-			break hoarderLoop	
+			break hoarderLoop
 
-		case <- cidHoarder.FinishedC:
+		case <-cidHoarder.FinishedC:
 			log.Info("cid hoarder sucessfully finished")
-			break hoarderLoop	
+			break hoarderLoop
 		}
 	}
 	return nil
