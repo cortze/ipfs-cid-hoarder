@@ -15,16 +15,18 @@ type cidSet struct {
 
 	cidMap   map[string]*models.CidInfo
 	cidArray []*models.CidInfo
-	
-	init bool
+
+	init    bool
+	pointer int
 }
 
-// newCidQueue creates a new CidSet 
+// newCidQueue creates a new CidSet
 func newCidSet() *cidSet {
 	return &cidSet{
 		cidMap:   make(map[string]*models.CidInfo),
 		cidArray: make([]*models.CidInfo, 0),
-		init: false,
+		init:     false,
+		pointer:  -1,
 	}
 }
 
@@ -46,7 +48,7 @@ func (s *cidSet) addCid(c *models.CidInfo) {
 
 	s.cidMap[c.CID.Hash().B58String()] = c
 	s.cidArray = append(s.cidArray, c)
-	
+
 	if !s.init {
 		s.init = true
 	}
@@ -72,6 +74,28 @@ func (s *cidSet) removeCid(cStr string) {
 	}
 }
 
+// Iterators
+
+func (s *cidSet) Next() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return s.pointer < s.Len() && s.pointer >= 0
+}
+
+func (s *cidSet) Cid() *models.CidInfo {
+	if s.pointer >= s.Len() {
+		return nil
+	}
+	s.Lock()
+	defer func() {
+		s.pointer++
+		s.Unlock()
+	}()
+	return s.cidArray[s.pointer]
+}
+
+// common usage
+
 func (s *cidSet) getCid(cStr string) (*models.CidInfo, bool) {
 	s.RLock()
 	defer s.RUnlock()
@@ -80,8 +104,17 @@ func (s *cidSet) getCid(cStr string) (*models.CidInfo, bool) {
 	return c, ok
 }
 
-func (s *cidSet) sortCidList() {
+func (s *cidSet) getCidList() []*models.CidInfo {
+	s.RLock()
+	defer s.RUnlock()
+	cidList := make([]*models.CidInfo, s.Len())
+	cidList = append(cidList, s.cidArray...)
+	return cidList
+}
+
+func (s *cidSet) SortCidList() {
 	sort.Sort(s)
+	s.pointer = 0
 	return
 }
 

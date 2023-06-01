@@ -34,11 +34,11 @@ func (db *DBClient) addPRHoldersSet(c cid.Cid, prHolders []*models.PeerInfo) per
 		INSERT INTO pr_holders (
 			cid_hash,
 			peer_id)`,
-		"", // no appendix to the query
+		"",             // no appendix to the query
 		len(prHolders), // number of Values to insert
-		2) // number of items per value (cid_hash, peer_id)
+		2)              // number of items per value (cid_hash, peer_id)
 
-	// add each of the items of the PR holders to the values 	
+	// add each of the items of the PR holders to the values
 	for _, p := range prHolders {
 		persis.values = append(persis.values, c.Hash().B58String())
 		persis.values = append(persis.values, p.ID.String())

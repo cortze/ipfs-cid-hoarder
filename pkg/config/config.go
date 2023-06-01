@@ -12,42 +12,39 @@ var log = logrus.WithField(
 // Harcoded variables for the tool's profiling
 var PprofIp = "127.0.0.1"
 var PprofPort = "9020"
-
-// Hardcoded variables for the cli host
-var CliIp string = "0.0.0.0"
-var UserAgent string = "BSC-Cid-Hoarder"
-
-// Blacklisting UserAgents
 var DefaultBlacklistUserAgent = ""
+var DefaultDHTProvideOperation = "standard"
 
 // default configuration
 var DefaultConfig = Config{
-	Port:            "9010",
-	LogLevel:        "info",
-	Database:        "postgres://user:password@ip:port/db",
-	CidContentSize:  1024, // 1MB in KBs
-	CidNumber:       10,
-	Workers:         250,
-	SinglePublisher: true,
-	ReqInterval:     "30m",
-	CidPingTime:     "48h",
-	K:               20,
-	BlacklistedUA:   DefaultBlacklistUserAgent,
+	Port:             "9010",
+	LogLevel:         "info",
+	Database:         "postgres://user:password@ip:port/db",
+	CidContentSize:   1024, // 1MB in KBs
+	CidNumber:        10,
+	Workers:          250,
+	SinglePublisher:  true,
+	ReqInterval:      "30m",
+	CidPingTime:      "48h",
+	K:                20,
+	ProvideOperation: DefaultDHTProvideOperation,
+	BlacklistedUA:    DefaultBlacklistUserAgent,
 }
 
 // Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
-	Port            string `json:"port"`
-	LogLevel        string `json:"log-level"`
-	Database        string `json:"database-endpoint"`
-	CidContentSize  int    `json:"cid-content-size"`
-	CidNumber       int    `json:"cid-number"`
-	Workers         int    `json:"workers"`
-	SinglePublisher bool   `json:"single-publisher"`
-	ReqInterval     string `json:"req-interval"`
-	CidPingTime     string `json:"cid-ping-time"`
-	K               int    `json:"k"`
-	BlacklistedUA     string   `json:"blacklisted-ua"`
+	Port             string `json:"port"`
+	LogLevel         string `json:"log-level"`
+	Database         string `json:"database-endpoint"`
+	CidContentSize   int    `json:"cid-content-size"`
+	CidNumber        int    `json:"cid-number"`
+	Workers          int    `json:"workers"`
+	SinglePublisher  bool   `json:"single-publisher"`
+	ReqInterval      string `json:"req-interval"`
+	CidPingTime      string `json:"cid-ping-time"`
+	K                int    `json:"k"`
+	ProvideOperation string `json:"prov-op"`
+	BlacklistedUA    string `json:"blacklisted-ua"`
 }
 
 // Init takes the command line argumenst from the urfave/cli context and composes the configuration
@@ -100,6 +97,10 @@ func (c *Config) Apply(ctx *cli.Context) {
 
 		if ctx.IsSet("k") {
 			c.K = ctx.Int("k")
+		}
+
+		if ctx.IsSet("prov-op") {
+			c.ProvideOperation = ctx.String("prov-op")
 		}
 
 		if ctx.IsSet("blacklisted-ua") {

@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	pgx "github.com/jackc/pgx/v5"
@@ -15,25 +14,25 @@ var (
 	QueryTimeout = 5 * time.Minute
 	MaxRetries   = 1
 
-	ErrorNoConnFree = "no connection adquirable"
-	noQueryError  string = "no error"
-	noQueryResult string = "no result"
+	ErrorNoConnFree        = "no connection adquirable"
+	noQueryError    string = "no error"
+	noQueryResult   string = "no result"
 )
 
 type QueryBatch struct {
-	ctx     context.Context
-	pgxPool *pgxpool.Pool
-	batch   *pgx.Batch
-	size    int
+	ctx          context.Context
+	pgxPool      *pgxpool.Pool
+	batch        *pgx.Batch
+	size         int
 	persistables []persistable
 }
 
 func NewQueryBatch(ctx context.Context, pgxPool *pgxpool.Pool, batchSize int) *QueryBatch {
 	return &QueryBatch{
-		ctx:     ctx,
-		pgxPool: pgxPool,
-		batch:   &pgx.Batch{},
-		size:    batchSize,
+		ctx:          ctx,
+		pgxPool:      pgxPool,
+		batch:        &pgx.Batch{},
+		size:         batchSize,
 		persistables: make([]persistable, 0),
 	}
 }
@@ -87,7 +86,6 @@ func (q *QueryBatch) persistBatch() error {
 	ctx, cancel := context.WithTimeout(q.ctx, QueryTimeout)
 	defer cancel()
 
-
 	batchResults := q.pgxPool.SendBatch(ctx, q.batch)
 	defer batchResults.Close()
 
@@ -103,21 +101,11 @@ func (q *QueryBatch) persistBatch() error {
 
 	// check if there was any error
 	if qerr != nil {
-		/*
 		log.WithFields(log.Fields{
-			"error": qerr.Error(),
-			"query": q.persistables[cnt-1].query,
+			"error":  qerr.Error(),
+			"query":  q.persistables[cnt-1].query,
 			"values": q.persistables[cnt-1].values,
-		}).Errorf("unable to persist query [cnt-1]")
-		log.WithFields(log.Fields{
-			"error": qerr.Error(),
-			"query": q.persistables[cnt].query,
-			"values": q.persistables[cnt].values,
-		}).Errorf("unable to persist query [cnt]")
-		*/
-		fmt.Println("idx", cnt+1, "", qerr.Error())
-		fmt.Println(q.persistables[cnt+1].query)
-		fmt.Println(q.persistables[cnt+1].values)
+		}).Errorf("unable to persist query")
 		return errors.Wrap(qerr, "error persisting batch")
 	}
 	return nil

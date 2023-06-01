@@ -3,8 +3,6 @@ package models
 import (
 	"strings"
 
-	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
@@ -12,25 +10,14 @@ import (
 
 // PeerInfo has the basic info of a Peer elected as a PR Holder
 type PeerInfo struct {
-	//TODO why not embed  AddrInfo struct here?
 	ID        peer.ID
 	MultiAddr []ma.Multiaddr
-	// peer.AddrInfo
 	UserAgent string
 	Client    string
 	Version   string
 	// TODO: Is there anything else to add?
 }
 
-// Creates a new:
-//
-//	type PeerInfo struct {
-//		ID        peer.ID
-//		MultiAddr []ma.Multiaddr
-//		UserAgent string
-//		Client    string
-//		Version   string
-//	}
 func NewPeerInfo(peerId peer.ID, multiAddr []ma.Multiaddr, userAgent string) *PeerInfo {
 	client, version := FilterClientType(userAgent)
 
@@ -41,15 +28,6 @@ func NewPeerInfo(peerId peer.ID, multiAddr []ma.Multiaddr, userAgent string) *Pe
 		Client:    client,
 		Version:   version,
 	}
-	/*
-		return &PeerInfo{
-			ID:  peerID,
-			MultiAddr: multiAddr
-			UserAgent: userAgent,
-			Client:    client,
-			Version:   version,
-		}
-	*/
 }
 
 func (p *PeerInfo) GetAddrInfo() peer.AddrInfo {
@@ -80,7 +58,7 @@ func FilterClientType(userAgent string) (string, string) {
 		return "ioi", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "storm") {
 		return "storm", cleanVersion(getVersionIfAny(fields, 1))
-	} else if userAgentLower == "" || userAgent == p2p.NoUserAgentDefined {
+	} else if userAgentLower == "" || userAgent == "Not Defined " {
 		return "NotIdentified", ""
 	} else {
 		log.Debugf("Could not get client from userAgent: %s", userAgent)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestUtils (t *testing.T) {
+func TestUtils(t *testing.T) {
 	query := `
 		INSERT INTO peer_info(
 			peer_id,

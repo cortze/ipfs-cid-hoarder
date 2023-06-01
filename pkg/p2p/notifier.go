@@ -7,7 +7,31 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// This is the struct type received and send by the notifier's channel.
+// MsgNotifier represents the communication channel or the debugging channel
+// for the Hoarder to identify the messages sent over the DHT messenger
+type MsgNotifier struct {
+	msgChan chan *MsgNotification
+}
+
+func NewMsgNotifier() *MsgNotifier {
+	return &MsgNotifier{
+		msgChan: make(chan *MsgNotification),
+	}
+}
+
+func (n *MsgNotifier) GetNotifierChan() chan *MsgNotification {
+	return n.msgChan
+}
+
+func (n *MsgNotifier) Notify(msgStatus *MsgNotification) {
+	n.msgChan <- msgStatus
+}
+
+func (n *MsgNotifier) Close() {
+	close(n.msgChan)
+}
+
+// MsgNotification is the basic notification struct received and send by the dht messenger
 type MsgNotification struct {
 	RemotePeer    peer.ID
 	QueryTime     time.Time
@@ -15,54 +39,4 @@ type MsgNotification struct {
 	Msg           pb.Message
 	Resp          pb.Message
 	Error         error
-}
-
-// Notifier will keep track of the
-type Notifier struct {
-	// so far with the pb.Messages we can already retrieve the PRHolders
-	msgChan chan *MsgNotification
-}
-
-func NewMsgNotifier() *Notifier {
-	return &Notifier{
-		msgChan: make(chan *MsgNotification),
-	}
-}
-
-// This returns the channel of the notifier struct:
-//
-//	msgChan chan *MsgNotification
-//
-// The notifier channel receives and sends:
-//
-//	MsgNotification struct{
-//		RemotePeer    peer.ID
-//		QueryTime     time.Time
-//		QueryDuration time.Duration
-//		Msg           pb.Message
-//		Resp          pb.Message
-//		Error         error
-//	}
-func (notifier_instance *Notifier) GetNotifierChan() chan *MsgNotification {
-	return notifier_instance.msgChan
-}
-
-// Sends a new:
-//
-//	MsgNotification struct{
-//	...
-//	}
-//
-// To the underlying channel:
-//
-//	msgChan chan *MsgNotification
-func (notifier_instance *Notifier) Notify(msgStatus *MsgNotification) {
-	notifier_instance.msgChan <- msgStatus
-}
-
-// Closes the underlying:
-//
-//	msgChan chan *MsgNotification
-func (notifier_instance *Notifier) Close() {
-	close(notifier_instance.msgChan)
 }

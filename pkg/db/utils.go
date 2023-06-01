@@ -7,7 +7,7 @@ import (
 
 // multiValueComposer includes the VALUES ($1, $2) ($3, $4) for the given query on the given
 // valueLen and itemsPerValue and returns the new query
-func multiValueComposer (mainQuery string, appendable string, valueLen, itemsPerValue int) string {
+func multiValueComposer(mainQuery string, appendable string, valueLen, itemsPerValue int) string {
 	var s strings.Builder
 	s.WriteString(mainQuery)
 	baseIdx := 1
@@ -22,7 +22,7 @@ func multiValueComposer (mainQuery string, appendable string, valueLen, itemsPer
 				s.WriteString(",")
 			}
 			s.WriteString(fmt.Sprintf("$%d", item))
-		}	
+		}
 		s.WriteString(")")
 		baseIdx += itemsPerValue
 	}

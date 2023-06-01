@@ -36,7 +36,7 @@ func (db *DBClient) CreatePingResultsTable() error {
 func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) persistable {
 	persis := newPersistable()
 	if len(pingRes) <= 0 {
-		return 	persis 
+		return persis
 	}
 
 	persis.query = multiValueComposer(`
@@ -51,9 +51,9 @@ func (db *DBClient) addPingResultsSet(pingRes []*models.PRPingResults) persistab
 			has_records,
 			records_with_maddrs,
 			conn_error)`,
-			"",
-			len(pingRes), // number of values
-			10) // number of items per value
+		"",
+		len(pingRes), // number of values
+		10)           // number of items per value
 
 	// insert each of the Peers holding the PR
 	for _, ping := range pingRes {

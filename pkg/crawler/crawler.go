@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
+	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -48,7 +49,7 @@ func New(ctx context.Context, privKey crypto.PrivKey, ip, port, blacklistUA stri
 	h, err := libp2p.New(
 		libp2p.ListenAddrs(mAddr),
 		libp2p.Identity(privKey),
-		libp2p.UserAgent(config.UserAgent),
+		libp2p.UserAgent(p2p.DefaultUserAgent),
 		libp2p.Transport(tcp.NewTCPTransport))
 	if err != nil {
 		return nil, err
@@ -82,7 +83,7 @@ func RunLightCrawler(ctx context.Context, balcklistingUA string) (CrawlResults, 
 	}
 
 	// Initialize the CidHoarder
-	c, err := New(ctx, priv, config.CliIp, config.DefaultConfig.Port, balcklistingUA)
+	c, err := New(ctx, priv, "0.0.0.0", config.DefaultConfig.Port, balcklistingUA)
 	if err != nil {
 		return CrawlResults{}, err
 	}
