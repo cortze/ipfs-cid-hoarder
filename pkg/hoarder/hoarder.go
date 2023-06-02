@@ -7,6 +7,7 @@ import (
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/config"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/db"
+	"github.com/cortze/ipfs-cid-hoarder/pkg/metrics"
 	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
 
 	"github.com/pkg/errors"
@@ -19,11 +20,11 @@ type CidHoarder struct {
 	ctx context.Context
 	wg  *sync.WaitGroup
 
-	dbCli *db.DBClient
-
+	dbCli        *db.DBClient
 	cidSet       *cidSet
 	cidPublisher *CidPublisher
 	cidPinger    *CidPinger
+	prometheus   *metrics.PrometheusMetrics
 
 	FinishedC chan struct{}
 }
@@ -113,14 +114,23 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	if err != nil {
 		return nil, err
 	}
-	return &CidHoarder{
+
+	prometheusMetrics := metrics.NewPrometheusMetrics(
+		ctx,
+		conf.MetricsIP,
+		conf.MetricsPort)
+
+	cidHoarder := &CidHoarder{
 		ctx:          ctx,
 		wg:           &studyWG,
 		dbCli:        dbInstance,
+		cidSet:       cidSet,
 		cidPublisher: cidPublisher,
 		cidPinger:    cidPinger,
+		prometheus:   prometheusMetrics,
 		FinishedC:    make(chan struct{}, 1),
-	}, nil
+	}
+	return cidHoarder, nil
 }
 
 func (c *CidHoarder) Run() error {
@@ -129,11 +139,17 @@ func (c *CidHoarder) Run() error {
 	c.wg.Add(1)
 	go c.cidPinger.Run()
 
+	// gather all the service metrics into the prometheus service
+	hoarderMetrics := c.GetMetrics()
+	c.prometheus.AddMeticsModule(hoarderMetrics)
+	c.prometheus.Start()
+
 	hlog := log.WithField("mod", "hoarder")
 	go func() {
 		c.wg.Wait()
 		hlog.Info("publisher and pinger successfully closed")
 		c.dbCli.Close()
+		c.prometheus.Close()
 		hlog.Info("run finished, organically closed")
 		c.FinishedC <- struct{}{}
 	}()

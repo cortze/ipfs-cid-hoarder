@@ -3,6 +3,7 @@ package hoarder
 import (
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 )
@@ -140,4 +141,19 @@ func (s *cidSet) Len() int {
 	defer s.RUnlock()
 
 	return len(s.cidArray)
+}
+
+func (s *cidSet) NextValidTimeToPing() (time.Time, bool) {
+	var validTime time.Time
+	s.RLock()
+	defer s.RUnlock()
+	for _, cid := range s.cidArray {
+		nextping := cid.NextPing
+		// asume that the array is sorted
+		if validTime.IsZero() && !nextping.IsZero() {
+			validTime = nextping
+			return validTime, true
+		}
+	}
+	return validTime, false
 }

@@ -10,14 +10,16 @@ var log = logrus.WithField(
 )
 
 // Harcoded variables for the tool's profiling
-var PprofIp = "127.0.0.1"
-var PprofPort = "9020"
+var MetricsIp = "127.0.0.1"
+var MetricsPort = "9022"
 var DefaultBlacklistUserAgent = ""
 var DefaultDHTProvideOperation = "standard"
 
 // default configuration
 var DefaultConfig = Config{
 	Port:             "9010",
+	MetricsIP:        MetricsIp,
+	MetricsPort:      MetricsPort,
 	LogLevel:         "info",
 	Database:         "postgres://user:password@ip:port/db",
 	CidContentSize:   1024, // 1MB in KBs
@@ -34,6 +36,8 @@ var DefaultConfig = Config{
 // Config compiles all the set of flags that can be read by the user while launching the cli
 type Config struct {
 	Port             string `json:"port"`
+	MetricsIP        string `json:"metrics-ip"`
+	MetricsPort      string `json:"metrics-port"`
 	LogLevel         string `json:"log-level"`
 	Database         string `json:"database-endpoint"`
 	CidContentSize   int    `json:"cid-content-size"`
@@ -61,6 +65,10 @@ func (c *Config) Apply(ctx *cli.Context) {
 	if ctx.Command.Name == "run" {
 		if ctx.IsSet("port") {
 			c.Port = ctx.String("port")
+		}
+
+		if ctx.IsSet("metrics-port") {
+			c.MetricsPort = ctx.String("metrics-port")
 		}
 
 		if ctx.IsSet("log-level") {

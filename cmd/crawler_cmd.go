@@ -53,7 +53,7 @@ func RunCrawler(ctx *cli.Context) error {
 
 	// expose the pprof and prometheus metrics
 	go func() {
-		pprofAddres := config.PprofIp + ":" + config.PprofPort
+		pprofAddres := config.MetricsIp + ":" + config.MetricsPort
 		log.Debugf("initializing pprof in %s\n", pprofAddres)
 		err := http.ListenAndServe(pprofAddres, nil)
 		if err != nil {
