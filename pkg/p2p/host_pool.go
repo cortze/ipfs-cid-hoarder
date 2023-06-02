@@ -111,7 +111,6 @@ func (p *HostPool) GetHostWorkload() map[int]int {
 	p.m.RLock()
 	defer p.m.RUnlock()
 
-	fmt.Println(p.hostArray)
 	for _, host := range p.hostArray {
 		summary[host.id] = host.GetOngoingCidPings()
 	}
