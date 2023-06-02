@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,6 +22,12 @@ var RunCmd = &cli.Command{
 			Usage:       "port number where the hoarder will be spawned",
 			EnvVars:     []string{"IPFS_CID_HOARDER_PORT"},
 			DefaultText: "9010",
+		},
+		&cli.StringFlag{
+			Name:        "metrics-port",
+			Usage:       "port number where the hoarder will post prometheus and pprof metrics",
+			EnvVars:     []string{"IPFS_CID_HOARDER_METRICS_PORT"},
+			DefaultText: "9022",
 		},
 		&cli.StringFlag{
 			Name:        "log-level",
@@ -111,20 +115,11 @@ func RunHoarder(ctx *cli.Context) error {
 	// log.SetOutput(config.ParseLogOutput("terminal"))
 	log.SetLevel(config.ParseLogLevel(conf.LogLevel))
 
-	// expose the pprof and prometheus metrics
-	go func() {
-		pprofAddres := config.PprofIp + ":" + config.PprofPort
-		log.Debugf("initializing pprof in %s\n", pprofAddres)
-		err := http.ListenAndServe(pprofAddres, nil)
-		if err != nil {
-			log.Errorf("unable to initialize pprof at %s - error %s", pprofAddres, err.Error())
-		}
-	}()
-
 	// Initialize the CidHoarder
 	log.WithFields(log.Fields{
 		"log-level":        conf.LogLevel,
 		"port":             conf.Port,
+		"metrics-port":     conf.MetricsPort,
 		"database":         conf.Database,
 		"cid-size":         conf.CidContentSize,
 		"cid-number":       conf.CidNumber,
@@ -161,7 +156,7 @@ hoarderLoop:
 		case <-ctx.Context.Done():
 			log.Info("context died, closing hoarder peacefully")
 			cidHoarder.Close()
-		
+
 		// finishedC will always determine when the Hoarder has finished
 		case <-cidHoarder.FinishedC:
 			log.Info("cid hoarder sucessfully finished")
