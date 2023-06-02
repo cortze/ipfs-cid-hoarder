@@ -38,6 +38,7 @@ type CidPublisher struct {
 
 	// main set of Cids that will keep track of them over the run
 	cidSet         *cidSet
+	metrics        *publisherMetrics
 	generationDone *atomic.Bool
 }
 
@@ -75,6 +76,7 @@ func NewCidPublisher(
 		CidPingTime:    cidPingTime,
 		Workers:        workers,
 		cidSet:         cidSet,
+		metrics:        newPublisherMetrics(string(hostOpts.ProvOp)),
 		generationDone: atomic.NewBool(false),
 	}, nil
 }
@@ -318,6 +320,9 @@ func (publisher *CidPublisher) publishingProcess(
 			cidInfo.AddProvideTime(reqTime)
 			cidInfo.AddPRFetchResults(fetchRes)
 
+			// add to the metrics
+			publisher.metrics.addCid(string(publisher.dhtProvide))
+
 			// the Cid has already being published, save it into the DB
 			publisher.DBCli.AddCidInfo(cidInfo)
 			publisher.DBCli.AddFetchResult(fetchRes)
@@ -358,4 +363,47 @@ func (publisher *CidPublisher) Close() {
 	if !publisher.generationDone.Load() {
 		publisher.cidGenerator.Close()
 	}
+}
+
+func (publisher *CidPublisher) GetTotalPublishedCids() map[string]uint64 {
+	provOpCids := publisher.metrics.getCidPublicationNumbers()
+	return provOpCids
+}
+
+type publisherMetrics struct {
+	m sync.RWMutex
+
+	counter map[string]uint64
+}
+
+func newPublisherMetrics(provOps ...string) *publisherMetrics {
+	counter := make(map[string]uint64)
+	for _, provOp := range provOps {
+		counter[provOp] = 0
+	}
+	return &publisherMetrics{
+		counter: counter,
+	}
+}
+
+func (m *publisherMetrics) addCid(provOp string) uint64 {
+	m.m.Lock()
+	defer m.m.Unlock()
+	cnt, ok := m.counter[provOp]
+	if !ok {
+		m.counter[provOp] = 0
+	}
+	m.counter[provOp] = cnt + 1
+	return cnt + 1
+}
+
+func (m *publisherMetrics) getCidPublicationNumbers() map[string]uint64 {
+	m.m.RLock()
+	defer m.m.RUnlock()
+	cntCopy := make(map[string]uint64)
+
+	for op, val := range m.counter {
+		cntCopy[op] = val
+	}
+	return cntCopy
 }

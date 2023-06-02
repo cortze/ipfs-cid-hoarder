@@ -324,6 +324,10 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 	}
 }
 
+func (pinger *CidPinger) GetHostWorkload() map[int]int {
+	return pinger.hostPool.GetHostWorkload()
+}
+
 func (pinger *CidPinger) Close() {
 	log.WithField("mod", "pinger").Info("shutdown detected from the CidPinger")
 	pinger.orchersterCloseC <- struct{}{}
