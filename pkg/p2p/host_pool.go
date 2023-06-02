@@ -23,6 +23,8 @@ type HostPool struct {
 	m   sync.RWMutex
 	ctx context.Context
 
+	hostCnt int
+
 	hostMap   map[peer.ID]*DHTHost
 	hostArray []*DHTHost
 }
@@ -37,13 +39,13 @@ func NewHostPool(ctx context.Context, poolSize int, hOpts DHTHostOptions) (*Host
 	hostPool := &HostPool{
 		sync.RWMutex{},
 		ctx,
+		0,
 		hostMap,
 		hostArray,
 	}
 
 	var errG errgroup.Group
 	for hostId := 0; hostId < poolSize; hostId++ {
-		hOpts.ID = hostId
 		errG.Go(func() error {
 			return hostPool.OneMoreHost(hOpts)
 		})
@@ -59,6 +61,12 @@ func NewHostPool(ctx context.Context, poolSize int, hOpts DHTHostOptions) (*Host
 }
 
 func (p *HostPool) OneMoreHost(hOpts DHTHostOptions) error {
+	p.m.Lock()
+	id := p.hostCnt
+	hOpts.ID = id
+	p.hostCnt++
+	p.m.Unlock()
+
 	h, err := NewDHTHost(p.ctx, hOpts)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("unable to create host %d", hOpts.ID))
@@ -96,6 +104,18 @@ func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
 		return p.hostArray[hid], ErrorRetrievingBestHost
 	}
 	return p.hostArray[hid], nil
+}
+
+func (p *HostPool) GetHostWorkload() map[int]int {
+	summary := make(map[int]int)
+	p.m.RLock()
+	defer p.m.RUnlock()
+
+	fmt.Println(p.hostArray)
+	for _, host := range p.hostArray {
+		summary[host.id] = host.GetOngoingCidPings()
+	}
+	return summary
 }
 
 func (p *HostPool) Close() {
