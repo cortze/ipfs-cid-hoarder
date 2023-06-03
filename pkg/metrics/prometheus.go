@@ -59,10 +59,7 @@ func (p *PrometheusMetrics) Start() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to init prometheus metrics")
 	}
-
-	p.wg.Add(1)
 	go p.launchMetricsUpdater()
-
 	return nil
 }
 
@@ -80,7 +77,6 @@ func (p *PrometheusMetrics) initPrometheusMetrics() error {
 }
 
 func (p *PrometheusMetrics) launchMetricsUpdater() {
-	defer p.wg.Done()
 	ticker := time.NewTicker(p.RefreshInterval)
 	for {
 		select {
@@ -112,6 +108,4 @@ func (p *PrometheusMetrics) Close() {
 	// Init loop for each of the Exporters
 	log.Debugf("closing %d prometheus metrics modules", len(p.Modules))
 	p.closeC <- struct{}{}
-	p.wg.Wait()
-	log.Debug("prometheus metrics exporte successfully closed")
 }
