@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	pingTimeout   = 2 * 60 * time.Second
+	pingTimeout   = 80 * time.Second
 	minIterTime   = 500 * time.Millisecond
 	dialGraceTime = 5 * time.Second
 )
@@ -60,7 +60,7 @@ func NewCidPinger(
 	// https://github.com/libp2p/go-libp2p-kad-dht/issues/805
 	hostPool, err := p2p.NewHostPool( // hosts are already bootstrapped
 		ctx,
-		(workers/5)+1,
+		(workers/20)+1, // update the host/worker relation
 		hostOpts,
 	)
 	if err != nil {
@@ -238,6 +238,8 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 				pingCounter,
 				pingT.K,
 			)
+			// Add Cid to the host
+			pingT.host.AddCidPing(pingT.CidInfo)
 
 			pingCtx, cancel := context.WithTimeout(pinger.ctx, pingTimeout)
 			defer cancel()
@@ -248,6 +250,7 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 				var isRetrievable bool = false
 				var prWithMAddrs bool = false
 
+				plog.Debug("finding providers...")
 				queryDuration, providers, err := pingT.host.FindProvidersOfCID(pingCtx, pingT.CidInfo)
 				cidFetchRes.FindProvDuration = queryDuration
 				if err != nil {
@@ -266,12 +269,14 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 				}
 				cidFetchRes.IsRetrievable = isRetrievable
 				cidFetchRes.PRWithMAddr = prWithMAddrs
+				plog.Debug("finished finding providers")
 			}()
 
 			// recalculate the closest k peers to the content.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				plog.Debug("getting closest peers")
 				queryDuration, closestPeers, lookupMetrics, err := pingT.host.GetClosestPeersToCid(pingCtx, pingT.CidInfo)
 				if err != nil {
 					plog.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
@@ -290,6 +295,7 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 				for _, peer := range closestPeers {
 					cidFetchRes.AddClosestPeer(peer)
 				}
+				plog.Debug("finished getting closest peers")
 			}()
 
 			// Ping in parallel each of the PRHolders
@@ -305,7 +311,12 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 					cidFetchRes.AddPRPingResults(pingRes)
 				}(*remotePeer)
 			}
-			wg.Wait() // wait for all the routines to finish
+			plog.Debug("waiting tasks to finish")
+			wg.Wait()
+			plog.Debug("ping tasks just finished")
+			// remove Cid from DHT host (for metrics)
+			pingT.host.RemoveCidPing(pingT.CidInfo)
+
 			cidFetchRes.FinishTime = time.Now()
 			pinger.dbCli.AddFetchResult(cidFetchRes)
 

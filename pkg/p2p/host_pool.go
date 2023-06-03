@@ -80,7 +80,6 @@ func (p *HostPool) OneMoreHost(hOpts DHTHostOptions) error {
 
 func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
 	p.m.RLock()
-	defer p.m.RUnlock()
 	xorDists := make([]*big.Int, len(p.hostArray))
 	for idx, dhtHost := range p.hostArray {
 		xorDist, idle := dhtHost.XORDistanceToOngoingCids(newCid.CID)
@@ -89,6 +88,8 @@ func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
 		}
 		xorDists[idx] = xorDist
 	}
+	p.m.RUnlock()
+
 	// get max dist out of the closes ongoing one
 	var hid int
 	maxDist := big.NewInt(0)
@@ -99,6 +100,8 @@ func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
 			hid = idx
 		}
 	}
+	p.m.RLock()
+	defer p.m.RUnlock()
 	if hid == 0 && maxDist == big.NewInt(0) {
 		// return at least the first node in the list (is among the hosts with fewer ongoing cids)
 		return p.hostArray[hid], ErrorRetrievingBestHost
@@ -109,11 +112,10 @@ func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
 func (p *HostPool) GetHostWorkload() map[int]int {
 	summary := make(map[int]int)
 	p.m.RLock()
-	defer p.m.RUnlock()
-
 	for _, host := range p.hostArray {
 		summary[host.id] = host.GetOngoingCidPings()
 	}
+	p.m.RUnlock()
 	return summary
 }
 
@@ -131,7 +133,6 @@ func (p *HostPool) SortHost() {
 func (p *HostPool) Swap(i, j int) {
 	p.m.Lock()
 	defer p.m.Unlock()
-
 	p.hostArray[i], p.hostArray[j] = p.hostArray[j], p.hostArray[i]
 }
 

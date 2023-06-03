@@ -89,7 +89,7 @@ func (h *CidHoarder) secsToNextPingMetrics() *metrics.IndvMetrics {
 				fmt.Sprintf("no valid time for next ping [time: %s]", validTime))
 		}
 		validSecs := validTime.Sub(time.Now()).Seconds()
-		ongoingCids.Set(float64(validSecs))
+		secsToNextPing.Set(float64(validSecs))
 		return validSecs, nil
 	}
 
