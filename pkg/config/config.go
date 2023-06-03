@@ -67,6 +67,10 @@ func (c *Config) Apply(ctx *cli.Context) {
 			c.Port = ctx.String("port")
 		}
 
+		if ctx.IsSet("metrics-ip") {
+			c.MetricsIP = ctx.String("metrics-ip")
+		}
+
 		if ctx.IsSet("metrics-port") {
 			c.MetricsPort = ctx.String("metrics-port")
 		}

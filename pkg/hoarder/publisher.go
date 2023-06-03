@@ -366,8 +366,7 @@ func (publisher *CidPublisher) Close() {
 }
 
 func (publisher *CidPublisher) GetTotalPublishedCids() map[string]uint64 {
-	provOpCids := publisher.metrics.getCidPublicationNumbers()
-	return provOpCids
+	return publisher.metrics.getCidPublicationNumbers()
 }
 
 type publisherMetrics struct {

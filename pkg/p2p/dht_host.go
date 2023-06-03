@@ -45,7 +45,7 @@ var (
 
 	DefaultUserAgent string = "cid-hoarder"
 	PingGraceTime           = 5 * time.Second
-	MaxDialAttempts         = 2
+	MaxDialAttempts         = 1
 	DialTimeout             = 60 * time.Second
 )
 
@@ -71,7 +71,7 @@ type DHTHost struct {
 	internalMsgNotifier *MsgNotifier
 	initTime            time.Time
 	// dht query related
-	ongoingPings map[cid.Cid]int
+	ongoingPings map[cid.Cid]struct{}
 }
 
 func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
@@ -134,7 +134,7 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 		h,
 		msgSender.GetMsgNotifier(),
 		time.Now(),
-		make(map[cid.Cid]int),
+		make(map[cid.Cid]struct{}),
 	}
 
 	err = dhtHost.Init()
@@ -226,29 +226,16 @@ func (h *DHTHost) ID() peer.ID {
 
 // control the number of CIDs the host is concurrently pinging
 
-func (h *DHTHost) addCidPing(cidInfo *models.CidInfo) {
+func (h *DHTHost) AddCidPing(cidInfo *models.CidInfo) {
 	h.m.Lock()
 	defer h.m.Unlock()
-	val, ok := h.ongoingPings[cidInfo.CID]
-	if ok {
-		val++
-	} else {
-		val = 1
-	}
-	h.ongoingPings[cidInfo.CID] = val
+	h.ongoingPings[cidInfo.CID] = struct{}{}
 }
 
-func (h *DHTHost) removeCidPing(cidInfo *models.CidInfo) {
+func (h *DHTHost) RemoveCidPing(cidInfo *models.CidInfo) {
 	h.m.Lock()
 	defer h.m.Unlock()
-	val, ok := h.ongoingPings[cidInfo.CID]
-	if !ok {
-		return
-	}
-	val++
-	if val <= 0 {
-		delete(h.ongoingPings, cidInfo.CID)
-	}
+	delete(h.ongoingPings, cidInfo.CID)
 }
 
 func (h *DHTHost) GetOngoingCidPings() int {
@@ -260,12 +247,11 @@ func (h *DHTHost) GetOngoingCidPings() int {
 func (h *DHTHost) XORDistanceToOngoingCids(cidHash cid.Cid) (*big.Int, bool) {
 	cidK := key.BytesKey([]byte(cidHash.Hash()))
 	xorDist := big.NewInt(0)
-	h.m.RLock()
-	defer h.m.RUnlock()
 	if h.GetOngoingCidPings() == 0 {
 		return xorDist, true
 	}
-	for ongoingCid, _ := range h.ongoingPings {
+	h.m.RLock()
+	for ongoingCid := range h.ongoingPings {
 		onK := key.BytesKey([]byte(ongoingCid.Hash()))
 		auxXor := key.DistInt(onK, cidK)
 		isNull := xorDist.Cmp(big.NewInt(0))
@@ -274,6 +260,7 @@ func (h *DHTHost) XORDistanceToOngoingCids(cidHash cid.Cid) (*big.Int, bool) {
 			xorDist = auxXor
 		}
 	}
+	h.m.RUnlock()
 	return xorDist, false
 }
 
@@ -284,15 +271,13 @@ func (h *DHTHost) PingPRHolderOnCid(
 	remotePeer peer.AddrInfo,
 	cid *models.CidInfo) *models.PRPingResults {
 
-	h.addCidPing(cid)
-	defer h.removeCidPing(cid)
-
 	hlog := log.WithFields(log.Fields{
 		"host-id":   h.id,
 		"cid":       cid.CID.Hash().B58String(),
 		"pr-holder": remotePeer.ID.String(),
 	})
 
+	ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 	var active, hasRecords, recordsWithMAddrs bool
 	var connError string = DialErrorUnknown
 	tstart := time.Now()
@@ -372,17 +357,12 @@ func (h *DHTHost) PingPRHolderOnCid(
 
 func (h *DHTHost) GetClosestPeersToCid(ctx context.Context, cid *models.CidInfo) (time.Duration, []peer.ID, *kaddht.LookupMetrics, error) {
 
-	h.addCidPing(cid)
-	defer h.removeCidPing(cid)
-
 	startT := time.Now()
 	closestPeers, lookupMetrics, err := h.dht.GetClosestPeers(ctx, string(cid.CID.Hash()))
 	return time.Since(startT), closestPeers, lookupMetrics, err
 }
 
 func (h *DHTHost) ProvideCid(ctx context.Context, cid *models.CidInfo) (time.Duration, *kaddht.LookupMetrics, error) {
-	h.addCidPing(cid)
-	defer h.removeCidPing(cid)
 
 	log.WithFields(log.Fields{
 		"host-id": h.id,
@@ -396,9 +376,6 @@ func (h *DHTHost) ProvideCid(ctx context.Context, cid *models.CidInfo) (time.Dur
 func (h *DHTHost) FindProvidersOfCID(
 	ctx context.Context,
 	cid *models.CidInfo) (time.Duration, []peer.AddrInfo, error) {
-
-	h.addCidPing(cid)
-	defer h.removeCidPing(cid)
 
 	log.WithFields(log.Fields{
 		"host-id": h.id,

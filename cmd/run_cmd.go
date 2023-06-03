@@ -24,6 +24,12 @@ var RunCmd = &cli.Command{
 			DefaultText: "9010",
 		},
 		&cli.StringFlag{
+			Name:        "metrics-ip",
+			Usage:       "IP where the hoarder will post prometheus and pprof metrics",
+			EnvVars:     []string{"IPFS_CID_HOARDER_METRICS_IP"},
+			DefaultText: "127.0.0.1",
+		},
+		&cli.StringFlag{
 			Name:        "metrics-port",
 			Usage:       "port number where the hoarder will post prometheus and pprof metrics",
 			EnvVars:     []string{"IPFS_CID_HOARDER_METRICS_PORT"},
@@ -119,6 +125,7 @@ func RunHoarder(ctx *cli.Context) error {
 	log.WithFields(log.Fields{
 		"log-level":        conf.LogLevel,
 		"port":             conf.Port,
+		"metrics-ip":       conf.MetricsIP,
 		"metrics-port":     conf.MetricsPort,
 		"database":         conf.Database,
 		"cid-size":         conf.CidContentSize,
