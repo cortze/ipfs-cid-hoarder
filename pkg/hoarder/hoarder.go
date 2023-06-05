@@ -67,11 +67,20 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		return nil, errors.Wrap(err, "error parsing ReqInterval "+conf.ReqInterval)
 	}
 
+	pubInterval, err := time.ParseDuration(conf.PubInterval)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing PubInterval "+conf.PubInterval)
+	}
+
+	taskTimeout, err := time.ParseDuration(conf.TaskTimeout)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing TaskTimeout "+conf.TaskTimeout)
+	}
+
 	cidPingTime, err := time.ParseDuration(conf.CidPingTime)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing StudyDuration "+conf.CidPingTime)
 	}
-	log.Info("configured Hoarder to request at an interval of ", reqInterval, " and during ", cidPingTime)
 
 	// ----- Generate the CidPinger -----
 	pingerHostOpts := hostOpts
@@ -81,7 +90,9 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		pingerHostOpts,
 		dbInstance,
 		reqInterval,
+		taskTimeout,
 		conf.Workers,
+		conf.Hosts,
 		cidSet)
 	if err != nil {
 		return nil, err
@@ -109,6 +120,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		conf.K,
 		pubWorkers,
 		reqInterval,
+		pubInterval,
 		cidPingTime,
 	)
 	if err != nil {

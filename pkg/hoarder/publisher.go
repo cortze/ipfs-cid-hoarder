@@ -16,10 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	maxPublicationTime = 2 * time.Minute
-)
-
 type CidPublisher struct {
 	ctx   context.Context
 	appWG *sync.WaitGroup
@@ -34,6 +30,7 @@ type CidPublisher struct {
 	K           int
 	Workers     int
 	ReqInterval time.Duration
+	PubInterval time.Duration
 	CidPingTime time.Duration
 
 	// main set of Cids that will keep track of them over the run
@@ -50,8 +47,7 @@ func NewCidPublisher(
 	generator *CidGenerator,
 	cidSet *cidSet,
 	k, workers int,
-	reqInterval,
-	cidPingTime time.Duration,
+	reqInterval, pubInterval, cidPingTime time.Duration,
 ) (*CidPublisher, error) {
 
 	log.WithField("mod", "publisher").Info("initializing...")
@@ -73,6 +69,7 @@ func NewCidPublisher(
 		cidGenerator:   generator,
 		K:              k,
 		ReqInterval:    reqInterval,
+		PubInterval:    pubInterval,
 		CidPingTime:    cidPingTime,
 		Workers:        workers,
 		cidSet:         cidSet,
@@ -257,6 +254,7 @@ func (publisher *CidPublisher) publishingProcess(
 	plog.Debugf("publisher ready")
 
 	generationDone := false
+	cidPubTicker := time.NewTicker(publisher.PubInterval)
 	minIterTicker := time.NewTicker(minIterTime)
 
 	for {
@@ -266,11 +264,15 @@ func (publisher *CidPublisher) publishingProcess(
 			return
 		}
 		select {
-		case nextCid := <-cidChannel: //this channel receives the CID from the CID generator go routine
+		//this channel receives the CID from the CID generator go routine
+		case <-cidPubTicker.C:
+			cidPubTicker.Reset(publisher.PubInterval)
+
+			nextCid := <-cidChannel
 			cidStr := nextCid.Hash().B58String()
 			plog.Debugf("new cid to publish %s", cidStr)
 
-			pCtx, cancel := context.WithTimeout(publisher.ctx, maxPublicationTime)
+			pCtx, cancel := context.WithTimeout(publisher.ctx, publisher.PubInterval-1*time.Second)
 
 			// generate the new CidInfo cause a new CID was just received
 			cidInfo := models.NewCidInfo(

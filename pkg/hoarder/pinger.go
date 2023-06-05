@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	pingTimeout   = 80 * time.Second
 	minIterTime   = 500 * time.Millisecond
 	dialGraceTime = 5 * time.Second
 )
@@ -33,6 +32,7 @@ type CidPinger struct {
 	hostPool     *p2p.HostPool
 	dbCli        *db.DBClient
 	pingInterval time.Duration
+	taskTimeout  time.Duration
 	workers      int
 
 	cidS          *cidSet
@@ -51,8 +51,8 @@ func NewCidPinger(
 	appWG *sync.WaitGroup,
 	hostOpts p2p.DHTHostOptions,
 	dbCli *db.DBClient,
-	pingInterval time.Duration,
-	workers int,
+	pingInterval, taskTimeout time.Duration,
+	workers, hosts int,
 	cidSet *cidSet) (*CidPinger, error) {
 
 	log.WithField("mod", "pinger").Info("initializing...")
@@ -60,7 +60,7 @@ func NewCidPinger(
 	// https://github.com/libp2p/go-libp2p-kad-dht/issues/805
 	hostPool, err := p2p.NewHostPool( // hosts are already bootstrapped
 		ctx,
-		(workers/20)+1, // update the host/worker relation
+		hosts,
 		hostOpts,
 	)
 	if err != nil {
@@ -77,6 +77,7 @@ func NewCidPinger(
 		hostPool:         hostPool,
 		dbCli:            dbCli,
 		pingInterval:     pingInterval,
+		taskTimeout:      taskTimeout,
 		pingTaskC:        make(chan pingTask, workers),
 		workers:          workers,
 		cidS:             cidSet,
@@ -241,7 +242,7 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 			// Add Cid to the host
 			pingT.host.AddCidPing(pingT.CidInfo)
 
-			pingCtx, cancel := context.WithTimeout(pinger.ctx, pingTimeout)
+			pingCtx, cancel := context.WithTimeout(pinger.ctx, pinger.taskTimeout)
 			defer cancel()
 			// DHT FindProviders call to see if the content is actually retrievable from the network
 			wg.Add(1)

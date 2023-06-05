@@ -25,7 +25,10 @@ var DefaultConfig = Config{
 	CidContentSize:   1024, // 1MB in KBs
 	CidNumber:        10,
 	Workers:          250,
+	Hosts:            10,
 	SinglePublisher:  true,
+	PubInterval:      "80s",
+	TaskTimeout:      "80s",
 	ReqInterval:      "30m",
 	CidPingTime:      "48h",
 	K:                20,
@@ -43,7 +46,10 @@ type Config struct {
 	CidContentSize   int    `json:"cid-content-size"`
 	CidNumber        int    `json:"cid-number"`
 	Workers          int    `json:"workers"`
+	Hosts            int    `json:"hosts"`
 	SinglePublisher  bool   `json:"single-publisher"`
+	PubInterval      string `json:"pub-interval"`
+	TaskTimeout      string `json:"task-timeout"`
 	ReqInterval      string `json:"req-interval"`
 	CidPingTime      string `json:"cid-ping-time"`
 	K                int    `json:"k"`
@@ -95,8 +101,20 @@ func (c *Config) Apply(ctx *cli.Context) {
 			c.Workers = ctx.Int("workers")
 		}
 
+		if ctx.IsSet("hosts") {
+			c.Hosts = ctx.Int("hosts")
+		}
+
 		if ctx.IsSet("single-publisher") {
 			c.SinglePublisher = ctx.Bool("single-publisher")
+		}
+
+		if ctx.IsSet("pub-interval") {
+			c.PubInterval = ctx.String("pub-interval")
+		}
+
+		if ctx.IsSet("task-timeout") {
+			c.TaskTimeout = ctx.String("task-timeout")
 		}
 
 		if ctx.IsSet("req-interval") {
