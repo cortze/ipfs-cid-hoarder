@@ -19,7 +19,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
@@ -58,6 +60,7 @@ type DHTHostOptions struct {
 	K                int
 	BlacklistingUA   string
 	BlacklistedPeers map[peer.ID]struct{}
+	Peerstore        peerstore.Peerstore
 }
 
 // DHT Host is the main operational instance to communicate with the IPFS DHT
@@ -88,6 +91,17 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 		return nil, err
 	}
 
+	// reuse the peerstore if it was given
+	var ps peerstore.Peerstore
+	if opts.Peerstore != nil {
+		ps = opts.Peerstore
+	} else {
+		ps, err = pstoremem.NewPeerstore()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// kad dht options
 	var dht *kaddht.IpfsDHT
 	msgSender := NewCustomMessageSender(opts.BlacklistingUA, opts.WithNotifier)
@@ -104,6 +118,7 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(DefaultUserAgent),
 		libp2p.ResourceManager(rm),
+		libp2p.Peerstore(ps),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dhtOpts := make([]kaddht.Option, 0)

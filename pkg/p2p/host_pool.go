@@ -9,6 +9,7 @@ import (
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -36,6 +37,12 @@ func NewHostPool(ctx context.Context, poolSize int, hOpts DHTHostOptions) (*Host
 	plog := log.WithField("mod", "host-pool")
 	plog.Infof("initializing %d hosts", poolSize)
 
+	sharedPeerstore, err := pstoremem.NewPeerstore()
+	if err != nil {
+		return nil, err
+	}
+	hOpts.Peerstore = sharedPeerstore
+
 	hostPool := &HostPool{
 		sync.RWMutex{},
 		ctx,
@@ -50,7 +57,7 @@ func NewHostPool(ctx context.Context, poolSize int, hOpts DHTHostOptions) (*Host
 			return hostPool.OneMoreHost(hOpts)
 		})
 	}
-	err := errG.Wait()
+	err = errG.Wait()
 	if err != nil {
 		return nil, err
 	}
