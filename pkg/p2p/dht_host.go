@@ -357,6 +357,12 @@ func (h *DHTHost) PingPRHolderOnCid(
 			}
 		}
 	}
+	// close the connection to the remote peer (return resources to the machine,
+	// as the peer might be connected again from another host)
+	err := h.host.Network().ClosePeer(remotePeer.ID)
+	if err != nil {
+		hlog.Errorf("unable to close connection to peer %s - %s", remotePeer.ID.String(), err.Error())
+	}
 	return models.NewPRPingResults(
 		cid.CID,
 		remotePeer.ID,
