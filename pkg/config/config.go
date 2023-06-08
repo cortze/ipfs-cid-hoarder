@@ -24,9 +24,9 @@ var DefaultConfig = Config{
 	Database:         "postgres://user:password@ip:port/db",
 	CidContentSize:   1024, // 1MB in KBs
 	CidNumber:        10,
-	Workers:          250,
+	Publishers:       1,
+	Pingers:          250,
 	Hosts:            10,
-	SinglePublisher:  true,
 	PubInterval:      "80s",
 	TaskTimeout:      "80s",
 	ReqInterval:      "30m",
@@ -45,9 +45,9 @@ type Config struct {
 	Database         string `json:"database-endpoint"`
 	CidContentSize   int    `json:"cid-content-size"`
 	CidNumber        int    `json:"cid-number"`
-	Workers          int    `json:"workers"`
+	Publishers       int    `json:"publishers"`
+	Pingers          int    `json:"pingers"`
 	Hosts            int    `json:"hosts"`
-	SinglePublisher  bool   `json:"single-publisher"`
 	PubInterval      string `json:"pub-interval"`
 	TaskTimeout      string `json:"task-timeout"`
 	ReqInterval      string `json:"req-interval"`
@@ -97,16 +97,16 @@ func (c *Config) Apply(ctx *cli.Context) {
 			c.CidNumber = ctx.Int("cid-number")
 		}
 
-		if ctx.IsSet("workers") {
-			c.Workers = ctx.Int("workers")
+		if ctx.IsSet("publishers") {
+			c.Publishers = ctx.Int("publishers")
+		}
+
+		if ctx.IsSet("pingers") {
+			c.Pingers = ctx.Int("pingers")
 		}
 
 		if ctx.IsSet("hosts") {
 			c.Hosts = ctx.Int("hosts")
-		}
-
-		if ctx.IsSet("single-publisher") {
-			c.SinglePublisher = ctx.Bool("single-publisher")
 		}
 
 		if ctx.IsSet("pub-interval") {
