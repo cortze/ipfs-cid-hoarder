@@ -186,6 +186,8 @@ func (pinger *CidPinger) runPingOrchester() {
 						cidInfo.StudyDuration,
 						pinger.cidS.Len())
 				}
+				// Add Cid to the host to have an effective WB
+				h.AddCidPing(cidInfo)
 				pinger.pingTaskC <- pingTask{h, cidInfo}
 
 			} else {
@@ -226,8 +228,10 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 		}
 		select {
 		case pingT := <-pinger.pingTaskC:
+
 			var wg sync.WaitGroup
 
+			
 			cidStr := pingT.CID.Hash().B58String()
 			pingCounter := pingT.GetPingCounter()
 			plog.Infof("pinging CID %s for round %d with host %d", cidStr, pingCounter, pingT.host.GetHostID())
@@ -239,8 +243,6 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 				pingCounter,
 				pingT.K,
 			)
-			// Add Cid to the host
-			pingT.host.AddCidPing(pingT.CidInfo)
 
 			pingCtx, cancel := context.WithTimeout(pinger.ctx, pinger.taskTimeout)
 			defer cancel()

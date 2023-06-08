@@ -3,7 +3,6 @@ package p2p
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sort"
 	"sync"
 
@@ -79,6 +78,9 @@ func (p *HostPool) OneMoreHost(hOpts DHTHostOptions) error {
 }
 
 func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
+	// Previus method that balances the pings based on XOR distance 
+	// Deprecated as it is not 100% tested 
+	/*
 	p.m.RLock()
 	xorDists := make([]*big.Int, len(p.hostArray))
 	for idx, dhtHost := range p.hostArray {
@@ -106,7 +108,12 @@ func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
 		// return at least the first node in the list (is among the hosts with fewer ongoing cids)
 		return p.hostArray[hid], ErrorRetrievingBestHost
 	}
-	return p.hostArray[hid], nil
+	*/
+	if p.Len() <= 0 {
+		return nil, errors.New("trying to get host from a pool with 0 hosts")
+	}
+	p.SortHost()
+	return p.hostArray[0], nil
 }
 
 func (p *HostPool) GetHostWorkload() map[int]int {

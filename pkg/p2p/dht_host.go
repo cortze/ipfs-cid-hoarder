@@ -244,6 +244,7 @@ func (h *DHTHost) GetOngoingCidPings() int {
 	return len(h.ongoingPings)
 }
 
+// Deprecater so far
 func (h *DHTHost) XORDistanceToOngoingCids(cidHash cid.Cid) (*big.Int, bool) {
 	cidK := key.BytesKey([]byte(cidHash.Hash()))
 	xorDist := big.NewInt(0)
