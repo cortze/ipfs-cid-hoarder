@@ -91,7 +91,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		dbInstance,
 		reqInterval,
 		taskTimeout,
-		conf.Workers,
+		conf.Pingers,
 		conf.Hosts,
 		cidSet)
 	if err != nil {
@@ -102,10 +102,6 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	// select the provide operation that we want to perform:
 	publisherHostOpts := hostOpts
 	publisherHostOpts.WithNotifier = true // the only time were want to have the notifier
-	pubWorkers := 1
-	if !conf.SinglePublisher {
-		pubWorkers = conf.Workers
-	}
 	cidPublisher, err := NewCidPublisher(
 		ctx,
 		&studyWG,
@@ -118,7 +114,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		),
 		cidSet,
 		conf.K,
-		pubWorkers,
+		conf.Publishers,
 		reqInterval,
 		pubInterval,
 		cidPingTime,
