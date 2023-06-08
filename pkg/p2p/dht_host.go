@@ -105,7 +105,7 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(DefaultUserAgent),
 		libp2p.ResourceManager(rm),
-		libp2p.Transport(tcp.TcpTransport{}),
+		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dhtOpts := make([]kaddht.Option, 0)

@@ -78,36 +78,36 @@ func (p *HostPool) OneMoreHost(hOpts DHTHostOptions) error {
 }
 
 func (p *HostPool) GetBestHost(newCid *models.CidInfo) (*DHTHost, error) {
-	// Previus method that balances the pings based on XOR distance 
-	// Deprecated as it is not 100% tested 
+	// Previus method that balances the pings based on XOR distance
+	// Deprecated as it is not 100% tested
 	/*
-	p.m.RLock()
-	xorDists := make([]*big.Int, len(p.hostArray))
-	for idx, dhtHost := range p.hostArray {
-		xorDist, idle := dhtHost.XORDistanceToOngoingCids(newCid.CID)
-		if idle { // if any host is idle, return it directly
-			return dhtHost, nil
+		p.m.RLock()
+		xorDists := make([]*big.Int, len(p.hostArray))
+		for idx, dhtHost := range p.hostArray {
+			xorDist, idle := dhtHost.XORDistanceToOngoingCids(newCid.CID)
+			if idle { // if any host is idle, return it directly
+				return dhtHost, nil
+			}
+			xorDists[idx] = xorDist
 		}
-		xorDists[idx] = xorDist
-	}
-	p.m.RUnlock()
+		p.m.RUnlock()
 
-	// get max dist out of the closes ongoing one
-	var hid int
-	maxDist := big.NewInt(0)
-	for idx, xorDist := range xorDists {
-		i := maxDist.Cmp(xorDist)
-		if i == int(big.Below) {
-			maxDist = xorDist
-			hid = idx
+		// get max dist out of the closes ongoing one
+		var hid int
+		maxDist := big.NewInt(0)
+		for idx, xorDist := range xorDists {
+			i := maxDist.Cmp(xorDist)
+			if i == int(big.Below) {
+				maxDist = xorDist
+				hid = idx
+			}
 		}
-	}
-	p.m.RLock()
-	defer p.m.RUnlock()
-	if hid == 0 && maxDist == big.NewInt(0) {
-		// return at least the first node in the list (is among the hosts with fewer ongoing cids)
-		return p.hostArray[hid], ErrorRetrievingBestHost
-	}
+		p.m.RLock()
+		defer p.m.RUnlock()
+		if hid == 0 && maxDist == big.NewInt(0) {
+			// return at least the first node in the list (is among the hosts with fewer ongoing cids)
+			return p.hostArray[hid], ErrorRetrievingBestHost
+		}
 	*/
 	if p.Len() <= 0 {
 		return nil, errors.New("trying to get host from a pool with 0 hosts")
