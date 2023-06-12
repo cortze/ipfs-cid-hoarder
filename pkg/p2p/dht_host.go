@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
@@ -84,10 +85,17 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
 	}
-	mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", opts.IP, opts.Port))
+	// transport protocols
+	mAddrs := make([]ma.Multiaddr, 0, 2)
+	tcpAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", opts.IP, opts.Port))
 	if err != nil {
 		return nil, err
 	}
+	quicAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/udp/%s/quic", opts.IP, opts.Port))
+	if err != nil {
+		return nil, err
+	}
+	mAddrs = append(mAddrs, tcpAddr, quicAddr)
 
 	// kad dht options
 	var dht *kaddht.IpfsDHT
@@ -101,11 +109,13 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 	// generate the libp2p host
 	h, err := libp2p.New(
 		libp2p.WithDialTimeout(DialTimeout),
-		libp2p.ListenAddrs(mAddr),
+		libp2p.ListenAddrs(mAddrs...),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(DefaultUserAgent),
 		libp2p.ResourceManager(rm),
 		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.Transport(quic.NewTransport),
+		libp2p.DialRanker(CustomDialRanker),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dhtOpts := make([]kaddht.Option, 0)
