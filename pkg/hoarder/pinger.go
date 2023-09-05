@@ -231,7 +231,6 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 
 			var wg sync.WaitGroup
 
-			
 			cidStr := pingT.CID.Hash().B58String()
 			pingCounter := pingT.GetPingCounter()
 			plog.Infof("pinging CID %s for round %d with host %d", cidStr, pingCounter, pingT.host.GetHostID())
@@ -270,50 +269,51 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 						}
 					}
 				}
+
 				cidFetchRes.IsRetrievable = isRetrievable
 				cidFetchRes.PRWithMAddr = prWithMAddrs
 				plog.Debug("finished finding providers")
 			}()
-
-			// recalculate the closest k peers to the content.
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				plog.Debug("getting closest peers")
-				queryDuration, closestPeers, lookupMetrics, err := pingT.host.GetClosestPeersToCid(pingCtx, pingT.CidInfo)
-				if err != nil {
-					plog.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
-				}
-				// just because we got an error, doesn't necesarelly mean that there are no lookup results
-				if lookupMetrics == nil {
-					cidFetchRes.TotalHops = -1
-					cidFetchRes.HopsTreeDepth = -1
-					cidFetchRes.MinHopsToClosest = -1
-				} else {
-					cidFetchRes.TotalHops = lookupMetrics.GetTotalHops()
-					cidFetchRes.HopsTreeDepth = lookupMetrics.GetTreeDepth()
-					cidFetchRes.MinHopsToClosest = lookupMetrics.GetMinHopsForPeerSet(lookupMetrics.GetClosestPeers())
-				}
-				cidFetchRes.GetClosePeersDuration = queryDuration
-				for _, peer := range closestPeers {
-					cidFetchRes.AddClosestPeer(peer)
-				}
-				plog.Debug("finished getting closest peers")
-			}()
-
-			// Ping in parallel each of the PRHolders
-			for _, remotePeer := range pingT.CidInfo.PRHolders {
+			/*
+				// recalculate the closest k peers to the content.
 				wg.Add(1)
-				go func(remotePeer models.PeerInfo) {
+				go func() {
 					defer wg.Done()
-					pingRes := pingT.host.PingPRHolderOnCid(
-						pingCtx,
-						remotePeer.GetAddrInfo(),
-						pingT.CidInfo)
-					pingRes.Round = pingCounter
-					cidFetchRes.AddPRPingResults(pingRes)
-				}(*remotePeer)
-			}
+					plog.Debug("getting closest peers")
+					queryDuration, closestPeers, lookupMetrics, err := pingT.host.GetClosestPeersToCid(pingCtx, pingT.CidInfo)
+					if err != nil {
+						plog.Warnf("unable to get the closest peers to cid %s - %s", cidStr, err.Error())
+					}
+					// just because we got an error, doesn't necesarelly mean that there are no lookup results
+					if lookupMetrics == nil {
+						cidFetchRes.TotalHops = -1
+						cidFetchRes.HopsTreeDepth = -1
+						cidFetchRes.MinHopsToClosest = -1
+					} else {
+						cidFetchRes.TotalHops = lookupMetrics.GetTotalHops()
+						cidFetchRes.HopsTreeDepth = lookupMetrics.GetTreeDepth()
+						cidFetchRes.MinHopsToClosest = lookupMetrics.GetMinHopsForPeerSet(lookupMetrics.GetClosestPeers())
+					}
+					cidFetchRes.GetClosePeersDuration = queryDuration
+					for _, peer := range closestPeers {
+						cidFetchRes.AddClosestPeer(peer)
+					}
+					plog.Debug("finished getting closest peers")
+				}()
+
+				// Ping in parallel each of the PRHolders
+				for _, remotePeer := range pingT.CidInfo.PRHolders {
+					wg.Add(1)
+					go func(remotePeer models.PeerInfo) {
+						defer wg.Done()
+						pingRes := pingT.host.PingPRHolderOnCid(
+							pingCtx,
+							remotePeer.GetAddrInfo(),
+							pingT.CidInfo)
+						pingRes.Round = pingCounter
+						cidFetchRes.AddPRPingResults(pingRes)
+					}(*remotePeer)
+				}*/
 			plog.Debug("waiting tasks to finish")
 			wg.Wait()
 			plog.Debug("ping tasks just finished")
