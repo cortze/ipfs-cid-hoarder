@@ -254,7 +254,7 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 				var prWithMAddrs bool = false
 
 				plog.Debug("finding providers...")
-				queryDuration, providers, err := pingT.host.FindProvidersOfCID(pingCtx, pingT.CidInfo)
+				queryDuration, providers, err := pingT.host.FindXXProvidersOfCID(pingCtx, pingT.CidInfo, 1)
 				cidFetchRes.FindProvDuration = queryDuration
 				if err != nil {
 					plog.Warnf("unable to lookup for provider of cid %s - %s",
