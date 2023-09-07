@@ -10,7 +10,8 @@ import (
 	"github.com/cortze/ipfs-cid-hoarder/pkg/p2p"
 	"go.uber.org/atomic"
 
-	"github.com/ipfs/go-cid"
+	cid "github.com/ipfs/go-cid"
+
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -312,8 +313,8 @@ func (publisher *CidPublisher) publishingProcess(
 				plog.Trace("finished publishing cid")
 			case <-pCtx.Done():
 				plog.Warnf("timeout publishing CID reached")
-				// give 500 ms extra to see if we receive any not from the msg-notifier
-				time.Sleep(500 * time.Millisecond)
+				// give 100 ms extra to see if we receive any not from the msg-notifier
+				time.Sleep(100 * time.Millisecond)
 			}
 			cancel()
 

@@ -99,7 +99,7 @@ func (c *CidInfo) AddPRFetchResults(results *CidFetchResults) {
 	if c.NextPing.IsZero() {
 		// Update the next ping time to PublicationTime + req interval
 		// take also into account the publication time
-		offset := c.ProvideTime / 2
+		offset := 0 * time.Nanosecond // c.ProvideTime / 2
 		c.NextPing = c.PublishTime.Add(offset).Add(c.ReqInterval)
 	}
 }
