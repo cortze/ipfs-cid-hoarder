@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
@@ -84,10 +85,17 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to generate priv key for client's host")
 	}
-	mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", opts.IP, opts.Port))
+	// transport protocols
+	mAddrs := make([]ma.Multiaddr, 0, 2)
+	tcpAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", opts.IP, opts.Port))
 	if err != nil {
 		return nil, err
 	}
+	quicAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/udp/%s/quic", opts.IP, opts.Port))
+	if err != nil {
+		return nil, err
+	}
+	mAddrs = append(mAddrs, tcpAddr, quicAddr)
 
 	// kad dht options
 	var dht *kaddht.IpfsDHT
@@ -101,11 +109,13 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 	// generate the libp2p host
 	h, err := libp2p.New(
 		libp2p.WithDialTimeout(DialTimeout),
-		libp2p.ListenAddrs(mAddr),
+		libp2p.ListenAddrs(mAddrs...),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(DefaultUserAgent),
 		libp2p.ResourceManager(rm),
 		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.Transport(quic.NewTransport),
+		libp2p.DialRanker(CustomDialRanker),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			dhtOpts := make([]kaddht.Option, 0)
@@ -201,7 +211,7 @@ func (h *DHTHost) isPeerConnected(pId peer.ID) bool {
 	// check if we already have a connection open to the peer
 	peerList := h.host.Network().Peers()
 	for _, p := range peerList {
-		if p.String() == pId.String() {
+		if p == pId {
 			return true
 		}
 	}
@@ -305,46 +315,47 @@ func (h *DHTHost) PingPRHolderOnCid(
 				}
 			}
 		}
-	}
-	// check if the peer is among the already connected ones
-	if h.isPeerConnected(remotePeer.ID) {
-		hlog.Debug("peer already connected")
-		succesfulConnection()
-	} else {
-		// loop over max tries if the connection is connection refused/ connection reset by peer
-	connetionRetry:
-		for att := 0; att < MaxDialAttempts; att++ {
-			// attempt to connect the peer
-			err := h.host.Connect(ctx, remotePeer)
-			connError = ParseConError(err)
-			switch connError {
-			case NoConnError: // no error at all
-				hlog.Debugf("succesful connection")
-				succesfulConnection()
-				break connetionRetry
-
-			case DialErrorConnectionRefused, DialErrorStreamReset:
-				// the error is due to a connection rejected, try again
-				hlog.Debugf("error on connection attempt %s, retrying", err.Error())
-				if (att + 1) < MaxDialAttempts {
-					ticker := time.NewTicker(PingGraceTime)
-					select {
-					case <-ticker.C:
-						continue
-					case <-h.ctx.Done():
-						break connetionRetry
-					}
-				} else {
-					hlog.Debugf("error on %d retry %s", att+1, connError)
-					break connetionRetry
-				}
-
-			default:
-				hlog.Debugf("unable to connect - error %s", err.Error())
-				break connetionRetry
-			}
+		// close the connection to the peer
+		err = h.host.Network().ClosePeer(remotePeer.ID)
+		if err != nil {
+			hlog.Errorf("unable to close connection to peer %s - %s", remotePeer.ID.String(), err.Error())
 		}
 	}
+	// check if the peer is among the already connected ones
+	// loop over max tries if the connection is connection refused/ connection reset by peer
+connetionRetry:
+	for att := 0; att < MaxDialAttempts; att++ {
+		// attempt to connect the peer
+		err := h.host.Connect(ctx, remotePeer)
+		connError = ParseConError(err)
+		switch connError {
+		case NoConnError: // no error at all
+			hlog.Debugf("succesful connection")
+			succesfulConnection()
+			break connetionRetry
+
+		case DialErrorConnectionRefused, DialErrorStreamReset:
+			// the error is due to a connection rejected, try again
+			hlog.Debugf("error on connection attempt %s, retrying", err.Error())
+			if (att + 1) < MaxDialAttempts {
+				ticker := time.NewTicker(PingGraceTime)
+				select {
+				case <-ticker.C:
+					continue
+				case <-h.ctx.Done():
+					break connetionRetry
+				}
+			} else {
+				hlog.Debugf("error on %d retry %s", att+1, connError)
+				break connetionRetry
+			}
+
+		default:
+			hlog.Debugf("unable to connect - error %s", err.Error())
+			break connetionRetry
+		}
+	}
+
 	return models.NewPRPingResults(
 		cid.CID,
 		remotePeer.ID,
