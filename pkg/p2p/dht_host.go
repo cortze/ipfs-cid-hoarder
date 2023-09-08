@@ -9,23 +9,24 @@ import (
 	"time"
 
 	"github.com/cortze/ipfs-cid-hoarder/pkg/models"
-	"github.com/ipfs/go-cid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/libp2p/go-libp2p"
+	cid "github.com/ipfs/go-cid"
+	ma "github.com/multiformats/go-multiaddr"
+
 	"github.com/libp2p/go-libp2p-xor/key"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+
+	libp2p "github.com/libp2p/go-libp2p"
+	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
-
-	kaddht "github.com/libp2p/go-libp2p-kad-dht"
-	ma "github.com/multiformats/go-multiaddr"
 )
 
 type ProvideOption string
@@ -385,6 +386,20 @@ func (h *DHTHost) ProvideCid(ctx context.Context, cid *models.CidInfo) (time.Dur
 	startT := time.Now()
 	lookupMetrics, err := h.dht.DetailedProvide(ctx, cid.CID, true)
 	return time.Since(startT), lookupMetrics, err
+}
+
+func (h *DHTHost) FindXXProvidersOfCID(
+	ctx context.Context,
+	cid *models.CidInfo,
+	targetProviders int) (time.Duration, []peer.AddrInfo, error) {
+
+	log.WithFields(log.Fields{
+		"host-id": h.id,
+		"cid":     cid.CID.Hash().B58String(),
+	}).Debug("looking for providers")
+	startT := time.Now()
+	providers, err := h.dht.LookupForXXProviders(ctx, cid.CID, targetProviders)
+	return time.Since(startT), providers, err
 }
 
 func (h *DHTHost) FindProvidersOfCID(
