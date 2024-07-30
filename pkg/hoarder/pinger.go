@@ -38,6 +38,7 @@ type CidPinger struct {
 	cidS          *cidSet
 	pingTaskC     chan pingTask
 	closePingerCs []chan struct{}
+	FinishedC     chan struct{}
 }
 
 type pingTask struct {
@@ -82,6 +83,7 @@ func NewCidPinger(
 		workers:          workers,
 		cidS:             cidSet,
 		closePingerCs:    make([]chan struct{}, 0, workers),
+		FinishedC:        make(chan struct{}),
 	}, nil
 }
 
@@ -116,6 +118,8 @@ func (pinger *CidPinger) Run() {
 	close(pinger.pingTaskC)
 	pinger.hostPool.Close()
 	plog.Info("successfully closed")
+
+	pinger.FinishedC <- struct{}{}
 }
 
 // runPingOrchester orchestrates all the pings based on the next ping time of the cids
@@ -231,7 +235,6 @@ func (pinger *CidPinger) runPinger(pingerID int, closeC chan struct{}) {
 
 			var wg sync.WaitGroup
 
-			
 			cidStr := pingT.CID.Hash().B58String()
 			pingCounter := pingT.GetPingCounter()
 			plog.Infof("pinging CID %s for round %d with host %d", cidStr, pingCounter, pingT.host.GetHostID())

@@ -77,6 +77,9 @@ func (p *PrometheusMetrics) initPrometheusMetrics() error {
 }
 
 func (p *PrometheusMetrics) launchMetricsUpdater() {
+	defer func() {
+		log.Info("closed prometheus metric exporter")
+	}()
 	ticker := time.NewTicker(p.RefreshInterval)
 	for {
 		select {

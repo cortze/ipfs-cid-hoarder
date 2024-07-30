@@ -29,6 +29,7 @@ type CidPublisher struct {
 	MsgNot      *p2p.MsgNotifier
 	K           int
 	Workers     int
+	taskTimeout time.Duration
 	ReqInterval time.Duration
 	PubInterval time.Duration
 	CidPingTime time.Duration
@@ -37,6 +38,8 @@ type CidPublisher struct {
 	cidSet         *cidSet
 	metrics        *publisherMetrics
 	generationDone *atomic.Bool
+
+	FinishedC chan struct{}
 }
 
 func NewCidPublisher(
@@ -47,7 +50,7 @@ func NewCidPublisher(
 	generator *CidGenerator,
 	cidSet *cidSet,
 	k, workers int,
-	reqInterval, pubInterval, cidPingTime time.Duration,
+	taskTimeout, reqInterval, pubInterval, cidPingTime time.Duration,
 ) (*CidPublisher, error) {
 
 	log.WithField("mod", "publisher").Info("initializing...")
@@ -68,6 +71,7 @@ func NewCidPublisher(
 		MsgNot:         h.GetMsgNotifier(),
 		cidGenerator:   generator,
 		K:              k,
+		taskTimeout:    taskTimeout,
 		ReqInterval:    reqInterval,
 		PubInterval:    pubInterval,
 		CidPingTime:    cidPingTime,
@@ -75,6 +79,7 @@ func NewCidPublisher(
 		cidSet:         cidSet,
 		metrics:        newPublisherMetrics(string(hostOpts.ProvOp)),
 		generationDone: atomic.NewBool(false),
+		FinishedC:      make(chan struct{}),
 	}, nil
 }
 
@@ -132,6 +137,8 @@ func (publisher *CidPublisher) Run() {
 
 	publisher.host.Close()
 	plog.Info("publisher successfully closed")
+
+	publisher.FinishedC <- struct{}{}
 	close(publicationDoneC)
 }
 
@@ -272,7 +279,7 @@ func (publisher *CidPublisher) publishingProcess(
 			cidStr := nextCid.Hash().B58String()
 			plog.Debugf("new cid to publish %s", cidStr)
 
-			pCtx, cancel := context.WithTimeout(publisher.ctx, publisher.PubInterval-1*time.Second)
+			pCtx, cancel := context.WithTimeout(publisher.ctx, publisher.taskTimeout)
 
 			// generate the new CidInfo cause a new CID was just received
 			cidInfo := models.NewCidInfo(

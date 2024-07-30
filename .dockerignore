@@ -1,5 +1,7 @@
-./analyzer/
-./docs/
+analyzer/
+hoarder-data/
+prometheus/
+docs/
 CITATION.cff
 README.md
 
