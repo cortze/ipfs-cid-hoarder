@@ -13,7 +13,7 @@ import (
 
 // MessageSender handles sending wire protocol messages to a given peer
 type MessageSender struct {
-	m             pb.MessageSender
+	m             pb.MessageSenderWithDisconnect
 	blacklistedUA string
 	msgNot        *MsgNotifier
 }
@@ -28,7 +28,7 @@ func NewCustomMessageSender(blacklistedUA string, withMsgNot bool) *MessageSende
 	}
 	return msgSender
 }
-func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSender {
+func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSenderWithDisconnect {
 	msgSender := net.NewMessageSenderImpl(h, protocols, ms.blacklistedUA)
 	ms.m = msgSender
 	return ms
@@ -36,6 +36,10 @@ func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSe
 
 func (ms *MessageSender) GetMsgNotifier() *MsgNotifier {
 	return ms.msgNot
+}
+
+func (ms *MessageSender) OnDisconnect(ctx context.Context, p peer.ID) {
+	ms.m.OnDisconnect(ctx, p)
 }
 
 func (ms *MessageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {

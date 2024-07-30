@@ -115,6 +115,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 		cidSet,
 		conf.K,
 		conf.Publishers,
+		taskTimeout,
 		reqInterval,
 		pubInterval,
 		cidPingTime,
@@ -142,9 +143,7 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 }
 
 func (c *CidHoarder) Run() error {
-	c.wg.Add(1)
 	go c.cidPublisher.Run()
-	c.wg.Add(1)
 	go c.cidPinger.Run()
 
 	// gather all the service metrics into the prometheus service
@@ -154,7 +153,8 @@ func (c *CidHoarder) Run() error {
 
 	hlog := log.WithField("mod", "hoarder")
 	go func() {
-		c.wg.Wait()
+		<-c.cidPublisher.FinishedC
+		<-c.cidPinger.FinishedC
 		hlog.Info("publisher and pinger successfully closed")
 		c.dbCli.Close()
 		c.prometheus.Close()

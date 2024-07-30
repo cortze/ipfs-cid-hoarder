@@ -398,7 +398,7 @@ func (h *DHTHost) FindXXProvidersOfCID(
 		"cid":     cid.CID.Hash().B58String(),
 	}).Debug("looking for providers")
 	startT := time.Now()
-	providers, err := h.dht.LookupForXXProviders(ctx, cid.CID, targetProviders)
+	providers, _, err := h.dht.LookupForXXProviders(ctx, cid.CID, targetProviders)
 	return time.Since(startT), providers, err
 }
 
