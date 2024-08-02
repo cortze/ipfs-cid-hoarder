@@ -24,6 +24,12 @@ var RunCmd = &cli.Command{
 			DefaultText: "9010",
 		},
 		&cli.StringFlag{
+			Name:        "network",
+			Usage:       "select where in which network will the CID-hoarder operate ('IPFS_AMINO', 'CELESTIA_MOCHA_4')",
+			EnvVars:     []string{"IPFS_CID_HOARDER_NETWORK"},
+			DefaultText: "IFPS_AMINO",
+		},
+		&cli.StringFlag{
 			Name:        "metrics-ip",
 			Usage:       "IP where the hoarder will post prometheus and pprof metrics",
 			EnvVars:     []string{"IPFS_CID_HOARDER_METRICS_IP"},
@@ -142,6 +148,7 @@ func RunHoarder(ctx *cli.Context) error {
 	// Initialize the CidHoarder
 	log.WithFields(log.Fields{
 		"log-level":      conf.LogLevel,
+		"network":        conf.Network,
 		"port":           conf.Port,
 		"metrics-ip":     conf.MetricsIP,
 		"metrics-port":   conf.MetricsPort,

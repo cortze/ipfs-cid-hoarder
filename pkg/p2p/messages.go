@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	net "github.com/libp2p/go-libp2p-kad-dht/net"
@@ -28,9 +29,11 @@ func NewCustomMessageSender(blacklistedUA string, withMsgNot bool) *MessageSende
 	}
 	return msgSender
 }
+
 func (ms *MessageSender) Init(h host.Host, protocols []protocol.ID) pb.MessageSenderWithDisconnect {
 	msgSender := net.NewMessageSenderImpl(h, protocols, ms.blacklistedUA)
 	ms.m = msgSender
+	fmt.Println(protocols)
 	return ms
 }
 

@@ -15,16 +15,18 @@ import (
 	cid "github.com/ipfs/go-cid"
 	ma "github.com/multiformats/go-multiaddr"
 
+	libp2p "github.com/libp2p/go-libp2p"
+	kaddht "github.com/libp2p/go-libp2p-kad-dht"
+	mplex "github.com/libp2p/go-libp2p-mplex"
 	"github.com/libp2p/go-libp2p-xor/key"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/routing"
-
-	libp2p "github.com/libp2p/go-libp2p"
-	kaddht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 )
@@ -49,13 +51,16 @@ var (
 	DefaultUserAgent string = "cid-hoarder"
 	PingGraceTime           = 5 * time.Second
 	MaxDialAttempts         = 1
-	DialTimeout             = 60 * time.Second
+	DialTimeout             = 10 * time.Second
 )
 
 type DHTHostOptions struct {
 	ID               int
 	IP               string
 	Port             string
+	Network          string
+	Protocol         protocol.ID
+	BootNodes        []peer.AddrInfo
 	ProvOp           ProvideOption
 	WithNotifier     bool
 	K                int
@@ -68,6 +73,7 @@ type DHTHost struct {
 	ctx context.Context
 	m   sync.RWMutex
 	// host related
+	opts                DHTHostOptions
 	id                  int
 	dht                 *kaddht.IpfsDHT
 	host                host.Host
@@ -99,7 +105,6 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 	mAddrs = append(mAddrs, tcpAddr, quicAddr)
 
 	// kad dht options
-	var dht *kaddht.IpfsDHT
 	msgSender := NewCustomMessageSender(opts.BlacklistingUA, opts.WithNotifier)
 	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
 	rm, err := rcmgr.NewResourceManager(limiter)
@@ -109,41 +114,46 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 
 	// generate the libp2p host
 	h, err := libp2p.New(
-		libp2p.WithDialTimeout(DialTimeout),
-		libp2p.ListenAddrs(mAddrs...),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(DefaultUserAgent),
+		libp2p.ListenAddrs(mAddrs...),
+		libp2p.WithDialTimeout(DialTimeout),
+		libp2p.Security(noise.ID, noise.New),
 		libp2p.ResourceManager(rm),
+		libp2p.DisableRelay(),
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(quic.NewTransport),
-		libp2p.DialRanker(CustomDialRanker),
-		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			var err error
-			dhtOpts := make([]kaddht.Option, 0)
-			dhtOpts = append(dhtOpts,
-				kaddht.Mode(kaddht.ModeClient),
-				kaddht.WithCustomMessageSender(msgSender.Init),
-				kaddht.BucketSize(opts.K),
-				kaddht.WithPeerBlacklist(opts.BlacklistedPeers)) // always blacklist (can be an empty map or a full one)
-			if opts.ProvOp == OpDHTProvide {
-				dhtOpts = append(dhtOpts, kaddht.EnableOptimisticProvide())
-			}
-			dht, err = kaddht.New(ctx, h, dhtOpts...)
-			return dht, err
-		}),
+		libp2p.Muxer(mplex.ID, mplex.DefaultTransport),
+		libp2p.Muxer(yamux.ID, yamux.DefaultTransport),
 	)
 	if err != nil {
 		return nil, err
 	}
-	if dht == nil {
-		return nil, errors.New("no IpfsDHT client was able to be created")
+
+	// DHT routing
+	dhtOpts := []kaddht.Option{
+		kaddht.Mode(kaddht.ModeClient),
+		kaddht.BootstrapPeers(opts.BootNodes...),
+		kaddht.V1ProtocolOverride(opts.Protocol),
+		kaddht.WithCustomMessageSender(msgSender.Init),
+		kaddht.BucketSize(opts.K),
+		kaddht.WithPeerBlacklist(opts.BlacklistedPeers), // always blacklist (can be an empty map or a full one)
+	}
+	// is there a custom protocol-prefix?
+	if opts.ProvOp == OpDHTProvide {
+		dhtOpts = append(dhtOpts, kaddht.EnableOptimisticProvide())
+	}
+	dhtCli, err := kaddht.New(ctx, h, dhtOpts...)
+	if err != nil {
+		return nil, err
 	}
 
 	dhtHost := &DHTHost{
 		ctx,
 		sync.RWMutex{},
+		opts,
 		opts.ID,
-		dht,
+		dhtCli,
 		h,
 		msgSender.GetMsgNotifier(),
 		time.Now(),
@@ -157,9 +167,11 @@ func NewDHTHost(ctx context.Context, opts DHTHostOptions) (*DHTHost, error) {
 
 	log.WithFields(log.Fields{
 		"host-id":    opts.ID,
+		"network":    opts.Network,
 		"multiaddrs": h.Addrs(),
 		"peer_id":    h.ID().String(),
-	}).Debug("generated new host")
+		"protocol":   opts.Protocol,
+	}).Info("generated new host")
 
 	return dhtHost, nil
 }
@@ -174,29 +186,51 @@ func (h *DHTHost) bootstrap() error {
 	var wg sync.WaitGroup
 
 	hlog := log.WithField("host-id", h.id)
-	for _, bnode := range kaddht.GetDefaultBootstrapPeerAddrInfos() {
+	for _, bnode := range h.opts.BootNodes {
 		wg.Add(1)
 		go func(bn peer.AddrInfo) {
 			defer wg.Done()
 			err := h.host.Connect(h.ctx, bn)
 			if err != nil {
-				hlog.Trace("unable to connect bootstrap node:", bn.String())
+				hlog.Warn("unable to connect bootstrap node:", bn.String(), err.Error())
 			} else {
-				hlog.Trace("successful connection to bootstrap node:", bn.String())
+				hlog.Info("successful connection to bootstrap node:", bn.String())
 				atomic.AddInt64(&succCon, 1)
 			}
-		}(*bnode)
+		}(bnode)
 	}
 
 	wg.Wait()
 
 	var err error
 	if succCon > 0 {
-		hlog.Debugf("got connected to %d bootstrap nodes", succCon)
+		hlog.Infof("got connected to %d bootstrap nodes", succCon)
 	} else {
-		err = errors.New("unable to connect any of the bootstrap nodes from KDHT")
+		return errors.New("unable to connect any of the bootstrap nodes from KDHT")
 	}
-	return err
+
+	// bootstrap the Routing table
+	err = h.dht.Bootstrap(h.ctx)
+	if err != nil {
+		return fmt.Errorf("unable to bootstrap nodes from KDHT. %s", err.Error())
+	}
+
+	// force waiting a little bit to let the bootstrap work
+	bootstrapTicker := time.NewTicker(5 * time.Second)
+	select {
+	case <-bootstrapTicker.C:
+	case <-h.ctx.Done():
+	}
+
+	routingSize := h.dht.RoutingTable().Size()
+	if routingSize == 0 {
+		return fmt.Errorf("no error, but empty routing table after bootstraping")
+
+	}
+	log.WithField(
+		"peers_in_routing", routingSize,
+	).Info("dht cli bootstrapped")
+	return nil
 }
 
 func (h *DHTHost) GetHostID() int {
