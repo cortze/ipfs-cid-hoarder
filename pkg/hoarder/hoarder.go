@@ -44,6 +44,9 @@ func NewCidHoarder(ctx context.Context, conf *config.Config) (*CidHoarder, error
 	hostOpts := p2p.DHTHostOptions{
 		IP:             "0.0.0.0",
 		Port:           conf.Port,
+		Network:        conf.Network,
+		Protocol:       conf.KadProtocol,
+		BootNodes:      conf.BootNodes,
 		ProvOp:         p2p.GetProvOpFromConf(conf.ProvideOperation),
 		WithNotifier:   false,
 		K:              conf.K,
