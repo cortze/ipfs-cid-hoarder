@@ -55,7 +55,7 @@ For the given number of CIDs and the number of workers, the tool will automatica
 
 For example, if we want to generate 1000 CIDs with a worker number of 200 CIDs, the tool will spawn 200 workers to publish the CIDs concurrently.
 
-_NOTE: The Provider Records WONΓÇÖT be republished after 12 hours. The goal of the study is to track the theoretical record lifetime for a range of CIDs across the hash space._ TODO Maybe change this to 22H as of late versions
+_NOTE: The Provider Records WON'T be republished after 22 hours. The goal of the study is to track the theoretical record lifetime for a range of CIDs across the hash space._ 
 
 
 ## Pinger
