@@ -16,7 +16,7 @@ As explained in the Kademlia DHT paper, the PRs get shared with other [K=20](htt
 
 The theory looks solid, the K=20 value was initially chosen to increase the resilience of the network to node churn. At the moment, the overall network seems to be working fine, although there are some concerns about the impact of Hydra nodes and the churn rate.
 
-The fact that k=20 peers keep the records, means that as soon as one of them is actively keeping the PR, the content should be retrievable. However, if after 4 hours of publishing the PRs, only one of the 20 peers keeps the records, one could conclude that the network is exposed to a very high node churn rate, and therefore, the K value wonΓÇÖt longer be the appropriate one for the node churn and network size at that specific moment.
+The fact that k=20 peers keep the records, means that as soon as one of them is actively keeping the PR, the content should be retrievable. However, if after 4 hours of publishing the PRs, only one of the 20 peers keeps the records, one could conclude that the network is exposed to a very high node churn rate, and therefore, the K value won’t longer be the appropriate one for the node churn and network size at that specific moment.
 
 There are some concerns about the impact of the Hydra-boosters in the network as they represent a more centralized infrastructure than the one targeted by the IPFS network. Hydra nodes are placed in the network to accelerate the content discovery, and therefore, the performance of IPFS. However, are they the ones keeping up IPFS Network alive?
 
