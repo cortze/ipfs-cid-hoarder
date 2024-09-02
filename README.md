@@ -62,7 +62,7 @@ _NOTE: The Provider Records WONΓÇÖT be republished after 12 hours. The goal o
 
 Once each CID has been generated and published to the network or read from a file, The tool proceeds to persist to the DB the recorded information and sends the CID information to the CID Ping-Orchester routine.
 
-The CID Ping-Orchester has a list of CIDs ordered by the next connection time. It uses this next connection time to determine whether the CID needs to be pinged again or not. If the CIDΓÇÖs next connections proves that the track frequency has passed since the last ping, it will add the CID info into a `Ping Queue` for the ping worker.
+The CID Ping-Orchester has a list of CIDs ordered by the next connection time. It uses this next connection time to determine whether the CID needs to be pinged again or not. If the CID’s next connection proves that the tracking frequency has passed since the last ping, it will add the CID info into a `Ping Queue` for the ping worker.
 
 Each of the CID Ping workers will try to establish a connection with the PR Holders of the CID reader from the `Ping Queue` tracking the dial time, whether they are active or not, the reported error if the connection attempt failed, and whether they still keep the PR or not. Further more, the tool also walks the DHT looking for the K closest peers at the moment of pinging the PR Holders, keeping track of the total hops needed to get the closest peers and the minimum hops to know all of them and trying to retrieve the PR from the DHT itself.
 
